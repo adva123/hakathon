@@ -14,14 +14,21 @@ export function useKeyboard() {
 
   useEffect(() => {
     const down = (e) => {
-      if (e.code in keys.current) keys.current[e.code] = true;
+      if (e.code in keys.current) {
+        e.preventDefault();
+        keys.current[e.code] = true;
+      }
     };
     const up = (e) => {
-      if (e.code in keys.current) keys.current[e.code] = false;
+      if (e.code in keys.current) {
+        e.preventDefault();
+        keys.current[e.code] = false;
+      }
     };
 
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
+    window.addEventListener("keydown", down, { passive: false });
+    window.addEventListener("keyup", up, { passive: false });
+
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);

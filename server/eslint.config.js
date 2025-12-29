@@ -22,6 +22,7 @@ export default [
       ...pluginN.configs['flat/recommended'].rules,
       ...pluginImport.flatConfigs.recommended.rules,
       ...pluginPromise.configs['flat/recommended'].rules,
+      'react/no-unknown-property': ['error', { ignore: ['object', 'intensity', 'position', 'castShadow', 'args', 'rotation'] }]
     },
   },
 ];
