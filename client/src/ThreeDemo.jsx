@@ -10,18 +10,30 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
 
+
 function Scene() {
   const keys = useKeyboard();
 
   // --------- ROOM SIZE (תואם למה שכבר היה לך) ----------
-  const ROOM_W = 60;
-  const ROOM_D = 60;
-  const WALL_PADDING = 6;
+  const ROOM_W = 50;
+  const ROOM_D = 50;
+  const WALL_PADDING = 2.5;
+
 
   const minX = -ROOM_W / 2 + WALL_PADDING;
   const maxX = ROOM_W / 2 - WALL_PADDING;
   const minZ = -ROOM_D / 2 + WALL_PADDING;
   const maxZ = ROOM_D / 2 - WALL_PADDING;
+
+  // ====== VISUAL BOUNDARIES (קירות שקופים) ======
+  const WALL_VIS_H = 200; // ממש גבוה כדי שלא תראי את הקצה
+  const wallMat = new THREE.MeshBasicMaterial({
+    color: "#ffffff",
+    transparent: true,
+    opacity: 0.18,        // כמה שקוף (תשחקי 0.1–0.3)
+    depthWrite: false,    // שלא “יחנוק” דברים מאחור
+  });
+
 
   // --------- refs ----------
   const robotRef = useRef();
@@ -57,7 +69,7 @@ function Scene() {
     if (k.ArrowLeft || k.KeyA) turn += 1;
     if (k.ArrowRight || k.KeyD) turn -= 1;
 
-    // 2) תנועה קדימה בלבד
+    // 2) תנועה קדימה ואחורה     
     let forward = 0;
     if (k.ArrowUp || k.KeyW) forward = 1;
     if (k.ArrowDown || k.KeyS) forward = -1;
@@ -114,6 +126,11 @@ function Scene() {
 
 
     // smooth camera move
+    // --- clamp camera so it never goes outside the room ---
+    const CAM_PADDING = 2.5;  
+    camTargetPos.current.x = clamp(camTargetPos.current.x, -ROOM_W / 2 + CAM_PADDING, ROOM_W / 2 - CAM_PADDING);
+    camTargetPos.current.z = clamp(camTargetPos.current.z, -ROOM_D / 2 + CAM_PADDING, ROOM_D / 2 - CAM_PADDING);
+
     camera.position.lerp(camTargetPos.current, CAM_LERP);
     camera.lookAt(camLookAt.current);
 
@@ -125,22 +142,64 @@ function Scene() {
 
   return (
     <>
-      {/* חדר ענק לבן -  */}
-      <mesh position={[0, 5, 0]}>
-        <boxGeometry args={[ROOM_W, 30, ROOM_D]} />
-        <meshStandardMaterial
-        color="#ffffff"
-        roughness={0.99}
-        metalness={0}
-        side={THREE.BackSide}
-        toneMapped={false}
-      />
-      </mesh>
+      
 
       {/* תאורה  */}
       <hemisphereLight intensity={1.2} skyColor="#ffffff" groundColor="#e1e6f0" />
-      <directionalLight position={[6, 10, 8]} intensity={0.5} color="#f0f4ff" castShadow/>
+      <directionalLight position={[6, 10, 8]} intensity={0.5} color="#f0f4ff" cast/>
       <directionalLight position={[-8, 6, -6]} intensity={0.35} color="#dde7ff" />
+      
+      {/* ====== VISUAL BOUNDARIES (4 קירות שקופים) ====== */}
+      {(() => {
+        const WALL_VIS_H = 200;         // גובה
+        const yCenter = -1.15 + WALL_VIS_H / 2;
+        const W = ROOM_W;
+        const D = ROOM_D;
+
+        const wallMat = new THREE.MeshBasicMaterial({
+          color: "#ffffff",
+          transparent: true,
+          opacity: 0.18,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+
+        // גבול החדר עצמו (לא גבול התנועה)
+        const leftX = -W / 2;
+        const rightX = W / 2;
+        const backZ = -D / 2;
+        const frontZ = D / 2;
+
+        return (
+          <>
+            {/* שמאל */}
+            <mesh position={[leftX, yCenter, 0]} rotation={[0, Math.PI / 2, 0]}>
+              <planeGeometry args={[D, WALL_VIS_H]} />
+              <primitive object={wallMat} attach="material" />
+            </mesh>
+
+            {/* ימין */}
+            <mesh position={[rightX, yCenter, 0]} rotation={[0, -Math.PI / 2, 0]}>
+              <planeGeometry args={[D, WALL_VIS_H]} />
+              <primitive object={wallMat} attach="material" />
+            </mesh>
+
+            {/* אחורה */}
+            <mesh position={[0, yCenter, backZ]} rotation={[0, 0, 0]}>
+              <planeGeometry args={[W, WALL_VIS_H]} />
+              <primitive object={wallMat} attach="material" />
+            </mesh>
+
+            {/* קדימה */}
+            <mesh position={[0, yCenter, frontZ]} rotation={[0, Math.PI, 0]}>
+              <planeGeometry args={[W, WALL_VIS_H]} />
+              <primitive object={wallMat} attach="material" />
+            </mesh>
+          </>
+        );
+      })()}
+
+
 
       {/* עיצוב רצפה*/}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.15, 0]} receiveShadow>
@@ -233,7 +292,7 @@ export default function ThreeDemo() {
         gl={{ antialias: true }}
         onCreated={({ scene }) => {
           scene.background = new THREE.Color("#ffffff");
-          scene.fog = new THREE.Fog("#e3e9ff", 30, 80);
+          scene.fog = new THREE.Fog("#e3e4f2", 25, 80);
 
         }}
       >
