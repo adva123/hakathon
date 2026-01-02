@@ -5,6 +5,8 @@ import Robot from "./Robot";
 import * as THREE from "three";
 import { useRef, useEffect } from "react";
 import { useKeyboard } from "./useKeyboard";
+import PasswordLevel from "./PasswordLevel";
+
 
 // תנועת הרובוט
 function MovingRobot({ robotRef }) {
@@ -135,7 +137,9 @@ export default function ThreeDemo() {
 
         {/* הרובוט + מצלמה עוקבת */}
         <MovingRobot robotRef={robotRef} />
+        <PasswordLevel robotRef={robotRef} />
         <FollowCamera targetRef={robotRef} />
+
 
         {/* ביטול שליטה עם העכבר */}
         <OrbitControls
