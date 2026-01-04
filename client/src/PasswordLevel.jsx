@@ -11,15 +11,7 @@ import { Text } from "@react-three/drei";
  * kind: "weak" | "medium" | "strong"
  */
 function PasswordPart({ part, onPick }) {
-  const ref = useRef();
-
-  // idle spin + bob
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = clock.getElapsedTime();
-    ref.current.rotation.y += 0.6 * (1 / 60);
-    ref.current.position.y = part.position[1] + Math.sin(t * 2 + part.seed) * 0.15;
-  });
+  // floor tiles are static — no idle spin/bob needed
 
   // Visual language by kind (simple, no custom colors required if you prefer defaults)
   // But for clarity, we’ll do subtle emissive tinting:
@@ -32,23 +24,23 @@ function PasswordPart({ part, onPick }) {
     return m;
   }, [part.kind]);
 
-  // We'll render the text using a simple "billboard card" later;
-  // for now, a capsule is enough as a pickup.
+  // We'll render the text on top of a floor tile. Compute thickness/gap so
+  // the text sits cleanly above the tile and doesn't intersect.
+  const thickness = 0.05; // tile thickness
+  const textGap = 0.01; // space between tile top and text bottom
+  const fontSize = 0.14;
+  const groupPos = [part.position[0], thickness / 2, part.position[2]];
+
   return (
-    <group position={part.position}>
-      <mesh ref={ref} material={material} onClick={() => onPick(part.id)}>
-        <capsuleGeometry args={[0.28, 0.35, 6, 12]} />
-        {/* ✅ Label */}
-        <Text
-          position={[0, 0.9, 0]}
-          fontSize={0.22}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.02}
-        >
-          {part.text}
-        </Text>
+    <group position={groupPos}>
+      <mesh material={material} onClick={() => onPick(part.id)}>
+        {/* flat floor tile: width, height(thickness), depth */}
+        <boxGeometry args={[0.9, thickness, 0.5]} />
       </mesh>
+      {/* label sits just above the tile; use bottom anchoring so it doesn't overlap */}
+      <Text position={[0, thickness / 2 + textGap, 0]} fontSize={fontSize} anchorX="center" anchorY="bottom" outlineWidth={0.02}>
+        {part.text}
+      </Text>
     </group>
   );
 }
@@ -132,12 +124,12 @@ export default function PasswordLevel({ robotRef }) {
   // Define pickup parts in the room (you can randomize later)
   const parts = useMemo(
     () => [
-      { id: "p1", text: "123456", kind: "weak", position: [-3, 0.4, -2], seed: 1 },
-      { id: "p2", text: "password", kind: "weak", position: [3, 0.4, -1], seed: 2 },
-      { id: "p3", text: "2024", kind: "medium", position: [-2, 0.4, 3], seed: 3 },
-      { id: "p4", text: "John", kind: "medium", position: [2.5, 0.4, 2.2], seed: 4 },
-      { id: "p5", text: "!K7", kind: "strong", position: [-4, 0.4, 1], seed: 5 },
-      { id: "p6", text: "Zq9@", kind: "strong", position: [4, 0.4, 1.5], seed: 6 },
+      { id: "p1", text: "123456", kind: "weak", position: [-3, -2, -2], seed: 1 },
+      { id: "p2", text: "password", kind: "weak", position: [3, -10, -1], seed: 2 },
+      { id: "p3", text: "2024", kind: "medium", position: [-2, 0.0, 3], seed: 3 },
+      { id: "p4", text: "John", kind: "medium", position: [2.5, 0.0, 2.2], seed: 4 },
+      { id: "p5", text: "!K7", kind: "strong", position: [-4, 0.0, 1], seed: 5 },
+      { id: "p6", text: "Zq9@", kind: "strong", position: [4, 0.0, 1.5], seed: 6 },
     ],
     []
   );
