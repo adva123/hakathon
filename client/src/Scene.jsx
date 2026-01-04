@@ -5,6 +5,8 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import Robot from "./components/Robot";
 import { useKeyboard } from "./useKeyboard";
+import PropTypes from "prop-types";
+
 
 // --- פונקציות עזר מתמטיות ---
 // הגבלת ערך בין מינימום למקסימום (למשל כדי שהרובוט לא יצא מהקירות)
@@ -12,10 +14,7 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
 
-// מעבר רך בין ערכים (Linear Interpolation)
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
+
 
 // --- רכיב האייקון של המשימה (MissionIcon) ---
 function MissionIcon({ position, tint = "#28f0e6" }) {
@@ -128,6 +127,11 @@ function MissionIcon({ position, tint = "#28f0e6" }) {
     </group>
   );
 }
+MissionIcon.propTypes = {
+  position: PropTypes.arrayOf(PropTypes.number).isRequired,
+  tint: PropTypes.string,
+};
+
 
 // --- רכיב הסצנה המרכזי (Scene) ---
 export default function Scene({
