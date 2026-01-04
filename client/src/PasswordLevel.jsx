@@ -38,23 +38,17 @@ function PasswordPart({ part, onPick }) {
     <group position={part.position}>
       <mesh ref={ref} material={material} onClick={() => onPick(part.id)}>
         <capsuleGeometry args={[0.28, 0.35, 6, 12]} />
+        {/* ✅ Label */}
+        <Text
+          position={[0, 0.9, 0]}
+          fontSize={0.22}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.02}
+        >
+          {part.text}
+        </Text>
       </mesh>
-
-      {/* Super simple label (optional). If you already use drei, you can swap for <Text>. */}
-      <mesh position={[0, 0.75, 0]}>
-        <planeGeometry args={[1.2, 0.4]} />
-        <meshStandardMaterial transparent opacity={0.85} />
-      </mesh>
-      {/* ✅ Label */}
-      <Text
-        position={[0, 0.9, 0]}
-        fontSize={0.22}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-      >
-        {part.text}
-      </Text>
     </group>
   );
 }
@@ -66,7 +60,7 @@ function PasswordPart({ part, onPick }) {
  * The core in the middle: shows selected parts and allows removing
  * when robot is close and presses E.
  */
-function PasswordCore({ position = [0, 0, 0], selected, onRemoveNearest, robotRef }) {
+function PasswordCore({ position = [0, 0, 0], selected, onRemoveNearest, onRemoveInstance, robotRef }) {
   const coreRef = useRef();
   const keys = useKeyboard();
 
@@ -82,18 +76,19 @@ function PasswordCore({ position = [0, 0, 0], selected, onRemoveNearest, robotRe
     }
   });
 
-  // Visual: core cylinder + floating "selected parts"
+  // Visual: floating "selected parts"
   return (
     <group ref={coreRef} position={position}>
-      <mesh>
-        <cylinderGeometry args={[0.7, 0.7, 0.35, 24]} />
-        <meshStandardMaterial roughness={0.2} metalness={0.4} />
-      </mesh>
-
       {/* Selected parts shown as small tiles */}
       <group position={[0, 1.0, 0]}>
         {selected.map((p, i) => (
-          <mesh key={p.instanceId} position={[i * 0.35 - (selected.length - 1) * 0.175, 0, 0]}>
+          <mesh
+            key={p.instanceId}
+            position={[i * 0.35 - (selected.length - 1) * 0.175, 0, 0]}
+            onClick={() => onRemoveInstance && onRemoveInstance(p.instanceId)}
+            onPointerOver={() => (document.body.style.cursor = "pointer")}
+            onPointerOut={() => (document.body.style.cursor = "")}
+          >
             <boxGeometry args={[0.3, 0.12, 0.2]} />
             <meshStandardMaterial />
           </mesh>
@@ -189,6 +184,24 @@ export default function PasswordLevel({ robotRef }) {
     });
   }, []);
 
+  // remove a specific selected instance (clicked in the core)
+  const onRemoveInstance = useCallback((instanceId) => {
+    setSelected((prev) => {
+      const idx = prev.findIndex((s) => s.instanceId === instanceId);
+      if (idx === -1) return prev;
+      const removed = prev[idx];
+
+      // return it to world
+      setAvailableIds((idsPrev) => {
+        const next = new Set(idsPrev);
+        next.add(removed.id);
+        return next;
+      });
+
+      return prev.filter((s) => s.instanceId !== instanceId);
+    });
+  }, []);
+
   // recompute strength immediately whenever selected changes
   useEffect(() => {
     setStrength(computeStrength(selected));
@@ -227,6 +240,7 @@ export default function PasswordLevel({ robotRef }) {
         position={[0, 0.2, 0]}
         selected={selected}
         onRemoveNearest={onRemoveNearest}
+        onRemoveInstance={onRemoveInstance}
         robotRef={robotRef}
       />
 
