@@ -244,6 +244,33 @@ function makeLakeGlintTexture({ size = 256 } = {}) {
   return tex;
 }
 
+function makeSoftShadowTexture({ size = 256 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.46;
+  const g = ctx.createRadialGradient(cx, cy, r * 0.10, cx, cy, r);
+  g.addColorStop(0, 'rgba(0,0,0,0.40)');
+  g.addColorStop(0.55, 'rgba(0,0,0,0.16)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
 function makeRainbowStripTexture({ width = 512, height = 64 } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -285,6 +312,54 @@ function makeRainbowStripTexture({ width = 512, height = 64 } = {}) {
   return tex;
 }
 
+function makeMirrorFakeTexture({ width = 512, height = 512 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  // Sky gradient.
+  const g = ctx.createLinearGradient(0, 0, 0, height);
+  g.addColorStop(0, '#bfe6ff');
+  g.addColorStop(0.6, '#eaf8ff');
+  g.addColorStop(1, '#d9ffe6');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+
+  // Soft "foliage" blobs (fake reflection).
+  ctx.globalAlpha = 0.20;
+  for (let i = 0; i < 38; i += 1) {
+    const x = prand(i + 700) * width;
+    const y = (0.35 + prand(i + 740) * 0.65) * height;
+    const r = 30 + prand(i + 780) * 120;
+    const hue = 0.25 + prand(i + 820) * 0.12;
+    const col = new THREE.Color().setHSL(hue, 0.65, 0.42 + prand(i + 860) * 0.18);
+    ctx.fillStyle = `rgba(${Math.floor(col.r * 255)},${Math.floor(col.g * 255)},${Math.floor(col.b * 255)},0.28)`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Subtle vertical sheen.
+  const sheen = ctx.createLinearGradient(0, 0, width, 0);
+  sheen.addColorStop(0.0, 'rgba(255,255,255,0)');
+  sheen.addColorStop(0.25, 'rgba(255,255,255,0.12)');
+  sheen.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+  sheen.addColorStop(0.75, 'rgba(255,255,255,0.10)');
+  sheen.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, width, height);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export function ForestSky() {
   const tex = useMemo(() => makeForestSkyTexture(), []);
   if (!tex) return null;
@@ -298,9 +373,16 @@ export function ForestSky() {
 }
 
 export function ForestWorld({ floorY, curveData }) {
+  // Global scaling: make the world feel bigger (robot handled elsewhere).
+  const WORLD_SCALE = 1.35;
+  const TREE_HEIGHT = 1.55;
+  const PROP_SCALE = 1.55;
+
   const grassTex = useMemo(() => makeGrassTexture(), []);
   const lakeGlintTex = useMemo(() => makeLakeGlintTexture(), []);
+  const softShadowTex = useMemo(() => makeSoftShadowTexture(), []);
   const rainbowTex = useMemo(() => makeRainbowStripTexture(), []);
+  const mirrorTex = useMemo(() => makeMirrorFakeTexture(), []);
 
   const pathPoints = useMemo(() => {
     if (!curveData?.curve) return [];
@@ -346,15 +428,18 @@ export function ForestWorld({ floorY, curveData }) {
     const cyclamenStems = [];
     const cyclamenPetals = [];
     const gypsophila = [];
-    const ducks = [];
+    const pathPebbles = [];
+    const edgeStones = [];
+    const leafPiles = [];
+    const pathRoots = [];
 
     const bounds = 58;
-    const clearance = 4.2; // keep path clear
+    const clearance = 4.8; // keep path clear (bigger objects)
     const clearance2 = clearance * clearance;
 
     // Trees (multiple types).
     let attempts = 0;
-    while (pines.length + rounds.length + birches.length < 320 && attempts < 2600) {
+    while (pines.length + rounds.length + birches.length < 520 && attempts < 4200) {
       attempts += 1;
       const i = attempts;
       const x = (prand(i + 100) - 0.5) * bounds * 2;
@@ -364,7 +449,7 @@ export function ForestWorld({ floorY, curveData }) {
       if (x * x + z * z < 18) continue; // keep center a bit open
 
       const typeRoll = prand(i + 777);
-      const s = 0.72 + prand(i + 300) * 0.9;
+      const s = (0.72 + prand(i + 300) * 0.9) * WORLD_SCALE;
 
       // Strongly mixed per-tree palette choice (no distance/spatial pattern):
       // 0 = bright green, 1 = khaki green, 2 = dark green.
@@ -413,7 +498,7 @@ export function ForestWorld({ floorY, curveData }) {
 
     // Palm trees (bright, lighter green). Keep them a bit further out for variety.
     attempts = 0;
-    while (palms.length < 90 && attempts < 1800) {
+    while (palms.length < 150 && attempts < 2800) {
       attempts += 1;
       const i = attempts;
       const x = (prand(i + 2100) - 0.5) * bounds * 2;
@@ -426,8 +511,8 @@ export function ForestWorld({ floorY, curveData }) {
       const r = Math.hypot(x, z);
       if (r < 34 && prand(i + 2300) < 0.75) continue;
 
-      const s = 0.85 + prand(i + 2400) * 1.05;
-      const trunkH = 3.1 + prand(i + 2500) * 2.2;
+      const s = (0.85 + prand(i + 2400) * 1.05) * WORLD_SCALE;
+      const trunkH = (3.1 + prand(i + 2500) * 2.2) * TREE_HEIGHT;
       const yaw = prand(i + 2600) * Math.PI * 2;
 
       // Bright palm leaf tint.
@@ -445,9 +530,36 @@ export function ForestWorld({ floorY, curveData }) {
     }
 
     // Bushes + small plants near path edges.
-    for (let i = 0; i < 140; i += 1) {
-      const t = i / 139;
-      if (!curveData?.curve) break;
+    const edgeCount = 220;
+    if (!curveData?.curve || curveData.curve?.points?.length < 2) {
+      // No path curve available yet.
+      return {
+        pines,
+        rounds,
+        birches,
+        palms,
+        palmFronds,
+        bushes,
+        flowers,
+        mushrooms,
+        grassClumps,
+        rocks,
+        sunflowers,
+        roseBlooms,
+        roseLeaves,
+        cyclamenStems,
+        cyclamenPetals,
+        gypsophila,
+        pathPebbles,
+        edgeStones,
+        leafPiles,
+        pathRoots,
+        lake: { x: 0, z: 0, rx: 6.2 * 1.22, rz: 4.8 * 1.22, yaw: 0 },
+      };
+    }
+
+    for (let i = 0; i < edgeCount; i += 1) {
+      const t = edgeCount <= 1 ? 0 : i / (edgeCount - 1);
       const p = curveData.curve.getPointAt(t);
       const tan = curveData.curve.getTangentAt(t);
       tan.y = 0;
@@ -455,10 +567,10 @@ export function ForestWorld({ floorY, curveData }) {
       const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
 
       const side = i % 2 === 0 ? 1 : -1;
-      const off = 2.4 + prand(i + 900) * 2.2;
+      const off = 2.6 + prand(i + 900) * 2.6;
       const x = p.x + left.x * off * side;
       const z = p.z + left.z * off * side;
-      const s = 0.45 + prand(i + 920) * 0.6;
+      const s = (0.45 + prand(i + 920) * 0.6) * WORLD_SCALE;
       bushes.push({ x, z, s });
 
       // Flowers a bit further from the path.
@@ -466,7 +578,7 @@ export function ForestWorld({ floorY, curveData }) {
         const off2 = off + 1.4 + prand(i + 940) * 1.8;
         const fx = p.x + left.x * off2 * side;
         const fz = p.z + left.z * off2 * side;
-        const fs = 0.22 + prand(i + 960) * 0.22;
+        const fs = (0.22 + prand(i + 960) * 0.22) * WORLD_SCALE;
         const hue = 0.92 + prand(i + 980) * 0.12; // pink/purple
         const col = new THREE.Color().setHSL(hue % 1, 0.75, 0.68);
         flowers.push({ x: fx, z: fz, s: fs, col });
@@ -477,7 +589,7 @@ export function ForestWorld({ floorY, curveData }) {
         const offS = off + 2.2 + prand(i + 1210) * 2.4;
         const sx = p.x + left.x * offS * side;
         const sz = p.z + left.z * offS * side;
-        const ss = 0.45 + prand(i + 1220) * 0.55;
+        const ss = (0.45 + prand(i + 1220) * 0.55) * WORLD_SCALE;
         const yaw = prand(i + 1230) * Math.PI * 2;
         const petalCol = new THREE.Color().setHSL(0.13 + prand(i + 1240) * 0.04, 0.92, 0.60);
         sunflowers.push({ x: sx, z: sz, s: ss, yaw, petalCol });
@@ -488,7 +600,7 @@ export function ForestWorld({ floorY, curveData }) {
         const offC = off + 1.2 + prand(i + 1510) * 2.2;
         const cx = p.x + left.x * offC * side + (prand(i + 1520) - 0.5) * 0.9;
         const cz = p.z + left.z * offC * side + (prand(i + 1530) - 0.5) * 0.9;
-        const cs = 0.55 + prand(i + 1540) * 0.75;
+        const cs = (0.55 + prand(i + 1540) * 0.75) * WORLD_SCALE;
         const yaw = prand(i + 1550) * Math.PI * 2;
         // Pink range.
         const hue = 0.92 + prand(i + 1560) * 0.08;
@@ -510,8 +622,8 @@ export function ForestWorld({ floorY, curveData }) {
         const offG = off + 2.6 + prand(i + 1710) * 3.2;
         const gx = p.x + left.x * offG * side + (prand(i + 1720) - 0.5) * 1.1;
         const gz = p.z + left.z * offG * side + (prand(i + 1730) - 0.5) * 1.1;
-        const baseS = 0.20 + prand(i + 1740) * 0.22;
-        const count = 10 + Math.floor(prand(i + 1750) * 14);
+        const baseS = (0.20 + prand(i + 1740) * 0.22) * WORLD_SCALE;
+        const count = 16 + Math.floor(prand(i + 1750) * 18);
         for (let k = 0; k < count; k += 1) {
           const ox = (prand(i * 50 + k + 1760) - 0.5) * 0.85;
           const oz = (prand(i * 50 + k + 1770) - 0.5) * 0.85;
@@ -528,8 +640,8 @@ export function ForestWorld({ floorY, curveData }) {
         const offR = off + 1.0 + prand(i + 1320) * 1.6;
         const rx = p.x + left.x * offR * side + (prand(i + 1330) - 0.5) * 0.8;
         const rz = p.z + left.z * offR * side + (prand(i + 1340) - 0.5) * 0.8;
-        const baseS = 0.30 + prand(i + 1350) * 0.38;
-        const bloomCount = 5 + Math.floor(prand(i + 1355) * 6);
+        const baseS = (0.30 + prand(i + 1350) * 0.38) * WORLD_SCALE;
+        const bloomCount = 8 + Math.floor(prand(i + 1355) * 8);
         for (let b = 0; b < bloomCount; b += 1) {
           const ox = (prand(i * 100 + b + 1360) - 0.5) * 0.55;
           const oz = (prand(i * 100 + b + 1370) - 0.5) * 0.55;
@@ -541,7 +653,7 @@ export function ForestWorld({ floorY, curveData }) {
           roseBlooms.push({ x: rx + ox, z: rz + oz, s: rs, col });
         }
 
-        const leafCount = 3 + Math.floor(prand(i + 1420) * 4);
+        const leafCount = 5 + Math.floor(prand(i + 1420) * 6);
         for (let l = 0; l < leafCount; l += 1) {
           const ox = (prand(i * 50 + l + 1430) - 0.5) * 0.85;
           const oz = (prand(i * 50 + l + 1440) - 0.5) * 0.85;
@@ -553,18 +665,18 @@ export function ForestWorld({ floorY, curveData }) {
       }
 
       // Mushrooms near bushes (sporadic).
-      if (prand(i + 1004) > 0.72) {
+      if (prand(i + 1004) > 0.62) {
         const mx = x + (prand(i + 1010) - 0.5) * 1.2;
         const mz = z + (prand(i + 1015) - 0.5) * 1.2;
-        const ms = 0.16 + prand(i + 1020) * 0.18;
+        const ms = (0.16 + prand(i + 1020) * 0.18) * WORLD_SCALE;
         mushrooms.push({ x: mx, z: mz, s: ms });
       }
 
       // Tufts of taller grass (lots of small variety close to the path).
-      if (prand(i + 1111) > 0.22) {
+      if (prand(i + 1111) > 0.12) {
         const gx = x + (prand(i + 1120) - 0.5) * 1.6;
         const gz = z + (prand(i + 1130) - 0.5) * 1.6;
-        const gs = 0.22 + prand(i + 1140) * 0.38;
+        const gs = (0.22 + prand(i + 1140) * 0.38) * WORLD_SCALE;
         const hue = 0.27 + prand(i + 1150) * 0.10;
         const col = new THREE.Color().setHSL(hue, 0.65, 0.46 + prand(i + 1160) * 0.14);
         grassClumps.push({ x: gx, z: gz, s: gs, col });
@@ -572,13 +684,13 @@ export function ForestWorld({ floorY, curveData }) {
     }
 
     // Rocks scattered around (low profile, helps break repetition).
-    for (let i = 0; i < 120; i += 1) {
+    for (let i = 0; i < 190; i += 1) {
       const x = (prand(i + 5000) - 0.5) * bounds * 2;
       const z = (prand(i + 5100) - 0.5) * bounds * 2;
       const d2 = curvePts2.length ? minDist2ToCurve(x, z) : 999;
       if (d2 < (clearance + 0.8) * (clearance + 0.8)) continue;
       if (x * x + z * z < 16) continue;
-      const s = 0.22 + prand(i + 5200) * 0.55;
+      const s = (0.22 + prand(i + 5200) * 0.55) * WORLD_SCALE;
       rocks.push({ x, z, s });
     }
 
@@ -586,13 +698,118 @@ export function ForestWorld({ floorY, curveData }) {
     const lake = {
       x: 0,
       z: 0,
-      rx: 6.2,
-      rz: 4.8,
+      rx: 6.2 * 1.22,
+      rz: 4.8 * 1.22,
       yaw: 0,
     };
 
+    // Small pebbles sprinkled on the path to break the smoothness.
+    // Keep this relatively sparse so the robot path stays readable.
+    const pebbleCount = 70;
+    for (let i = 0; i < pebbleCount; i += 1) {
+      const t = prand(i + 60000);
+      const p = curveData.curve.getPointAt(t);
+      const tan = curveData.curve.getTangentAt(t);
+      tan.y = 0;
+      tan.normalize();
+      const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
+
+      const side = prand(i + 60100) > 0.5 ? 1 : -1;
+      const off = (0.15 + prand(i + 60200) * 1.05) * side; // within the ribbon
+      const along = (prand(i + 60300) - 0.5) * 0.55;
+      const x = p.x + left.x * off + tan.x * along;
+      const z = p.z + left.z * off + tan.z * along;
+      if (x * x + z * z < 7.2 * 7.2) continue;
+
+      const s = (0.06 + prand(i + 60400) * 0.10) * WORLD_SCALE;
+      const hue = 0.06 + prand(i + 60500) * 0.06;
+      const light = 0.28 + prand(i + 60600) * 0.20;
+      const col = new THREE.Color().setHSL(hue, 0.18, light);
+      pathPebbles.push({ x, z, s, col });
+    }
+
+    // Stones along the path edges to soften the grass/path transition.
+    // Keep fewer stones to avoid cluttering the route.
+    const edgeStoneCount = 90;
+    for (let i = 0; i < edgeStoneCount; i += 1) {
+      const t = prand(i + 71000);
+      const p = curveData.curve.getPointAt(t);
+      const tan = curveData.curve.getTangentAt(t);
+      tan.y = 0;
+      tan.normalize();
+      const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
+
+      const side = prand(i + 71100) > 0.5 ? 1 : -1;
+      const off = 1.55 + prand(i + 71200) * 1.35; // just outside the ribbon (width ~2.9)
+      const along = (prand(i + 71300) - 0.5) * 1.15;
+      const x = p.x + left.x * off * side + tan.x * along;
+      const z = p.z + left.z * off * side + tan.z * along;
+      if (x * x + z * z < 8.4 * 8.4) continue;
+
+      const s = (0.10 + prand(i + 71400) * 0.28) * WORLD_SCALE;
+      const hue = 0.06 + prand(i + 71500) * 0.06;
+      const light = 0.22 + prand(i + 71600) * 0.24;
+      const col = new THREE.Color().setHSL(hue, 0.14, light);
+      edgeStones.push({ x, z, s, col });
+    }
+
+    // Fallen leaf piles in autumn colors (small low-poly mounds).
+    const leafPileCount = 170;
+    for (let i = 0; i < leafPileCount; i += 1) {
+      const t = prand(i + 72000);
+      const p = curveData.curve.getPointAt(t);
+      const tan = curveData.curve.getTangentAt(t);
+      tan.y = 0;
+      tan.normalize();
+      const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
+
+      // Some piles on the edge, some lightly spilling onto the path.
+      const spillOnPath = prand(i + 72100) > 0.64;
+      const side = prand(i + 72110) > 0.5 ? 1 : -1;
+      const off = spillOnPath
+        ? (prand(i + 72120) - 0.5) * 1.25
+        : (1.35 + prand(i + 72130) * 2.15) * side;
+      const along = (prand(i + 72140) - 0.5) * 1.05;
+      const x = p.x + left.x * off + tan.x * along;
+      const z = p.z + left.z * off + tan.z * along;
+      if (x * x + z * z < 8.2 * 8.2) continue;
+
+      const s = (0.16 + prand(i + 72200) * 0.34) * WORLD_SCALE;
+      const yaw = prand(i + 72300) * Math.PI * 2;
+      const pick = prand(i + 72400);
+      const col = pick < 0.34
+        ? new THREE.Color('#f4b23a') // golden
+        : pick < 0.68
+          ? new THREE.Color('#e3632d') // orange
+          : new THREE.Color('#c43c2f'); // red
+      leafPiles.push({ x, z, s, yaw, col });
+    }
+
+    // Occasional exposed roots/twigs that cross the path a bit.
+    // Keep them small so they read as subtle sticks.
+    const rootCount = 12;
+    for (let i = 0; i < rootCount; i += 1) {
+      const t = prand(i + 73000);
+      const p = curveData.curve.getPointAt(t);
+      const tan = curveData.curve.getTangentAt(t);
+      tan.y = 0;
+      tan.normalize();
+      const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
+
+      const along = (prand(i + 73100) - 0.5) * 1.4;
+      const x = p.x + tan.x * along;
+      const z = p.z + tan.z * along;
+      if (x * x + z * z < 10.0 * 10.0) continue;
+
+      const side = prand(i + 73200) > 0.5 ? 1 : -1;
+      const yaw = Math.atan2(left.x * side, left.z * side) + (prand(i + 73300) - 0.5) * 0.35;
+      const len = (1.25 + prand(i + 73400) * 0.85) * WORLD_SCALE;
+      const r = (0.045 + prand(i + 73500) * 0.045) * WORLD_SCALE;
+      pathRoots.push({ x, z, yaw, len, r });
+    }
+
     // Extra rose patches for a richer look.
-    for (let i = 0; i < 120; i += 1) {
+    for (let i = 0; i < 170; i += 1) {
       if (!curveData?.curve) break;
       const t = prand(i + 9000);
       const p = curveData.curve.getPointAt(t);
@@ -604,8 +821,8 @@ export function ForestWorld({ floorY, curveData }) {
       const off = 3.8 + prand(i + 9100) * 3.2;
       const rx = p.x + left.x * off * side + (prand(i + 9200) - 0.5) * 1.2;
       const rz = p.z + left.z * off * side + (prand(i + 9300) - 0.5) * 1.2;
-      const baseS = 0.30 + prand(i + 9400) * 0.42;
-      const bloomCount = 6 + Math.floor(prand(i + 9500) * 8);
+      const baseS = (0.30 + prand(i + 9400) * 0.42) * WORLD_SCALE;
+      const bloomCount = 9 + Math.floor(prand(i + 9500) * 10);
       for (let b = 0; b < bloomCount; b += 1) {
         const ox = (prand(i * 100 + b + 9600) - 0.5) * 0.7;
         const oz = (prand(i * 100 + b + 9700) - 0.5) * 0.7;
@@ -616,7 +833,7 @@ export function ForestWorld({ floorY, curveData }) {
         const col = new THREE.Color().setHSL(hue % 1, Math.min(1, sat), Math.min(0.66, light));
         roseBlooms.push({ x: rx + ox, z: rz + oz, s: rs, col });
       }
-      const leafCount = 4 + Math.floor(prand(i + 9970) * 4);
+      const leafCount = 6 + Math.floor(prand(i + 9970) * 6);
       for (let l = 0; l < leafCount; l += 1) {
         const ox = (prand(i * 50 + l + 9980) - 0.5) * 1.05;
         const oz = (prand(i * 50 + l + 9990) - 0.5) * 1.05;
@@ -625,17 +842,6 @@ export function ForestWorld({ floorY, curveData }) {
         const col = new THREE.Color().setHSL(hue, 0.72, 0.34 + prand(i * 50 + l + 10030) * 0.12);
         roseLeaves.push({ x: rx + ox, z: rz + oz, s: ls, col });
       }
-    }
-
-    // 5 ducks on the lake.
-    for (let k = 0; k < 5; k += 1) {
-      const a = (k / 5) * Math.PI * 2 + 0.35;
-      const r = 0.38 + prand(k + 20000) * 0.10;
-      const x = lake.x + Math.cos(a) * lake.rx * r;
-      const z = lake.z + Math.sin(a) * lake.rz * r;
-      const yaw = -a + Math.PI / 2;
-      const s = 0.7 + prand(k + 20010) * 0.25;
-      ducks.push({ x, z, yaw, s });
     }
 
     return {
@@ -655,10 +861,13 @@ export function ForestWorld({ floorY, curveData }) {
       cyclamenStems,
       cyclamenPetals,
       gypsophila,
+      pathPebbles,
+      edgeStones,
+      leafPiles,
+      pathRoots,
       lake,
-      ducks,
     };
-  }, [curveData, pathPoints, TREE_COLOR_REV]);
+  }, [curveData, pathPoints, floorY, TREE_COLOR_REV]);
 
   const trunkMat = useMemo(
     () =>
@@ -781,6 +990,49 @@ export function ForestWorld({ floorY, curveData }) {
     []
   );
 
+  const pathPebbleMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        vertexColors: true,
+        roughness: 0.96,
+        metalness: 0,
+      }),
+    []
+  );
+
+  const edgeStoneMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        vertexColors: true,
+        roughness: 0.98,
+        metalness: 0,
+      }),
+    []
+  );
+
+  const leafPileMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        vertexColors: true,
+        roughness: 0.92,
+        metalness: 0,
+      }),
+    []
+  );
+
+  const rootMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#6b4b2a',
+        roughness: 0.95,
+        metalness: 0,
+      }),
+    []
+  );
+
   const rockMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
@@ -891,35 +1143,161 @@ export function ForestWorld({ floorY, curveData }) {
     []
   );
 
-  const duckBodyMat = useMemo(
+  const woodMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#ffd54a',
-        roughness: 0.7,
+        color: '#7a5432',
+        roughness: 0.92,
         metalness: 0,
       }),
     []
   );
 
-  const duckBeakMat = useMemo(
+  const ropeMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#ff8a2a',
-        roughness: 0.75,
+        color: '#cdbb9a',
+        roughness: 0.95,
         metalness: 0,
       }),
     []
   );
 
-  const duckEyeMat = useMemo(
+  const metalMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#111827',
-        roughness: 0.85,
-        metalness: 0,
+        color: '#b7c2cc',
+        roughness: 0.35,
+        metalness: 0.85,
       }),
     []
   );
+
+  const mirrorMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        map: mirrorTex || undefined,
+        toneMapped: false,
+      }),
+    [mirrorTex]
+  );
+
+  const propsData = useMemo(() => {
+    const curvePts = pathPoints.length ? pathPoints : [];
+    const curvePts2 = curvePts.map((p) => new THREE.Vector3(p.x, 0, p.z));
+    const minDist2ToCurve = (x, z) => {
+      let best = Infinity;
+      for (let i = 0; i < curvePts2.length; i += 1) {
+        const p = curvePts2[i];
+        const dx = p.x - x;
+        const dz = p.z - z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < best) best = d2;
+      }
+      return best;
+    };
+
+    const bounds = 58;
+    const clearance = 7.2;
+    const clearance2 = clearance * clearance;
+
+    const pickSpot = (seed, rMin = 18, rMax = 52) => {
+      for (let k = 0; k < 140; k += 1) {
+        const a = prand(seed + k * 10) * Math.PI * 2;
+        const r = rMin + prand(seed + k * 10 + 2) * (rMax - rMin);
+        const x = Math.cos(a) * r + (prand(seed + k * 10 + 3) - 0.5) * 6;
+        const z = Math.sin(a) * r + (prand(seed + k * 10 + 4) - 0.5) * 6;
+        if (curvePts2.length && minDist2ToCurve(x, z) < clearance2) continue;
+        // avoid lake area
+        if (x * x + z * z < 9.5 * 9.5) continue;
+        if (Math.abs(x) > bounds || Math.abs(z) > bounds) continue;
+        return { x, z };
+      }
+      return { x: (prand(seed) - 0.5) * bounds * 1.6, z: (prand(seed + 1) - 0.5) * bounds * 1.6 };
+    };
+
+    const mirrors = Array.from({ length: 5 }, (_, i) => ({ ...pickSpot(31001 + i * 7), yaw: prand(31002 + i * 11) * Math.PI * 2, s: 0.95 + prand(31003 + i * 13) * 0.18 }));
+
+    const swings = Array.from({ length: 3 }, (_, i) => ({ ...pickSpot(31101 + i * 19), yaw: prand(31102 + i * 23) * Math.PI * 2, s: 0.95 + prand(31103 + i * 29) * 0.16 }));
+    const explorers = Array.from({ length: 10 }, (_, i) => ({ ...pickSpot(31201 + i * 31), yaw: prand(31202 + i * 37) * Math.PI * 2, s: 1.55 + prand(31203 + i * 41) * 0.40 }));
+    const picnics = Array.from({ length: 2 }, (_, i) => ({ ...pickSpot(31301 + i * 43), yaw: prand(31302 + i * 47) * Math.PI * 2, s: 0.95 + prand(31303 + i * 53) * 0.14 }));
+
+    const ladders = Array.from({ length: 5 }, (_, i) => ({ ...pickSpot(31401 + i * 13), yaw: prand(31402 + i * 17) * Math.PI * 2, s: 0.92 + prand(31403 + i * 19) * 0.18 }));
+
+    return { mirrors, swings, explorers, picnics, ladders };
+  }, [floorY, pathPoints]);
+
+  const swingRef = useRef(null);
+  const pathPebbleRef = useRef(null);
+  const edgeStoneRef = useRef(null);
+  const leafPileRef = useRef(null);
+
+  useEffect(() => {
+    const pebbles = pathPebbleRef.current;
+    if (!pebbles || !treeData.pathPebbles?.length) return;
+
+    const m = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    treeData.pathPebbles.forEach((p, idx) => {
+      pos.set(p.x, floorY + 0.035, p.z);
+      quat.setFromEuler(new THREE.Euler(0, prand(idx + 65000) * Math.PI * 2, 0));
+      sc.set(p.s, p.s * (0.55 + prand(idx + 65100) * 0.9), p.s);
+      m.compose(pos, quat, sc);
+      pebbles.setMatrixAt(idx, m);
+      pebbles.setColorAt(idx, p.col);
+    });
+    pebbles.instanceMatrix.needsUpdate = true;
+    if (pebbles.instanceColor) pebbles.instanceColor.needsUpdate = true;
+
+    const stones = edgeStoneRef.current;
+    if (stones && treeData.edgeStones?.length) {
+      const m2 = new THREE.Matrix4();
+      const pos2 = new THREE.Vector3();
+      const quat2 = new THREE.Quaternion();
+      const sc2 = new THREE.Vector3();
+      treeData.edgeStones.forEach((s, idx) => {
+        pos2.set(s.x, floorY + 0.036, s.z);
+        quat2.setFromEuler(new THREE.Euler(0, prand(idx + 66000) * Math.PI * 2, 0));
+        sc2.set(s.s, s.s * (0.55 + prand(idx + 66100) * 0.9), s.s);
+        m2.compose(pos2, quat2, sc2);
+        stones.setMatrixAt(idx, m2);
+        stones.setColorAt(idx, s.col);
+      });
+      stones.instanceMatrix.needsUpdate = true;
+      if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
+    }
+
+    const piles = leafPileRef.current;
+    if (piles && treeData.leafPiles?.length) {
+      const m3 = new THREE.Matrix4();
+      const pos3 = new THREE.Vector3();
+      const quat3 = new THREE.Quaternion();
+      const sc3 = new THREE.Vector3();
+      treeData.leafPiles.forEach((p, idx) => {
+        pos3.set(p.x, floorY + 0.034, p.z);
+        quat3.setFromEuler(new THREE.Euler(0, p.yaw, 0));
+        // Flatten into a little mound.
+        sc3.set(p.s, p.s * (0.20 + prand(idx + 67100) * 0.16), p.s);
+        m3.compose(pos3, quat3, sc3);
+        piles.setMatrixAt(idx, m3);
+        piles.setColorAt(idx, p.col);
+      });
+      piles.instanceMatrix.needsUpdate = true;
+      if (piles.instanceColor) piles.instanceColor.needsUpdate = true;
+    }
+  }, [treeData, floorY]);
+
+  useFrame(({ clock }, delta) => {
+    const t = clock.getElapsedTime();
+
+    // Gentle swing motion.
+    if (swingRef.current) {
+      swingRef.current.rotation.z = Math.sin(t * 0.7) * 0.18;
+      swingRef.current.rotation.x = Math.sin(t * 0.42) * 0.04;
+    }
+  });
 
   const pineTrunkRef = useRef(null);
   const pineCanopyRef = useRef(null);
@@ -976,45 +1354,45 @@ export function ForestWorld({ floorY, curveData }) {
     const scale = new THREE.Vector3();
 
     treeData.pines.forEach((t, idx) => {
-      pos.set(t.x, floorY + 0.8 * t.s, t.z);
+      pos.set(t.x, floorY + 0.8 * t.s * TREE_HEIGHT, t.z);
       quat.setFromEuler(new THREE.Euler(0, prand(idx + 600) * Math.PI * 2, 0));
-      scale.set(1 * t.s, 1.25 * t.s, 1 * t.s);
+      scale.set(1 * t.s, 1.25 * t.s * TREE_HEIGHT, 1 * t.s);
       m.compose(pos, quat, scale);
       pineTrunks.setMatrixAt(idx, m);
       if (t.trunkCol) pineTrunks.setColorAt(idx, t.trunkCol);
 
-      pos.set(t.x, floorY + (1.95 + prand(idx + 800) * 0.25) * t.s, t.z);
-      scale.set(1.0 * t.s, 1.45 * t.s, 1.0 * t.s);
+      pos.set(t.x, floorY + (1.95 + prand(idx + 800) * 0.25) * t.s * TREE_HEIGHT, t.z);
+      scale.set(1.0 * t.s, 1.45 * t.s * TREE_HEIGHT, 1.0 * t.s);
       m.compose(pos, quat, scale);
       pineCanopies.setMatrixAt(idx, m);
       pineCanopies.setColorAt(idx, t.leafCol);
     });
 
     treeData.rounds.forEach((t, idx) => {
-      pos.set(t.x, floorY + 0.65 * t.s, t.z);
+      pos.set(t.x, floorY + 0.65 * t.s * TREE_HEIGHT, t.z);
       quat.setFromEuler(new THREE.Euler(0, prand(idx + 1600) * Math.PI * 2, 0));
-      scale.set(0.9 * t.s, 1.05 * t.s, 0.9 * t.s);
+      scale.set(0.9 * t.s, 1.05 * t.s * TREE_HEIGHT, 0.9 * t.s);
       m.compose(pos, quat, scale);
       roundTrunks.setMatrixAt(idx, m);
       if (t.trunkCol) roundTrunks.setColorAt(idx, t.trunkCol);
 
-      pos.set(t.x, floorY + (1.55 + prand(idx + 1800) * 0.35) * t.s, t.z);
-      scale.set(1.25 * t.s, 1.15 * t.s, 1.25 * t.s);
+      pos.set(t.x, floorY + (1.55 + prand(idx + 1800) * 0.35) * t.s * TREE_HEIGHT, t.z);
+      scale.set(1.25 * t.s, 1.15 * t.s * TREE_HEIGHT, 1.25 * t.s);
       m.compose(pos, quat, scale);
       roundCanopies.setMatrixAt(idx, m);
       roundCanopies.setColorAt(idx, t.leafCol);
     });
 
     treeData.birches.forEach((t, idx) => {
-      pos.set(t.x, floorY + 0.9 * t.s, t.z);
+      pos.set(t.x, floorY + 0.9 * t.s * TREE_HEIGHT, t.z);
       quat.setFromEuler(new THREE.Euler(0, prand(idx + 2600) * Math.PI * 2, 0));
-      scale.set(0.55 * t.s, 1.6 * t.s, 0.55 * t.s);
+      scale.set(0.55 * t.s, 1.6 * t.s * TREE_HEIGHT, 0.55 * t.s);
       m.compose(pos, quat, scale);
       birchTrunks.setMatrixAt(idx, m);
       if (t.trunkCol) birchTrunks.setColorAt(idx, t.trunkCol);
 
-      pos.set(t.x, floorY + (2.05 + prand(idx + 2800) * 0.35) * t.s, t.z);
-      scale.set(0.95 * t.s, 0.85 * t.s, 0.95 * t.s);
+      pos.set(t.x, floorY + (2.05 + prand(idx + 2800) * 0.35) * t.s * TREE_HEIGHT, t.z);
+      scale.set(0.95 * t.s, 0.85 * t.s * TREE_HEIGHT, 0.95 * t.s);
       m.compose(pos, quat, scale);
       birchCanopies.setMatrixAt(idx, m);
       birchCanopies.setColorAt(idx, t.leafCol);
@@ -1188,7 +1566,7 @@ export function ForestWorld({ floorY, curveData }) {
       treeData.cyclamenStems.forEach((c, idx) => {
         pos.set(c.x, floorY + 0.60 * c.s, c.z);
         quat.setFromEuler(new THREE.Euler(0, c.yaw, 0));
-        scale.set(0.06 * c.s, 1.20 * c.s, 0.06 * c.s);
+        scale.set(0.06 * c.s, 1.40 * c.s, 0.06 * c.s);
         m.compose(pos, quat, scale);
         cyclamenStemsInst.setMatrixAt(idx, m);
       });
@@ -1198,7 +1576,7 @@ export function ForestWorld({ floorY, curveData }) {
     if (cyclamenPetalsInst) {
       treeData.cyclamenPetals.forEach((c, idx) => {
         // Petals cluster, slightly tilted forward.
-        const headY = floorY + 1.28 * c.s + 0.02;
+        const headY = floorY + 1.46 * c.s + 0.02;
         pos.set(c.x, headY, c.z);
         quat.setFromEuler(new THREE.Euler(-Math.PI / 2 + 0.35, c.yaw, 0));
         scale.set(0.28 * c.s, 0.28 * c.s, 0.28 * c.s);
@@ -1245,7 +1623,47 @@ export function ForestWorld({ floorY, curveData }) {
         </mesh>
       ) : null}
 
-      {/* Water (single lake + ducks) */}
+      {/* Path details: small pebbles */}
+      {treeData.pathPebbles?.length ? (
+        <instancedMesh ref={pathPebbleRef} args={[null, null, treeData.pathPebbles.length]} frustumCulled={false} castShadow receiveShadow>
+          <icosahedronGeometry args={[1, 0]} />
+          <primitive object={pathPebbleMat} attach="material" />
+        </instancedMesh>
+      ) : null}
+
+      {/* Path edge stones */}
+      {treeData.edgeStones?.length ? (
+        <instancedMesh ref={edgeStoneRef} args={[null, null, treeData.edgeStones.length]} frustumCulled={false} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <primitive object={edgeStoneMat} attach="material" />
+        </instancedMesh>
+      ) : null}
+
+      {/* Fallen leaves (autumn piles) */}
+      {treeData.leafPiles?.length ? (
+        <instancedMesh ref={leafPileRef} args={[null, null, treeData.leafPiles.length]} frustumCulled={false} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <primitive object={leafPileMat} attach="material" />
+        </instancedMesh>
+      ) : null}
+
+      {/* Occasional roots crossing the path */}
+      {treeData.pathRoots?.length
+        ? treeData.pathRoots.map((r, idx) => (
+          <mesh
+            key={`root-${idx}`}
+            position={[r.x, floorY + 0.055, r.z]}
+            rotation={[Math.PI / 2, r.yaw, 0]}
+            castShadow
+            receiveShadow
+          >
+            <cylinderGeometry args={[r.r, r.r * 0.85, r.len, 7, 1]} />
+            <primitive object={rootMat} attach="material" />
+          </mesh>
+        ))
+        : null}
+
+      {/* Water (single lake) */}
       {treeData.lake ? (
         <group>
           <mesh
@@ -1270,7 +1688,7 @@ export function ForestWorld({ floorY, curveData }) {
               <meshBasicMaterial
                 map={lakeGlintTex}
                 transparent
-                opacity={0.55}
+                opacity={0.16}
                 blending={THREE.AdditiveBlending}
                 depthWrite={false}
                 toneMapped={false}
@@ -1290,7 +1708,7 @@ export function ForestWorld({ floorY, curveData }) {
               <meshBasicMaterial
                 map={rainbowTex}
                 transparent
-                opacity={0.22}
+                opacity={0.06}
                 blending={THREE.AdditiveBlending}
                 depthWrite={false}
                 toneMapped={false}
@@ -1298,36 +1716,253 @@ export function ForestWorld({ floorY, curveData }) {
             </mesh>
           ) : null}
 
-          {treeData.ducks?.map((d, idx) => (
-            <group key={`duck-${idx}`} position={[d.x, floorY + 0.055, d.z]} rotation={[0, d.yaw, 0]} scale={[d.s, d.s, d.s]}>
-              {/* body */}
-              <mesh castShadow>
-                <sphereGeometry args={[0.22, 14, 12]} />
-                <primitive object={duckBodyMat} attach="material" />
+        </group>
+      ) : null}
+
+      {/* Light & reflections props */}
+      {/* (No airborne props) */}
+
+      {/* Ancient mirrors */}
+      {propsData.mirrors.map((m, idx) => (
+        <group key={`mirror-${idx}`} position={[m.x, floorY, m.z]} rotation={[0, m.yaw, 0]} scale={[m.s * PROP_SCALE, m.s * PROP_SCALE, m.s * PROP_SCALE]}>
+          {/* frame */}
+          <mesh position={[0, 1.65, 0.02]} castShadow receiveShadow>
+            <boxGeometry args={[2.1, 3.0, 0.18]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+          {/* mirror surface */}
+          <mesh position={[0, 1.65, 0.12]}>
+            <planeGeometry args={[1.72, 2.56, 1, 1]} />
+            <primitive object={mirrorMat} attach="material" />
+          </mesh>
+          {/* base */}
+          <mesh position={[0, 0.18, -0.20]} castShadow receiveShadow>
+            <boxGeometry args={[1.0, 0.22, 0.8]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Rustic swings */}
+      {propsData.swings.map((s, idx) => (
+        <group key={`swing-${idx}`} position={[s.x, floorY, s.z]} rotation={[0, s.yaw, 0]} scale={[s.s * PROP_SCALE, s.s * PROP_SCALE, s.s * PROP_SCALE]}>
+          {/* Soft contact shadow to "stick" the swing to the ground */}
+          {softShadowTex ? (
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} scale={[2.6, 1.8, 1]} renderOrder={3}>
+              <planeGeometry args={[1, 1]} />
+              <meshBasicMaterial map={softShadowTex} transparent opacity={0.42} depthWrite={false} />
+            </mesh>
+          ) : null}
+
+          {/* Frame (anchored posts + top beam + footings) */}
+          <mesh position={[0, 2.55, 0]} castShadow receiveShadow>
+            <boxGeometry args={[2.1, 0.12, 0.16]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+          {[
+            [-0.78, 1.25, -0.48],
+            [-0.78, 1.25, 0.48],
+            [0.78, 1.25, -0.48],
+            [0.78, 1.25, 0.48],
+          ].map((p, j) => (
+            <group key={`post-${j}`} position={[p[0], 0, p[2]]}>
+              <mesh position={[0, p[1], 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[0.09, 0.11, 2.55, 10]} />
+                <primitive object={woodMat} attach="material" />
               </mesh>
-              {/* head */}
-              <mesh position={[0.16, 0.12, 0]} castShadow>
-                <sphereGeometry args={[0.14, 14, 12]} />
-                <primitive object={duckBodyMat} attach="material" />
-              </mesh>
-              {/* beak */}
-              <mesh position={[0.30, 0.10, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-                <coneGeometry args={[0.055, 0.10, 10, 1]} />
-                <primitive object={duckBeakMat} attach="material" />
-              </mesh>
-              {/* eyes */}
-              <mesh position={[0.20, 0.16, 0.06]} castShadow>
-                <sphereGeometry args={[0.02, 8, 8]} />
-                <primitive object={duckEyeMat} attach="material" />
-              </mesh>
-              <mesh position={[0.20, 0.16, -0.06]} castShadow>
-                <sphereGeometry args={[0.02, 8, 8]} />
-                <primitive object={duckEyeMat} attach="material" />
+              {/* footing */}
+              <mesh position={[0, 0.06, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[0.18, 0.22, 0.12, 14]} />
+                <primitive object={metalMat} attach="material" />
               </mesh>
             </group>
           ))}
+
+          {/* Little grass around footings to soften the hard edge */}
+          {Array.from({ length: 12 }, (_, k) => {
+            const feet = [
+              [-0.78, -0.48],
+              [-0.78, 0.48],
+              [0.78, -0.48],
+              [0.78, 0.48],
+            ];
+            const f = feet[k % feet.length];
+            const ox = (prand(idx * 1000 + k * 17 + 700) - 0.5) * 0.42;
+            const oz = (prand(idx * 1000 + k * 17 + 701) - 0.5) * 0.42;
+            const ss = 0.16 + prand(idx * 1000 + k * 17 + 702) * 0.12;
+            const yaw = prand(idx * 1000 + k * 17 + 703) * Math.PI * 2;
+            return (
+              <mesh key={`swing-grass-${k}`} position={[f[0] + ox, 0.03, f[1] + oz]} rotation={[0, yaw, 0]} castShadow>
+                <coneGeometry args={[0.11 * ss, 0.28 * ss, 6, 1]} />
+                <primitive object={grassClumpMat} attach="material" />
+              </mesh>
+            );
+          })}
+
+          {/* Swinging seat assembly */}
+          <group position={[0, 2.55, 0]} ref={idx === 0 ? swingRef : undefined}>
+            {/* ropes */}
+            <mesh position={[-0.34, -1.1, 0]} castShadow>
+              <cylinderGeometry args={[0.03, 0.03, 2.2, 8]} />
+              <primitive object={ropeMat} attach="material" />
+            </mesh>
+            <mesh position={[0.34, -1.1, 0]} castShadow>
+              <cylinderGeometry args={[0.03, 0.03, 2.2, 8]} />
+              <primitive object={ropeMat} attach="material" />
+            </mesh>
+            {/* plank */}
+            <mesh position={[0, -2.25, 0]} castShadow receiveShadow>
+              <boxGeometry args={[0.95, 0.10, 0.35]} />
+              <primitive object={woodMat} attach="material" />
+            </mesh>
+          </group>
         </group>
-      ) : null}
+      ))}
+
+      {/* Old ladders with pots/jars */}
+      {propsData.ladders.map((l, idx) => (
+        <group key={`ladder-${idx}`} position={[l.x, floorY, l.z]} rotation={[0, l.yaw, 0]} scale={[l.s * PROP_SCALE, l.s * PROP_SCALE, l.s * PROP_SCALE]}>
+          <group rotation={[0, 0, -0.35]} position={[0, 0, 0]}>
+            <mesh position={[-0.35, 1.35, 0]} castShadow receiveShadow>
+              <boxGeometry args={[0.10, 2.8, 0.10]} />
+              <primitive object={woodMat} attach="material" />
+            </mesh>
+            <mesh position={[0.35, 1.35, 0]} castShadow receiveShadow>
+              <boxGeometry args={[0.10, 2.8, 0.10]} />
+              <primitive object={woodMat} attach="material" />
+            </mesh>
+            {Array.from({ length: 5 }, (_, r) => (
+              <mesh key={r} position={[0, 0.55 + r * 0.48, 0]} castShadow receiveShadow>
+                <boxGeometry args={[0.78, 0.06, 0.12]} />
+                <primitive object={woodMat} attach="material" />
+              </mesh>
+            ))}
+
+            {/* pot */}
+            <mesh position={[0.10, 2.55, 0.12]} castShadow receiveShadow>
+              <cylinderGeometry args={[0.12, 0.16, 0.20, 12]} />
+              <meshStandardMaterial color={'#d77a3a'} roughness={0.9} metalness={0} />
+            </mesh>
+            <mesh position={[0.10, 2.70, 0.12]} castShadow>
+              <sphereGeometry args={[0.18, 12, 10]} />
+              <meshStandardMaterial color={'#2f8a3b'} roughness={0.9} metalness={0} />
+            </mesh>
+
+            {/* jar */}
+            <mesh position={[-0.18, 2.45, 0.14]} castShadow>
+              <cylinderGeometry args={[0.10, 0.12, 0.22, 12]} />
+              <meshPhysicalMaterial color={'#ffffff'} transmission={0.9} thickness={0.3} roughness={0.1} />
+            </mesh>
+            <mesh position={[-0.18, 2.33, 0.14]} castShadow>
+              <cylinderGeometry args={[0.09, 0.09, 0.06, 10]} />
+              <primitive object={woodMat} attach="material" />
+            </mesh>
+          </group>
+        </group>
+      ))}
+
+      {/* Explorer corners: table + maps + magnifier + books + easel */}
+      {propsData.explorers.map((e, idx) => (
+      <group key={`explorer-${idx}`} position={[e.x, floorY, e.z]} rotation={[0, e.yaw, 0]} scale={[e.s * PROP_SCALE, e.s * PROP_SCALE, e.s * PROP_SCALE]}>
+        {/* table */}
+        <mesh position={[0, 0.62, 0]} castShadow receiveShadow>
+          <boxGeometry args={[2.2, 0.12, 1.2]} />
+          <primitive object={woodMat} attach="material" />
+        </mesh>
+        {[
+          [-0.95, 0.30, -0.48],
+          [0.95, 0.30, -0.48],
+          [-0.95, 0.30, 0.48],
+          [0.95, 0.30, 0.48],
+        ].map((p, idx) => (
+          <mesh key={`leg-${idx}`} position={[p[0], p[1], p[2]]} castShadow receiveShadow>
+            <boxGeometry args={[0.10, 0.60, 0.10]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+        ))}
+
+        {/* maps */}
+        <mesh position={[-0.25, 0.69, 0.05]} rotation={[-Math.PI / 2, 0.25, 0]}>
+          <planeGeometry args={[1.4, 0.8]} />
+          <meshStandardMaterial color={'#f5e9c8'} roughness={0.95} metalness={0} />
+        </mesh>
+        <mesh position={[0.35, 0.70, -0.20]} rotation={[-Math.PI / 2, -0.35, 0]}>
+          <planeGeometry args={[0.9, 0.55]} />
+          <meshStandardMaterial color={'#efe0b2'} roughness={0.95} metalness={0} />
+        </mesh>
+
+        {/* magnifying glass */}
+        <mesh position={[0.62, 0.72, 0.25]} rotation={[-Math.PI / 2, 0.2, 0]} castShadow>
+          <torusGeometry args={[0.16, 0.03, 10, 22]} />
+          <primitive object={metalMat} attach="material" />
+        </mesh>
+        <mesh position={[0.78, 0.72, 0.33]} rotation={[-Math.PI / 2, 0.2, 0]} castShadow>
+          <cylinderGeometry args={[0.02, 0.02, 0.22, 10]} />
+          <primitive object={woodMat} attach="material" />
+        </mesh>
+        <mesh position={[0.62, 0.72, 0.25]} rotation={[-Math.PI / 2, 0.2, 0]}>
+          <circleGeometry args={[0.135, 18]} />
+          <meshPhysicalMaterial color={'#ffffff'} transmission={0.9} thickness={0.2} roughness={0.08} opacity={0.85} transparent />
+        </mesh>
+
+        {/* books */}
+        <mesh position={[-0.72, 0.70, -0.24]} rotation={[0, 0.6, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.38, 0.08, 0.28]} />
+          <meshStandardMaterial color={'#6b2a2a'} roughness={0.9} metalness={0.05} />
+        </mesh>
+        <mesh position={[-0.56, 0.78, -0.18]} rotation={[0, 0.2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.34, 0.07, 0.26]} />
+          <meshStandardMaterial color={'#2a3a6b'} roughness={0.9} metalness={0.05} />
+        </mesh>
+
+        {/* easel + canvas */}
+        <group position={[2.1, 0, -0.4]} rotation={[0, -0.75, 0]}>
+          <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.08, 1.8, 0.08]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+          <mesh position={[-0.35, 0.65, 0]} rotation={[0, 0, 0.12]} castShadow receiveShadow>
+            <boxGeometry args={[0.07, 1.3, 0.07]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+          <mesh position={[0.35, 0.65, 0]} rotation={[0, 0, -0.12]} castShadow receiveShadow>
+            <boxGeometry args={[0.07, 1.3, 0.07]} />
+            <primitive object={woodMat} attach="material" />
+          </mesh>
+          <mesh position={[0, 1.08, 0.12]} rotation={[0, 0, 0]}>
+            <planeGeometry args={[0.95, 0.70]} />
+            <meshStandardMaterial color={'#ffffff'} roughness={0.95} metalness={0} />
+          </mesh>
+          {/* half-painted */}
+          <mesh position={[0, 1.08, 0.121]} rotation={[0, 0, 0]}>
+            <planeGeometry args={[0.95, 0.70]} />
+            <meshBasicMaterial color={'#7fd26c'} transparent opacity={0.22} />
+          </mesh>
+        </group>
+      </group>
+      ))}
+
+      {/* Picnic blanket + baskets */}
+      {propsData.picnics.map((p, idx) => (
+        <group key={`picnic-${idx}`} position={[p.x, floorY + 0.02, p.z]} rotation={[0, p.yaw, 0]} scale={[p.s * PROP_SCALE, p.s * PROP_SCALE, p.s * PROP_SCALE]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[3.2, 2.2, 1, 1]} />
+            <meshStandardMaterial color={'#f7f1e6'} roughness={0.95} metalness={0} />
+          </mesh>
+          <mesh position={[-0.65, 0.12, 0.10]} castShadow receiveShadow>
+            <boxGeometry args={[0.55, 0.26, 0.40]} />
+            <meshStandardMaterial color={'#caa56a'} roughness={0.95} metalness={0} />
+          </mesh>
+          <mesh position={[-0.65, 0.28, 0.10]} castShadow>
+            <sphereGeometry args={[0.18, 12, 10]} />
+            <meshStandardMaterial color={'#b13b3b'} roughness={0.8} metalness={0} />
+          </mesh>
+          <mesh position={[0.55, 0.10, -0.25]} castShadow receiveShadow>
+            <boxGeometry args={[0.42, 0.22, 0.34]} />
+            <meshStandardMaterial color={'#caa56a'} roughness={0.95} metalness={0} />
+          </mesh>
+        </group>
+      ))}
 
       {/* Trees (variety) */}
       <instancedMesh ref={pineTrunkRef} args={[null, null, treeData.pines.length]} castShadow receiveShadow frustumCulled={false}>

@@ -1804,7 +1804,8 @@ SparkleTrail.propTypes = {
   enabled: PropTypes.bool,
 };
 
-function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false }) {
+function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false, occluderRootRef }) {
+  const { scene } = useThree();
   const isoOffset = useMemo(
     () => (boardMode ? new THREE.Vector3(6.2, 16.5, 12.8) : new THREE.Vector3(10.5, 10.0, 10.5)),
     [boardMode]
@@ -1814,11 +1815,42 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false 
   const scratch3Ref = useRef(new THREE.Vector3());
   const shakeScratchRef = useRef(new THREE.Vector3());
 
-  useFrame(({ camera }) => {
+  const occludersRef = useRef([]);
+  const occluderRefreshRef = useRef(0);
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const rayOriginRef = useRef(new THREE.Vector3());
+  const rayDirRef = useRef(new THREE.Vector3());
+  const occlusionAmtRef = useRef(0);
+
+  const rebuildOccluders = () => {
+    const root = occluderRootRef?.current || scene;
+    if (!root) return;
+    const out = [];
+    root.traverse((o) => {
+      if (!o.visible) return;
+      if (o.userData?.noCameraOcclude) return;
+      if (o.isInstancedMesh) {
+        out.push(o);
+        return;
+      }
+      if (o.isMesh && o.castShadow) {
+        out.push(o);
+      }
+    });
+    occludersRef.current = out;
+  };
+
+  useFrame(({ camera }, delta) => {
     if (!targetRef.current) return;
     if (!curveData?.curve) return;
     const target = targetRef.current;
     const p = target.position;
+
+    // Refresh occluder list occasionally (trees/props are static, so this is cheap and stable).
+    occluderRefreshRef.current += 1;
+    if (occludersRef.current.length === 0 || occluderRefreshRef.current % 240 === 1) {
+      rebuildOccluders();
+    }
 
     const t = typeof target.userData?.pathT === 'number'
       ? target.userData.pathT
@@ -1836,9 +1868,64 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false 
     const ahead = boardMode ? (navActive ? 2.2 : 1.6) : (navActive ? 2.6 : 1.9);
     scratch.copy(p).addScaledVector(tan, ahead);
     scratch3.copy(p).add(isoOffset).addScaledVector(tan, boardMode ? 0.45 : 0.8);
+
+    // Robot visibility: if something blocks line-of-sight, lift the camera a bit.
+    const rayOrigin = rayOriginRef.current;
+    rayOrigin.set(p.x, p.y + (boardMode ? 1.05 : 1.25), p.z);
+
+    const rayDir = rayDirRef.current;
+    rayDir.copy(scratch3).sub(rayOrigin);
+    const dist = rayDir.length();
+    let occluded = false;
+    let hitDist = Infinity;
+
+    if (dist > 0.001 && occludersRef.current.length) {
+      rayDir.multiplyScalar(1 / dist);
+      const rc = raycasterRef.current;
+      rc.near = 0.05;
+      rc.far = Math.max(0.1, dist - 0.15);
+      rc.set(rayOrigin, rayDir);
+
+      const hits = rc.intersectObjects(occludersRef.current, true);
+
+      const isPartOfTarget = (obj) => {
+        let o = obj;
+        while (o) {
+          if (o === target) return true;
+          o = o.parent;
+        }
+        return false;
+      };
+
+      for (let i = 0; i < hits.length; i += 1) {
+        const h = hits[i];
+        if (!h?.object) continue;
+        if (isPartOfTarget(h.object)) continue;
+        // Ignore tiny/near-ground intersections that aren't actually blocking the robot.
+        if (h.point && h.point.y < p.y + 0.45) continue;
+        occluded = true;
+        hitDist = h.distance;
+        break;
+      }
+    }
+
+    // Smoothly adjust an occlusion amount to avoid camera popping.
+    const targetOcc = occluded ? 1 : 0;
+    const occA = 1 - Math.exp(-(delta || 0.016) * 6.5);
+    occlusionAmtRef.current += (targetOcc - occlusionAmtRef.current) * occA;
+
+    // Lift when occluded.
+    scratch3.y += occlusionAmtRef.current * (boardMode ? 3.0 : 4.2);
+
+    // If still occluded, also pull the camera closer to the robot.
+    if (occluded && hitDist !== Infinity) {
+      const safe = Math.max(1.8, hitDist - 0.8);
+      scratch3.copy(rayOrigin).addScaledVector(rayDir, safe);
+      scratch3.y += 0.35 + occlusionAmtRef.current * 0.35;
+    }
     scratch2.copy(scratch3);
 
-    camera.position.lerp(scratch2, 0.08);
+    camera.position.lerp(scratch2, occlusionAmtRef.current > 0.01 ? 0.11 : 0.08);
 
     // Subtle candy shake (triggered externally).
     const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -1869,6 +1956,7 @@ CandyFollowCamera.propTypes = {
   }).isRequired,
   navActive: PropTypes.bool,
   boardMode: PropTypes.bool,
+  occluderRootRef: PropTypes.shape({ current: PropTypes.any }),
 };
 
 function RobotLobbyReturnAnimator({ enabled, robotRef, request, floorY }) {
@@ -2212,6 +2300,9 @@ export default function ThreeDemo({
   const robotRef = useRef(null);
   const worldRef = useRef(null);
   const sunRef = useRef(null);
+  const sunGroupRef = useRef(null);
+  const dirLightRef = useRef(null);
+  const dirLightTargetRef = useRef(null);
   const floorY = MAP_Y;
   const isLobby = sceneId === SCENES.lobby;
   const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
@@ -2247,6 +2338,50 @@ export default function ThreeDemo({
 
   const curveData = useMemo(() => buildCurveData(CANDY_PATH_POINTS), []);
 
+  function SunRig() {
+    const sunFollow = useRef({
+      fwd: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      tmp: new THREE.Vector3(),
+    });
+
+    // Keep the sun visible in-frame and shining toward the robot/trees.
+    useFrame(({ camera }, delta) => {
+      const g = sunGroupRef.current;
+      const light = dirLightRef.current;
+      const target = dirLightTargetRef.current;
+      const robot = robotRef.current;
+      if (!g || !light) return;
+
+      const { fwd, right, tmp } = sunFollow.current;
+      camera.getWorldDirection(fwd);
+      fwd.normalize();
+
+      // Right vector in camera space.
+      right.crossVectors(fwd, camera.up).normalize();
+
+      // Place sun slightly top-right in view so rays streak toward scene center.
+      tmp.copy(camera.position)
+        .addScaledVector(fwd, 160)
+        .addScaledVector(camera.up, 95)
+        .addScaledVector(right, 105);
+
+      const a = 1 - Math.exp(-delta * 2.8);
+      g.position.lerp(tmp, a);
+
+      // Match main shadow light direction to the sun.
+      light.position.copy(g.position);
+
+      if (target) {
+        if (robot) target.position.copy(robot.position);
+        else target.position.set(0, 0, 0);
+        light.target = target;
+      }
+    });
+
+    return null;
+  }
+
   return (
     <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
       <Canvas
@@ -2254,33 +2389,36 @@ export default function ThreeDemo({
         shadows
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
+        <SunRig />
         <SceneAtmosphere mode={'forest'} />
 
         {/* Forest lighting */}
         <ambientLight intensity={1.25} color={'#f3fff6'} />
         <hemisphereLight intensity={1.05} skyColor={'#effff7'} groundColor={'#2a6b2f'} />
         <directionalLight
+          ref={dirLightRef}
           position={[-14, 18, 8]}
-          intensity={1.65}
-          color={'#ffffff'}
+          intensity={1.85}
+          color={'#fff3b0'}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
         />
+        <object3D ref={dirLightTargetRef} position={[0, 0, 0]} />
 
         {/* Sun (visual) */}
-        <group position={[42, 56, -36]}>
+        <group ref={sunGroupRef} position={[42, 56, -36]}>
           <mesh ref={sunRef}>
-            <sphereGeometry args={[2.2, 24, 16]} />
-            <meshBasicMaterial color={'#fff6d6'} toneMapped={false} />
+            <sphereGeometry args={[2.6, 24, 16]} />
+            <meshBasicMaterial color={'#ffe36a'} toneMapped={false} />
           </mesh>
           {/* soft glow */}
           <mesh>
-            <sphereGeometry args={[4.6, 24, 16]} />
+            <sphereGeometry args={[6.2, 24, 16]} />
             <meshBasicMaterial
-              color={'#ffe7a8'}
+              color={'#ffd54a'}
               transparent
-              opacity={0.22}
+              opacity={0.36}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
               toneMapped={false}
@@ -2309,19 +2447,19 @@ export default function ThreeDemo({
           mode={'forest'}
         />
 
-        <CandyFollowCamera targetRef={robotRef} curveData={curveData} navActive={navActive} />
+        <CandyFollowCamera targetRef={robotRef} curveData={curveData} navActive={navActive} occluderRootRef={worldRef} />
 
         {/* Postprocessing candy bloom */}
         <EffectComposer>
-          <Bloom intensity={0.85} luminanceThreshold={0.55} luminanceSmoothing={0.12} mipmapBlur />
+          <Bloom intensity={1.05} luminanceThreshold={0.42} luminanceSmoothing={0.14} mipmapBlur />
           {sunRef.current ? (
             <GodRays
               sun={sunRef}
-              samples={45}
-              density={0.9}
-              decay={0.92}
-              weight={0.7}
-              exposure={0.28}
+              samples={70}
+              density={1.0}
+              decay={0.96}
+              weight={0.85}
+              exposure={0.48}
               clampMax={1}
               blur
             />

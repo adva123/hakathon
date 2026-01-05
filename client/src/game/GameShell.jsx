@@ -6,13 +6,14 @@ import styles from './game.module.css';
 import MainGameContainer from './MainGameContainer.jsx';
 import SideNavigation from '../components/common/SideNavigation/SideNavigation.jsx';
 import GestureManager from '../components/common/GestureManager/GestureManager.jsx';
+import bgTrackUrl from '../music/A.mp3';
 
 function useBackgroundAudio({ muted }) {
   const audioRef = useRef(null);
 
   // Lazy-create audio element once.
   useEffect(() => {
-    const audio = new Audio('/audio/bg.mp3');
+    const audio = new Audio(bgTrackUrl);
     audio.loop = true;
     audio.volume = 0.35;
     audioRef.current = audio;
@@ -31,15 +32,18 @@ function useBackgroundAudio({ muted }) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    audio.muted = Boolean(muted);
     if (muted) {
+      audio.muted = true;
       try {
         audio.pause();
+        audio.currentTime = 0;
       } catch {
         // ignore
       }
       return;
     }
+
+    audio.muted = false;
 
     // Autoplay may be blocked until user interaction; ignore errors.
     audio.play().catch(() => {});

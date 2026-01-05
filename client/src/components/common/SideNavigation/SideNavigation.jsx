@@ -107,7 +107,7 @@ export default function SideNavigation({
         <div className={styles.section}>
           <div className={styles.row}>
             <div>
-              <div className={styles.small}>Energy</div>
+              <div className={styles.title} style={{ marginBottom: 10 }}>Energy</div>
               <EnergyBar energy={energy} />
             </div>
             <div className={styles.kpi}>Score: {score}</div>
@@ -162,8 +162,7 @@ export default function SideNavigation({
                 <div className={styles.row}>
                   <div className={styles.iconWrap}>{it.icon}</div>
                   <div style={{ flex: 1 }}>
-                    <div className={styles.gestureName}>{it.name}</div>
-                    <div className={styles.gestureAction}>{it.action}</div>
+                    <div className={styles.gestureName}>{it.action}</div>
                   </div>
                 </div>
               </div>

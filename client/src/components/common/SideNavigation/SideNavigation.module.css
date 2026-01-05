@@ -9,11 +9,37 @@
   overflow: hidden;
   z-index: 55;
   border-radius: 26px;
-  background: color-mix(in srgb, white 92%, var(--neo-text) 8%);
-  border: 1px solid color-mix(in srgb, var(--neo-text) 14%, transparent);
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--neo-text) 18%, transparent);
+  font-family: 'Rajdhani', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: color-mix(in srgb, white 46%, transparent);
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid color-mix(in srgb, white 34%, transparent);
+  box-shadow:
+    0 18px 44px color-mix(in srgb, var(--neo-text) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--candy-sky) 16%, transparent) inset,
+    0 0 26px color-mix(in srgb, var(--candy-sky) 14%, transparent);
   display: flex;
   flex-direction: column;
+  animation: panelIn 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
 }
 
 .root::before {
@@ -74,17 +100,22 @@
   position: relative;
 }
 
+.header .title {
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+
 .title {
   color: color-mix(in srgb, var(--neo-text) 92%, transparent);
-  letter-spacing: 0.03em;
-  font-size: 14px;
+  letter-spacing: 0.05em;
+  font-size: 15px;
   font-weight: 800;
   margin: 0;
   text-shadow: none;
 }
 
 .section {
-  padding: 12px;
+  padding: 14px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--neo-text) 10%, transparent);
   position: relative;
 }
@@ -98,7 +129,7 @@
 
 .kpis {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
   margin-top: 10px;
 }
@@ -106,23 +137,33 @@
 .kpi {
   padding: 6px 10px;
   border-radius: 999px;
-  background: color-mix(in srgb, white 88%, var(--candy-mint) 12%);
-  border: 1px solid color-mix(in srgb, var(--neo-text) 14%, transparent);
+  background: color-mix(in srgb, white 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--candy-sky) 32%, transparent);
   color: color-mix(in srgb, var(--neo-text) 92%, transparent);
   font-size: 13px;
   font-weight: 700;
   box-shadow:
-    0 1px 0 color-mix(in srgb, white 60%, transparent) inset,
-    0 10px 18px color-mix(in srgb, var(--neo-text) 12%, transparent);
+    0 0 0 1px color-mix(in srgb, white 30%, transparent) inset,
+    0 14px 28px color-mix(in srgb, var(--neo-text) 12%, transparent),
+    0 0 18px color-mix(in srgb, var(--candy-sky) 10%, transparent);
   cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .kpi:hover {
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.03);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--glass-border) 62%, transparent) inset,
-    0 14px 26px color-mix(in srgb, var(--neo-text) 18%, transparent),
-    0 0 18px color-mix(in srgb, var(--candy-sky) 22%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--candy-sky) 40%, transparent) inset,
+    0 18px 36px color-mix(in srgb, var(--neo-text) 18%, transparent),
+    0 0 22px color-mix(in srgb, var(--candy-sky) 22%, transparent);
+}
+
+.kpi:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--candy-lemon) 38%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--candy-sky) 40%, transparent) inset,
+    0 18px 36px color-mix(in srgb, var(--neo-text) 18%, transparent);
 }
 
 .small {
@@ -138,10 +179,22 @@
 
 .gestureCard {
   border-radius: 22px;
-  padding: 10px;
-  background: color-mix(in srgb, white 90%, var(--candy-sky) 10%);
-  border: 1px solid color-mix(in srgb, var(--neo-text) 12%, transparent);
-  box-shadow: 0 10px 18px color-mix(in srgb, var(--neo-text) 12%, transparent);
+  padding: 9px;
+  background: color-mix(in srgb, white 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--candy-sky) 18%, transparent);
+  box-shadow:
+    0 14px 26px color-mix(in srgb, var(--neo-text) 12%, transparent),
+    0 0 18px color-mix(in srgb, var(--candy-sky) 10%, transparent);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.gestureCard:hover {
+  transform: translateY(-1px) scale(1.02);
+  border-color: color-mix(in srgb, var(--candy-sky) 34%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--candy-sky) 26%, transparent) inset,
+    0 18px 34px color-mix(in srgb, var(--neo-text) 16%, transparent),
+    0 0 22px color-mix(in srgb, var(--candy-sky) 18%, transparent);
 }
 
 .gestureName {
@@ -149,6 +202,13 @@
   font-size: 12px;
   margin-top: 8px;
   font-weight: 800;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+  transition: opacity 160ms ease;
+}
+
+.gestureCard:hover .gestureName {
+  opacity: 1;
 }
 
 .gestureAction {
@@ -165,14 +225,16 @@
 }
 
 .iconWrap {
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, white 88%, var(--candy-lemon) 12%);
-  border: 1px solid color-mix(in srgb, var(--neo-text) 12%, transparent);
-  box-shadow: 0 10px 16px color-mix(in srgb, var(--neo-text) 10%, transparent);
+  background: color-mix(in srgb, white 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--candy-lemon) 24%, transparent);
+  box-shadow:
+    0 10px 18px color-mix(in srgb, var(--neo-text) 10%, transparent),
+    0 0 14px color-mix(in srgb, var(--candy-lemon) 10%, transparent);
 }
 
 .footer {
@@ -205,8 +267,8 @@
   background:
     radial-gradient(circle at 18% 30%, color-mix(in srgb, var(--candy-mint) 22%, transparent), transparent 52%),
     radial-gradient(circle at 76% 72%, color-mix(in srgb, var(--candy-sky) 18%, transparent), transparent 56%),
-    color-mix(in srgb, white 92%, var(--neo-text) 8%);
-  border: 1px solid color-mix(in srgb, var(--neo-text) 12%, transparent);
+    color-mix(in srgb, white 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--candy-sky) 18%, transparent);
 }
 
 .destinationsMap::before {
