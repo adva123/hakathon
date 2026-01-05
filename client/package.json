@@ -10,9 +10,15 @@
     "preview": "eslint . && vite preview"
   },
   "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/drawing_utils": "^0.3.1675466124",
+    "@mediapipe/hands": "^0.4.1675469240",
     "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.4.2",
+    "@react-three/fiber": "^9.5.0",
+    "@react-three/postprocessing": "^3.0.4",
     "axios": "^1.13.2",
+    "postprocessing": "^6.38.2",
+    "prop-types": "^15.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router": "^7.9.6",

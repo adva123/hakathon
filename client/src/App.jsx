@@ -1,11 +1,7 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router'
-import Home from './pages/HomePage/HomePage';
-import styles from './styles/App.module.css';
-import projectLogo from './assets/project-logo.png'
-import ThreeDemo from "./ThreeDemo";
+import GameShell from './game/GameShell.jsx';
 
 function App() {
-  return <ThreeDemo />;
+  return <GameShell />;
 }
 
 export default App;

@@ -1,0 +1,127 @@
+:root {
+  --bg0: #ffe7f2;
+  --bg1: #fff6d6;
+  --ink: rgba(25, 25, 28, 0.88);
+  --panel: rgba(255, 255, 255, 0.78);
+  --panelBorder: rgba(255, 255, 255, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  color: var(--ink);
+  background: radial-gradient(1200px 600px at 20% 15%, var(--bg1), transparent 60%),
+    radial-gradient(900px 700px at 80% 25%, var(--bg0), transparent 55%),
+    linear-gradient(180deg, #fff, #ffeef7);
+  overflow: hidden;
+}
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.6));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.brand__title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.brand__subtitle {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panelBorder);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot--done {
+  background: linear-gradient(180deg, #5eead4, #22c55e);
+}
+
+.dot--current {
+  background: linear-gradient(180deg, #ffce3a, #ff5aa7);
+}
+
+.dot--locked {
+  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+}
+
+.mapWrap {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.map {
+  width: 100%;
+  display: block;
+}
+
+.toast {
+  position: sticky;
+  bottom: 12px;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: min(560px, calc(100% - 24px));
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

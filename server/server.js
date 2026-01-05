@@ -15,15 +15,15 @@ const app = express();
 app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'images'))); // Serve static images
 
-app.use(cors({
-  origin: process.env.CLIENT_URL
-}));
+// Dev-friendly CORS: allow the client regardless of Vite port (3000/3001/etc.).
+// If you want to lock it down later, replace this with an allowlist.
+app.use(cors());
 
 // Use the routes file for all `/ducks` routes
 app.use('/ducks', rubberDuckRoutes);
 
 // Start server
-const PORT = process.env.PORT;
+const PORT = Number(process.env.PORT) || 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
