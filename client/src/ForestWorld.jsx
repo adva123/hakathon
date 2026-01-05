@@ -4,6 +4,9 @@ import PropTypes from 'prop-types';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
+// Bump this to force tree re-generation under React Fast Refresh.
+const TREE_COLOR_REV = 1;
+
 function prand(n) {
   // Deterministic pseudo-random in [0,1).
   const x = Math.sin(n * 973.231 + n * n * 0.131) * 43758.5453123;
@@ -579,7 +582,7 @@ export function ForestWorld({ floorY, curveData }) {
       lake,
       ducks,
     };
-  }, [curveData, pathPoints]);
+  }, [curveData, pathPoints, TREE_COLOR_REV]);
 
   const trunkMat = useMemo(
     () =>
