@@ -5,7 +5,7 @@ import { OrbitControls } from '@react-three/drei';
 import PropTypes from 'prop-types';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Bloom, EffectComposer } from '@react-three/postprocessing';
+import { Bloom, EffectComposer, GodRays } from '@react-three/postprocessing';
 import RobotModel from './RobotModel.jsx';
 import { SCENES } from './context/gameState.js';
 import { CANDY_PATH_POINTS, MAP_Y } from './game/mapTargets.js';
@@ -811,13 +811,14 @@ function SceneAtmosphere({ mode }) {
       fogFar = 120;
     } else if (mode === 'forest') {
       bg = '#bfe6ff';
-      fogColor = '#bfe6ff';
-      fogNear = 24;
-      fogFar = 120;
+      // No fog in forest: user wants foliage colors not to depend on distance.
+      fogColor = '#d9ffe6';
+      fogNear = 9999;
+      fogFar = 10000;
     }
 
     scene.background = new THREE.Color(bg);
-    scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+    scene.fog = mode === 'forest' ? null : new THREE.Fog(fogColor, fogNear, fogFar);
   }, [mode, scene]);
 
   return null;
@@ -2210,6 +2211,7 @@ export default function ThreeDemo({
 }) {
   const robotRef = useRef(null);
   const worldRef = useRef(null);
+  const sunRef = useRef(null);
   const floorY = MAP_Y;
   const isLobby = sceneId === SCENES.lobby;
   const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
@@ -2255,16 +2257,36 @@ export default function ThreeDemo({
         <SceneAtmosphere mode={'forest'} />
 
         {/* Forest lighting */}
-        <ambientLight intensity={0.85} color={'#e9fff0'} />
-        <hemisphereLight intensity={0.65} skyColor={'#d8f1ff'} groundColor={'#163018'} />
+        <ambientLight intensity={1.25} color={'#f3fff6'} />
+        <hemisphereLight intensity={1.05} skyColor={'#effff7'} groundColor={'#2a6b2f'} />
         <directionalLight
           position={[-14, 18, 8]}
-          intensity={1.1}
-          color={'#fff1d0'}
+          intensity={1.65}
+          color={'#ffffff'}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
         />
+
+        {/* Sun (visual) */}
+        <group position={[42, 56, -36]}>
+          <mesh ref={sunRef}>
+            <sphereGeometry args={[2.2, 24, 16]} />
+            <meshBasicMaterial color={'#fff6d6'} toneMapped={false} />
+          </mesh>
+          {/* soft glow */}
+          <mesh>
+            <sphereGeometry args={[4.6, 24, 16]} />
+            <meshBasicMaterial
+              color={'#ffe7a8'}
+              transparent
+              opacity={0.22}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
+        </group>
 
         <ForestSky />
 
@@ -2292,6 +2314,18 @@ export default function ThreeDemo({
         {/* Postprocessing candy bloom */}
         <EffectComposer>
           <Bloom intensity={0.85} luminanceThreshold={0.55} luminanceSmoothing={0.12} mipmapBlur />
+          {sunRef.current ? (
+            <GodRays
+              sun={sunRef}
+              samples={45}
+              density={0.9}
+              decay={0.92}
+              weight={0.7}
+              exposure={0.28}
+              clampMax={1}
+              blur
+            />
+          ) : null}
         </EffectComposer>
 
         <OrbitControls enablePan={false} enableZoom={false} enableRotate={false} enableKeys={false} />

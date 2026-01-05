@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 // Bump this to force tree re-generation under React Fast Refresh.
-const TREE_COLOR_REV = 1;
+const TREE_COLOR_REV = 2;
 
 function prand(n) {
   // Deterministic pseudo-random in [0,1).
@@ -210,6 +210,81 @@ function makePoiIconTexture({ emoji, size = 256 } = {}) {
   return tex;
 }
 
+function makeLakeGlintTexture({ size = 256 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.48;
+  const g = ctx.createRadialGradient(cx, cy, r * 0.05, cx, cy, r);
+  g.addColorStop(0, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.22)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // A faint streak to feel like a sun reflection.
+  ctx.globalAlpha = 0.28;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(cx - size * 0.02, cy - size * 0.28, size * 0.04, size * 0.56);
+  ctx.globalAlpha = 1;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeRainbowStripTexture({ width = 512, height = 64 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, width, height);
+
+  const g = ctx.createLinearGradient(0, 0, width, 0);
+  g.addColorStop(0.00, 'rgba(255,60,60,1)');
+  g.addColorStop(0.16, 'rgba(255,160,60,1)');
+  g.addColorStop(0.33, 'rgba(255,240,90,1)');
+  g.addColorStop(0.50, 'rgba(80,255,140,1)');
+  g.addColorStop(0.66, 'rgba(60,220,255,1)');
+  g.addColorStop(0.82, 'rgba(80,120,255,1)');
+  g.addColorStop(1.00, 'rgba(190,90,255,1)');
+
+  // Soft vertical fade (thin rainbow arc look).
+  const v = ctx.createLinearGradient(0, 0, 0, height);
+  v.addColorStop(0.0, 'rgba(255,255,255,0)');
+  v.addColorStop(0.35, 'rgba(255,255,255,1)');
+  v.addColorStop(0.65, 'rgba(255,255,255,1)');
+  v.addColorStop(1.0, 'rgba(255,255,255,0)');
+
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, width, height);
+  ctx.globalCompositeOperation = 'source-over';
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export function ForestSky() {
   const tex = useMemo(() => makeForestSkyTexture(), []);
   if (!tex) return null;
@@ -224,6 +299,8 @@ export function ForestSky() {
 
 export function ForestWorld({ floorY, curveData }) {
   const grassTex = useMemo(() => makeGrassTexture(), []);
+  const lakeGlintTex = useMemo(() => makeLakeGlintTexture(), []);
+  const rainbowTex = useMemo(() => makeRainbowStripTexture(), []);
 
   const pathPoints = useMemo(() => {
     if (!curveData?.curve) return [];
@@ -289,47 +366,46 @@ export function ForestWorld({ floorY, curveData }) {
       const typeRoll = prand(i + 777);
       const s = 0.72 + prand(i + 300) * 0.9;
 
-      // Canopy tint: mix of very bright (grass-like), darker green, and mid/mixed.
-      const leafVariant = prand(i + 4020);
-      const pickLeafLight = () => {
-        // Push contrast harder: very bright vs deep dark.
-        if (leafVariant < 0.34) return 0.74 + prand(i + 4040) * 0.14; // very bright (grass-like)
-        if (leafVariant < 0.68) return 0.20 + prand(i + 4050) * 0.16; // deep dark
-        return 0.52 + prand(i + 4060) * 0.18; // mid/mixed
-      };
-      const pickLeafSat = () => {
-        if (leafVariant < 0.34) return 0.92 + prand(i + 4075) * 0.08; // super vivid
-        if (leafVariant < 0.68) return 0.78 + prand(i + 4085) * 0.14; // still saturated
-        return 0.86 + prand(i + 4095) * 0.10; // vivid mid
-      };
+      // Strongly mixed per-tree palette choice (no distance/spatial pattern):
+      // 0 = bright green, 1 = khaki green, 2 = dark green.
+      const sx = Math.floor((x + bounds) * 17);
+      const sz = Math.floor((z + bounds) * 17);
+      const spatialSeed = (sx * 73856093) ^ (sz * 19349663);
+      const mixSeed = (spatialSeed ^ (i * 83492791)) | 0;
+      const variant = Math.floor(prand(mixSeed + 9001) * 3);
+      const jitterH = (prand(mixSeed + 9011) - 0.5) * 0.05;
+      const jitterS = (prand(mixSeed + 9021) - 0.5) * 0.10;
+      const jitterL = (prand(mixSeed + 9031) - 0.5) * 0.10;
+
+      const palette = (() => {
+        // HSL: hue in [0..1], saturation/lightness in [0..1]
+        if (variant === 0) return { h: 0.30, s: 0.92, l: 0.58 }; // bright green
+        if (variant === 1) return { h: 0.22, s: 0.55, l: 0.44 }; // khaki/olive green
+        return { h: 0.31, s: 0.80, l: 0.26 }; // dark green
+      })();
+
+      const leafH = (palette.h + jitterH + 1) % 1;
+      const leafS = Math.max(0.35, Math.min(1, palette.s + jitterS));
+      const leafL = Math.max(0.18, Math.min(0.72, palette.l + jitterL));
 
       // Trunk tint: not all the same dark brown.
-      const trunkVariant = prand(i + 4120);
-      const trunkHue = 0.07 + prand(i + 4150) * 0.04; // brown/orange range
-      const trunkSat = 0.52 + prand(i + 4160) * 0.18;
-      const trunkLight = trunkVariant < 0.55 ? 0.16 + prand(i + 4130) * 0.10 : 0.26 + prand(i + 4140) * 0.12;
+      const trunkVariant = prand(spatialSeed + 4120);
+      const trunkHue = 0.07 + prand(spatialSeed + 4150) * 0.04; // brown/orange range
+      const trunkSat = 0.52 + prand(spatialSeed + 4160) * 0.18;
+      const trunkLight = trunkVariant < 0.55 ? 0.16 + prand(spatialSeed + 4130) * 0.10 : 0.26 + prand(spatialSeed + 4140) * 0.12;
       const trunkCol = new THREE.Color().setHSL(trunkHue, Math.min(0.78, trunkSat), Math.min(0.44, trunkLight));
 
       if (typeRoll < 0.48) {
-        const hue = 0.26 + prand(i + 400) * 0.14; // wider green range
-        const sat = pickLeafSat();
-        const light = pickLeafLight();
-        const leafCol = new THREE.Color().setHSL(hue, Math.min(1, sat), Math.min(0.90, light));
+        const leafCol = new THREE.Color().setHSL(leafH, leafS, leafL);
         pines.push({ x, z, s, leafCol, trunkCol });
       } else if (typeRoll < 0.82) {
-        const hue = 0.25 + prand(i + 410) * 0.16;
-        const sat = pickLeafSat();
-        const light = pickLeafLight();
-        const leafCol = new THREE.Color().setHSL(hue, Math.min(1, sat), Math.min(0.90, light));
+        const leafCol = new THREE.Color().setHSL(leafH, leafS, leafL);
         rounds.push({ x, z, s, leafCol, trunkCol });
       } else {
-        const hue = 0.27 + prand(i + 420) * 0.14;
-        const sat = pickLeafSat();
-        const light = pickLeafLight();
-        const leafCol = new THREE.Color().setHSL(hue, Math.min(1, sat), Math.min(0.90, light));
+        const leafCol = new THREE.Color().setHSL(leafH, leafS, leafL);
         // Birches use a lighter, slightly desaturated trunk range.
-        const birchTrunkLight = 0.74 + prand(i + 4180) * 0.16;
-        const birchTrunkSat = 0.06 + prand(i + 4190) * 0.08;
+        const birchTrunkLight = 0.74 + prand(spatialSeed + 4180) * 0.16;
+        const birchTrunkSat = 0.06 + prand(spatialSeed + 4190) * 0.08;
         const birchTrunkCol = new THREE.Color().setHSL(0.10, birchTrunkSat, Math.min(0.92, birchTrunkLight));
         birches.push({ x, z, s, leafCol, trunkCol: birchTrunkCol });
       }
@@ -611,6 +687,8 @@ export function ForestWorld({ floorY, curveData }) {
       new THREE.MeshStandardMaterial({
         color: '#ffffff',
         vertexColors: true,
+        emissive: new THREE.Color('#1fff63'),
+        emissiveIntensity: 0.10,
         roughness: 0.85,
         metalness: 0,
       }),
@@ -622,6 +700,8 @@ export function ForestWorld({ floorY, curveData }) {
       new THREE.MeshStandardMaterial({
         color: '#ffffff',
         vertexColors: true,
+        emissive: new THREE.Color('#1fff63'),
+        emissiveIntensity: 0.10,
         roughness: 0.86,
         metalness: 0,
       }),
@@ -805,8 +885,8 @@ export function ForestWorld({ floorY, curveData }) {
         color: '#67d5ff',
         transparent: true,
         opacity: 0.72,
-        roughness: 0.10,
-        metalness: 0.05,
+        roughness: 0.06,
+        metalness: 0.12,
       }),
     []
   );
@@ -1151,7 +1231,7 @@ export function ForestWorld({ floorY, curveData }) {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
         <planeGeometry args={[140, 140, 1, 1]} />
         <meshStandardMaterial
-          color={'#2f8a3b'}
+          color={'#43c75a'}
           map={grassTex || undefined}
           roughness={1}
           metalness={0}
@@ -1177,6 +1257,46 @@ export function ForestWorld({ floorY, curveData }) {
             <circleGeometry args={[1, 48]} />
             <primitive object={waterMat} attach="material" />
           </mesh>
+
+          {/* Sun glint reflection */}
+          {lakeGlintTex ? (
+            <mesh
+              rotation={[-Math.PI / 2, treeData.lake.yaw + 0.35, 0]}
+              position={[treeData.lake.x, floorY + 0.033, treeData.lake.z]}
+              scale={[treeData.lake.rx * 0.72, treeData.lake.rz * 0.34, 1]}
+              renderOrder={5}
+            >
+              <circleGeometry args={[1, 48]} />
+              <meshBasicMaterial
+                map={lakeGlintTex}
+                transparent
+                opacity={0.55}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                toneMapped={false}
+              />
+            </mesh>
+          ) : null}
+
+          {/* Subtle rainbow arc on the lake */}
+          {rainbowTex ? (
+            <mesh
+              rotation={[-Math.PI / 2, treeData.lake.yaw - 0.15, 0]}
+              position={[treeData.lake.x, floorY + 0.034, treeData.lake.z]}
+              scale={[treeData.lake.rx * 0.92, treeData.lake.rz * 0.92, 1]}
+              renderOrder={6}
+            >
+              <ringGeometry args={[0.62, 1.0, 96, 1, Math.PI * 0.05, Math.PI * 0.80]} />
+              <meshBasicMaterial
+                map={rainbowTex}
+                transparent
+                opacity={0.22}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                toneMapped={false}
+              />
+            </mesh>
+          ) : null}
 
           {treeData.ducks?.map((d, idx) => (
             <group key={`duck-${idx}`} position={[d.x, floorY + 0.055, d.z]} rotation={[0, d.yaw, 0]} scale={[d.s, d.s, d.s]}>
@@ -1210,114 +1330,114 @@ export function ForestWorld({ floorY, curveData }) {
       ) : null}
 
       {/* Trees (variety) */}
-      <instancedMesh ref={pineTrunkRef} args={[null, null, treeData.pines.length]} castShadow receiveShadow>
+      <instancedMesh ref={pineTrunkRef} args={[null, null, treeData.pines.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.16, 0.22, 1.7, 7, 1]} />
         <primitive object={trunkMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={pineCanopyRef} args={[null, null, treeData.pines.length]} castShadow>
+      <instancedMesh ref={pineCanopyRef} args={[null, null, treeData.pines.length]} castShadow frustumCulled={false}>
         <coneGeometry args={[0.95, 2.35, 10, 1]} />
         <primitive object={leafMat} attach="material" />
       </instancedMesh>
 
-      <instancedMesh ref={roundTrunkRef} args={[null, null, treeData.rounds.length]} castShadow receiveShadow>
+      <instancedMesh ref={roundTrunkRef} args={[null, null, treeData.rounds.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.14, 0.2, 1.35, 7, 1]} />
         <primitive object={trunkMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={roundCanopyRef} args={[null, null, treeData.rounds.length]} castShadow>
+      <instancedMesh ref={roundCanopyRef} args={[null, null, treeData.rounds.length]} castShadow frustumCulled={false}>
         <sphereGeometry args={[1.05, 12, 10]} />
         <primitive object={roundLeafMat} attach="material" />
       </instancedMesh>
 
-      <instancedMesh ref={birchTrunkRef} args={[null, null, treeData.birches.length]} castShadow receiveShadow>
+      <instancedMesh ref={birchTrunkRef} args={[null, null, treeData.birches.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.11, 0.16, 2.0, 8, 1]} />
         <primitive object={birchMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={birchCanopyRef} args={[null, null, treeData.birches.length]} castShadow>
+      <instancedMesh ref={birchCanopyRef} args={[null, null, treeData.birches.length]} castShadow frustumCulled={false}>
         <dodecahedronGeometry args={[0.85, 0]} />
         <primitive object={leafMat} attach="material" />
       </instancedMesh>
 
       {/* Palm trees (bright green) */}
-      <instancedMesh ref={palmTrunkRef} args={[null, null, treeData.palms.length]} castShadow receiveShadow>
+      <instancedMesh ref={palmTrunkRef} args={[null, null, treeData.palms.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.12, 0.14, 1.0, 9, 1]} />
         <primitive object={palmTrunkMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={palmFrondRef} args={[null, null, treeData.palmFronds.length]} castShadow receiveShadow>
+      <instancedMesh ref={palmFrondRef} args={[null, null, treeData.palmFronds.length]} castShadow receiveShadow frustumCulled={false}>
         {/* A flattened cone reads like a palm frond cluster from above */}
         <coneGeometry args={[1.0, 0.55, 8, 1]} />
         <primitive object={palmLeafMat} attach="material" />
       </instancedMesh>
 
       {/* Bushes near the path */}
-      <instancedMesh ref={bushRef} args={[null, null, treeData.bushes.length]} castShadow receiveShadow>
+      <instancedMesh ref={bushRef} args={[null, null, treeData.bushes.length]} castShadow receiveShadow frustumCulled={false}>
         <sphereGeometry args={[0.45, 10, 8]} />
         <primitive object={bushMat} attach="material" />
       </instancedMesh>
 
       {/* Flowers */}
-      <instancedMesh ref={flowerRef} args={[null, null, treeData.flowers.length]} castShadow receiveShadow>
+      <instancedMesh ref={flowerRef} args={[null, null, treeData.flowers.length]} castShadow receiveShadow frustumCulled={false}>
         <coneGeometry args={[0.08, 0.18, 6, 1]} />
         <primitive object={flowerMat} attach="material" />
       </instancedMesh>
 
       {/* Sunflowers */}
-      <instancedMesh ref={sunflowerStemRef} args={[null, null, treeData.sunflowers.length]} castShadow receiveShadow>
+      <instancedMesh ref={sunflowerStemRef} args={[null, null, treeData.sunflowers.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.06, 0.06, 1.0, 7, 1]} />
         <primitive object={sunflowerStemMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={sunflowerPetalRef} args={[null, null, treeData.sunflowers.length]} castShadow receiveShadow>
+      <instancedMesh ref={sunflowerPetalRef} args={[null, null, treeData.sunflowers.length]} castShadow receiveShadow frustumCulled={false}>
         <circleGeometry args={[1.0, 12]} />
         <primitive object={sunflowerPetalMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={sunflowerCenterRef} args={[null, null, treeData.sunflowers.length]} castShadow receiveShadow>
+      <instancedMesh ref={sunflowerCenterRef} args={[null, null, treeData.sunflowers.length]} castShadow receiveShadow frustumCulled={false}>
         <circleGeometry args={[1.0, 12]} />
         <primitive object={sunflowerCenterMat} attach="material" />
       </instancedMesh>
 
       {/* Roses */}
-      <instancedMesh ref={roseLeafRef} args={[null, null, treeData.roseLeaves.length]} castShadow receiveShadow>
+      <instancedMesh ref={roseLeafRef} args={[null, null, treeData.roseLeaves.length]} castShadow receiveShadow frustumCulled={false}>
         <sphereGeometry args={[0.26, 10, 8]} />
         <primitive object={roseLeafMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={roseBloomRef} args={[null, null, treeData.roseBlooms.length]} castShadow receiveShadow>
+      <instancedMesh ref={roseBloomRef} args={[null, null, treeData.roseBlooms.length]} castShadow receiveShadow frustumCulled={false}>
         <icosahedronGeometry args={[0.22, 1]} />
         <primitive object={roseMat} attach="material" />
       </instancedMesh>
 
       {/* Cyclamen (pink, tall) */}
-      <instancedMesh ref={cyclamenStemRef} args={[null, null, treeData.cyclamenStems.length]} castShadow receiveShadow>
+      <instancedMesh ref={cyclamenStemRef} args={[null, null, treeData.cyclamenStems.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.05, 0.05, 1.0, 7, 1]} />
         <primitive object={cyclamenStemMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={cyclamenPetalRef} args={[null, null, treeData.cyclamenPetals.length]} castShadow receiveShadow>
+      <instancedMesh ref={cyclamenPetalRef} args={[null, null, treeData.cyclamenPetals.length]} castShadow receiveShadow frustumCulled={false}>
         <circleGeometry args={[1.0, 14]} />
         <primitive object={cyclamenPetalMat} attach="material" />
       </instancedMesh>
 
       {/* Gypsophila (colorful bouquets) */}
-      <instancedMesh ref={gypsophilaRef} args={[null, null, treeData.gypsophila.length]} castShadow receiveShadow>
+      <instancedMesh ref={gypsophilaRef} args={[null, null, treeData.gypsophila.length]} castShadow receiveShadow frustumCulled={false}>
         <sphereGeometry args={[0.18, 8, 7]} />
         <primitive object={gypsophilaMat} attach="material" />
       </instancedMesh>
 
       {/* Taller grass clumps */}
-      <instancedMesh ref={grassClumpRef} args={[null, null, treeData.grassClumps.length]} castShadow receiveShadow>
+      <instancedMesh ref={grassClumpRef} args={[null, null, treeData.grassClumps.length]} castShadow receiveShadow frustumCulled={false}>
         <coneGeometry args={[0.14, 0.55, 6, 1]} />
         <primitive object={grassClumpMat} attach="material" />
       </instancedMesh>
 
       {/* Rocks */}
-      <instancedMesh ref={rockRef} args={[null, null, treeData.rocks.length]} castShadow receiveShadow>
+      <instancedMesh ref={rockRef} args={[null, null, treeData.rocks.length]} castShadow receiveShadow frustumCulled={false}>
         <dodecahedronGeometry args={[0.32, 0]} />
         <primitive object={rockMat} attach="material" />
       </instancedMesh>
 
       {/* Mushrooms */}
-      <instancedMesh ref={mushroomStemRef} args={[null, null, treeData.mushrooms.length]} castShadow receiveShadow>
+      <instancedMesh ref={mushroomStemRef} args={[null, null, treeData.mushrooms.length]} castShadow receiveShadow frustumCulled={false}>
         <cylinderGeometry args={[0.05, 0.06, 0.18, 8, 1]} />
         <primitive object={mushroomStemMat} attach="material" />
       </instancedMesh>
-      <instancedMesh ref={mushroomCapRef} args={[null, null, treeData.mushrooms.length]} castShadow receiveShadow>
+      <instancedMesh ref={mushroomCapRef} args={[null, null, treeData.mushrooms.length]} castShadow receiveShadow frustumCulled={false}>
         <sphereGeometry args={[0.10, 10, 8]} />
         <primitive object={mushroomCapMat} attach="material" />
       </instancedMesh>
