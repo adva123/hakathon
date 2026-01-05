@@ -286,24 +286,49 @@ export function ForestWorld({ floorY, curveData }) {
       const typeRoll = prand(i + 777);
       const s = 0.72 + prand(i + 300) * 0.9;
 
+      // Canopy tint: mix of very bright (grass-like), darker green, and mid/mixed.
+      const leafVariant = prand(i + 4020);
+      const pickLeafLight = () => {
+        // Push contrast harder: very bright vs deep dark.
+        if (leafVariant < 0.34) return 0.74 + prand(i + 4040) * 0.14; // very bright (grass-like)
+        if (leafVariant < 0.68) return 0.20 + prand(i + 4050) * 0.16; // deep dark
+        return 0.52 + prand(i + 4060) * 0.18; // mid/mixed
+      };
+      const pickLeafSat = () => {
+        if (leafVariant < 0.34) return 0.92 + prand(i + 4075) * 0.08; // super vivid
+        if (leafVariant < 0.68) return 0.78 + prand(i + 4085) * 0.14; // still saturated
+        return 0.86 + prand(i + 4095) * 0.10; // vivid mid
+      };
+
+      // Trunk tint: not all the same dark brown.
+      const trunkVariant = prand(i + 4120);
+      const trunkHue = 0.07 + prand(i + 4150) * 0.04; // brown/orange range
+      const trunkSat = 0.52 + prand(i + 4160) * 0.18;
+      const trunkLight = trunkVariant < 0.55 ? 0.16 + prand(i + 4130) * 0.10 : 0.26 + prand(i + 4140) * 0.12;
+      const trunkCol = new THREE.Color().setHSL(trunkHue, Math.min(0.78, trunkSat), Math.min(0.44, trunkLight));
+
       if (typeRoll < 0.48) {
-        const hue = 0.28 + prand(i + 400) * 0.10;
-        let light = 0.28 + prand(i + 500) * 0.10;
-        if (prand(i + 505) > 0.78) light = Math.min(0.62, light + 0.16);
-        const col = new THREE.Color().setHSL(hue, 0.62, light);
-        pines.push({ x, z, s, col });
+        const hue = 0.26 + prand(i + 400) * 0.14; // wider green range
+        const sat = pickLeafSat();
+        const light = pickLeafLight();
+        const leafCol = new THREE.Color().setHSL(hue, Math.min(1, sat), Math.min(0.90, light));
+        pines.push({ x, z, s, leafCol, trunkCol });
       } else if (typeRoll < 0.82) {
-        const hue = 0.25 + prand(i + 410) * 0.12;
-        let light = 0.34 + prand(i + 520) * 0.10;
-        if (prand(i + 525) > 0.78) light = Math.min(0.62, light + 0.14);
-        const col = new THREE.Color().setHSL(hue, 0.55, light);
-        rounds.push({ x, z, s, col });
+        const hue = 0.25 + prand(i + 410) * 0.16;
+        const sat = pickLeafSat();
+        const light = pickLeafLight();
+        const leafCol = new THREE.Color().setHSL(hue, Math.min(1, sat), Math.min(0.90, light));
+        rounds.push({ x, z, s, leafCol, trunkCol });
       } else {
-        const hue = 0.30 + prand(i + 420) * 0.08;
-        let light = 0.32 + prand(i + 540) * 0.08;
-        if (prand(i + 545) > 0.78) light = Math.min(0.62, light + 0.16);
-        const col = new THREE.Color().setHSL(hue, 0.50, light);
-        birches.push({ x, z, s, col });
+        const hue = 0.27 + prand(i + 420) * 0.14;
+        const sat = pickLeafSat();
+        const light = pickLeafLight();
+        const leafCol = new THREE.Color().setHSL(hue, Math.min(1, sat), Math.min(0.90, light));
+        // Birches use a lighter, slightly desaturated trunk range.
+        const birchTrunkLight = 0.74 + prand(i + 4180) * 0.16;
+        const birchTrunkSat = 0.06 + prand(i + 4190) * 0.08;
+        const birchTrunkCol = new THREE.Color().setHSL(0.10, birchTrunkSat, Math.min(0.92, birchTrunkLight));
+        birches.push({ x, z, s, leafCol, trunkCol: birchTrunkCol });
       }
     }
 
@@ -559,7 +584,8 @@ export function ForestWorld({ floorY, curveData }) {
   const trunkMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#6b4a2b',
+        color: '#ffffff',
+        vertexColors: true,
         roughness: 0.95,
         metalness: 0,
       }),
@@ -569,7 +595,8 @@ export function ForestWorld({ floorY, curveData }) {
   const birchMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#d9d3c8',
+        color: '#ffffff',
+        vertexColors: true,
         roughness: 0.95,
         metalness: 0,
       }),
@@ -579,7 +606,7 @@ export function ForestWorld({ floorY, curveData }) {
   const leafMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#2f7d32',
+        color: '#ffffff',
         vertexColors: true,
         roughness: 0.85,
         metalness: 0,
@@ -590,7 +617,7 @@ export function ForestWorld({ floorY, curveData }) {
   const roundLeafMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#2f7d32',
+        color: '#ffffff',
         vertexColors: true,
         roughness: 0.86,
         metalness: 0,
@@ -871,12 +898,13 @@ export function ForestWorld({ floorY, curveData }) {
       scale.set(1 * t.s, 1.25 * t.s, 1 * t.s);
       m.compose(pos, quat, scale);
       pineTrunks.setMatrixAt(idx, m);
+      if (t.trunkCol) pineTrunks.setColorAt(idx, t.trunkCol);
 
       pos.set(t.x, floorY + (1.95 + prand(idx + 800) * 0.25) * t.s, t.z);
       scale.set(1.0 * t.s, 1.45 * t.s, 1.0 * t.s);
       m.compose(pos, quat, scale);
       pineCanopies.setMatrixAt(idx, m);
-      pineCanopies.setColorAt(idx, t.col);
+      pineCanopies.setColorAt(idx, t.leafCol);
     });
 
     treeData.rounds.forEach((t, idx) => {
@@ -885,12 +913,13 @@ export function ForestWorld({ floorY, curveData }) {
       scale.set(0.9 * t.s, 1.05 * t.s, 0.9 * t.s);
       m.compose(pos, quat, scale);
       roundTrunks.setMatrixAt(idx, m);
+      if (t.trunkCol) roundTrunks.setColorAt(idx, t.trunkCol);
 
       pos.set(t.x, floorY + (1.55 + prand(idx + 1800) * 0.35) * t.s, t.z);
       scale.set(1.25 * t.s, 1.15 * t.s, 1.25 * t.s);
       m.compose(pos, quat, scale);
       roundCanopies.setMatrixAt(idx, m);
-      roundCanopies.setColorAt(idx, t.col);
+      roundCanopies.setColorAt(idx, t.leafCol);
     });
 
     treeData.birches.forEach((t, idx) => {
@@ -899,12 +928,13 @@ export function ForestWorld({ floorY, curveData }) {
       scale.set(0.55 * t.s, 1.6 * t.s, 0.55 * t.s);
       m.compose(pos, quat, scale);
       birchTrunks.setMatrixAt(idx, m);
+      if (t.trunkCol) birchTrunks.setColorAt(idx, t.trunkCol);
 
       pos.set(t.x, floorY + (2.05 + prand(idx + 2800) * 0.35) * t.s, t.z);
       scale.set(0.95 * t.s, 0.85 * t.s, 0.95 * t.s);
       m.compose(pos, quat, scale);
       birchCanopies.setMatrixAt(idx, m);
-      birchCanopies.setColorAt(idx, t.col);
+      birchCanopies.setColorAt(idx, t.leafCol);
     });
 
     pineTrunks.instanceMatrix.needsUpdate = true;
@@ -914,8 +944,11 @@ export function ForestWorld({ floorY, curveData }) {
     birchTrunks.instanceMatrix.needsUpdate = true;
     birchCanopies.instanceMatrix.needsUpdate = true;
 
+    if (pineTrunks.instanceColor) pineTrunks.instanceColor.needsUpdate = true;
     if (pineCanopies.instanceColor) pineCanopies.instanceColor.needsUpdate = true;
+    if (roundTrunks.instanceColor) roundTrunks.instanceColor.needsUpdate = true;
     if (roundCanopies.instanceColor) roundCanopies.instanceColor.needsUpdate = true;
+    if (birchTrunks.instanceColor) birchTrunks.instanceColor.needsUpdate = true;
     if (birchCanopies.instanceColor) birchCanopies.instanceColor.needsUpdate = true;
 
     if (bushes) {

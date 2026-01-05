@@ -17,6 +17,23 @@ const Robot = forwardRef((props, ref) => {
   const groupRef = useRef(null);
   useImperativeHandle(ref, () => groupRef.current);
 
+  // Eye gaze + greeting refs.
+  const leftEyeGlowRef = useRef(null);
+  const rightEyeGlowRef = useRef(null);
+  const leftPupilRef = useRef(null);
+  const rightPupilRef = useRef(null);
+
+  const gazeTmp = useRef(new THREE.Vector3());
+  const gazeDir = useRef(new THREE.Vector3());
+  const winkState = useRef({ lastWinkAt: 0, activeUntil: 0 });
+
+  const waveRig = useRef({
+    ready: false,
+    inner: null,
+    shell: null,
+    base: null,
+  });
+
   // Two clones: inner (core) + outer (glass shell)
   const innerScene = useMemo(() => clone(scene), [scene]);
   const shellScene = useMemo(() => clone(scene), [scene]);
@@ -402,6 +419,50 @@ const Robot = forwardRef((props, ref) => {
     });
   }, [shellScene]);
 
+  // Cache bones for a simple wave gesture (right arm/forearm/hand) on both rigs.
+  useEffect(() => {
+    const pickRightBones = (root) => {
+      const out = { arm: null, forearm: null, hand: null };
+      root.traverse((obj) => {
+        if (!obj?.isBone) return;
+        const n = (obj.name || '').toLowerCase();
+        const isRight = n.includes('right') || n.includes('r_') || n.endsWith('_r') || n.endsWith('.r');
+        if (!isRight) return;
+        if (!out.hand && n.includes('hand')) out.hand = obj;
+        if (!out.forearm && (n.includes('forearm') || n.includes('lowerarm'))) out.forearm = obj;
+        if (!out.arm && (n.includes('upperarm') || (n.includes('arm') && !n.includes('fore') && !n.includes('hand')))) out.arm = obj;
+      });
+      return out;
+    };
+
+    const inner = pickRightBones(innerScene);
+    const shell = pickRightBones(shellScene);
+    const ok = inner.arm && inner.forearm && inner.hand && shell.arm && shell.forearm && shell.hand;
+
+    if (ok) {
+      waveRig.current.ready = true;
+      waveRig.current.inner = inner;
+      waveRig.current.shell = shell;
+      waveRig.current.base = {
+        inner: {
+          arm: inner.arm.rotation.clone(),
+          forearm: inner.forearm.rotation.clone(),
+          hand: inner.hand.rotation.clone(),
+        },
+        shell: {
+          arm: shell.arm.rotation.clone(),
+          forearm: shell.forearm.rotation.clone(),
+          hand: shell.hand.rotation.clone(),
+        },
+      };
+    } else {
+      waveRig.current.ready = false;
+      waveRig.current.inner = null;
+      waveRig.current.shell = null;
+      waveRig.current.base = null;
+    }
+  }, [innerScene, shellScene]);
+
   // === שליטה באנימציות (Idle / Walking) ===
   useEffect(() => {
     if (actions && names.length > 0) {
@@ -475,17 +536,98 @@ const Robot = forwardRef((props, ref) => {
   // חיוך + מצמוץ עדין (כמו קודם)
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
+
+    const robot = groupRef.current;
+    const greetActive = !!robot?.userData?.greetActive;
+    const lookAt = robot?.userData?.lookAtVec;
+
+    // Schedule a wink while greeting.
+    if (greetActive) {
+      if (t - winkState.current.lastWinkAt > 2.8) {
+        winkState.current.lastWinkAt = t;
+        winkState.current.activeUntil = t + 0.16;
+      }
+    } else {
+      winkState.current.activeUntil = 0;
+    }
+    const isWinkingNow = t < winkState.current.activeUntil;
+
+    // Eye gaze: move pupils toward camera in face-local space.
+    if (lookAt && faceParent) {
+      gazeTmp.current.copy(lookAt);
+      faceParent.worldToLocal(gazeTmp.current);
+
+      const setPupil = (ref, baseX) => {
+        const p = ref.current;
+        if (!p) return;
+        const eyeCenterX = baseX;
+        const eyeCenterY = 0.10;
+        const eyeCenterZ = 0.22;
+        gazeDir.current.copy(gazeTmp.current);
+        gazeDir.current.x -= eyeCenterX;
+        gazeDir.current.y -= eyeCenterY;
+        gazeDir.current.z -= eyeCenterZ;
+        const len = gazeDir.current.length() || 1;
+        gazeDir.current.multiplyScalar(1 / len);
+
+        const ox = Math.max(-0.035, Math.min(0.035, gazeDir.current.x * 0.028));
+        const oy = Math.max(-0.022, Math.min(0.022, gazeDir.current.y * 0.022));
+        p.position.set(baseX + ox, eyeCenterY + oy, 0.255);
+      };
+
+      setPupil(leftPupilRef, -0.12);
+      setPupil(rightPupilRef, 0.12);
+    }
+
+    // Visual wink (works even if the GLB has no blink morph targets).
+    if (rightEyeGlowRef.current) {
+      const y = isWinkingNow ? 0.18 : 1;
+      rightEyeGlowRef.current.scale.y = y;
+    }
+    if (leftEyeGlowRef.current) {
+      leftEyeGlowRef.current.scale.y = 1;
+    }
+
+    // Wave gesture: raise right arm and wave forearm/hand.
+    if (waveRig.current.ready && waveRig.current.base) {
+      const wave = Math.sin(t * 6.0);
+      const raise = greetActive ? 1 : 0;
+      const a = 1 - Math.exp(-0.12 * 60);
+
+      const apply = (rig, base) => {
+        if (!rig) return;
+        const targetArmX = base.arm.x + (-0.95) * raise;
+        const targetArmZ = base.arm.z + (0.25) * raise;
+        const targetForeZ = base.forearm.z + (0.30 * raise) + (0.55 * raise) * wave;
+        const targetHandY = base.hand.y + (0.18 * raise) * wave;
+
+        rig.arm.rotation.x = rig.arm.rotation.x + (targetArmX - rig.arm.rotation.x) * a;
+        rig.arm.rotation.z = rig.arm.rotation.z + (targetArmZ - rig.arm.rotation.z) * a;
+        rig.forearm.rotation.z = rig.forearm.rotation.z + (targetForeZ - rig.forearm.rotation.z) * a;
+        rig.hand.rotation.y = rig.hand.rotation.y + (targetHandY - rig.hand.rotation.y) * a;
+      };
+
+      apply(waveRig.current.inner, waveRig.current.base.inner);
+      apply(waveRig.current.shell, waveRig.current.base.shell);
+    }
+
     innerScene.traverse((obj) => {
       if (!obj.morphTargetInfluences || !obj.morphTargetDictionary) return;
       const dict = obj.morphTargetDictionary;
       const infl = obj.morphTargetInfluences;
       const smileKey = Object.keys(dict).find((k) => /smile|happy/i.test(k));
-      const blinkKey = Object.keys(dict).find((k) => /blink/i.test(k));
+      const blinkL = Object.keys(dict).find((k) => /blink.*(left|l)\b|(left|l)\b.*blink/i.test(k));
+      const blinkR = Object.keys(dict).find((k) => /blink.*(right|r)\b|(right|r)\b.*blink/i.test(k));
+      const blinkAny = Object.keys(dict).find((k) => /blink/i.test(k));
 
       if (smileKey) infl[dict[smileKey]] = 0.55;
-      if (blinkKey) {
-        const blink = Math.max(0, Math.sin(t * 1.8));
-        infl[dict[blinkKey]] = blink > 0.98 ? 1 : 0;
+
+      const autoBlink = Math.max(0, Math.sin(t * 1.8)) > 0.985 ? 1 : 0;
+      if (blinkL && blinkR) {
+        infl[dict[blinkL]] = isWinkingNow ? 0 : autoBlink;
+        infl[dict[blinkR]] = isWinkingNow ? 1 : autoBlink;
+      } else if (blinkAny) {
+        infl[dict[blinkAny]] = isWinkingNow ? 1 : autoBlink;
       }
     });
   });
@@ -556,13 +698,23 @@ const Robot = forwardRef((props, ref) => {
       {faceParent ? (
         <primitive object={faceParent}>
           {/* Cyberpunk eyes (glow) */}
-          <mesh position={[-0.12, 0.10, 0.22]}>
+          <mesh ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.22]}>
             <sphereGeometry args={[0.035, 14, 14]} />
             <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
           </mesh>
-          <mesh position={[0.12, 0.10, 0.22]}>
+          <mesh ref={rightEyeGlowRef} position={[0.12, 0.10, 0.22]}>
             <sphereGeometry args={[0.035, 14, 14]} />
             <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
+          </mesh>
+
+          {/* Pupils (gaze) */}
+          <mesh ref={leftPupilRef} position={[-0.12, 0.10, 0.255]} renderOrder={21}>
+            <sphereGeometry args={[0.012, 12, 10]} />
+            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
+          </mesh>
+          <mesh ref={rightPupilRef} position={[0.12, 0.10, 0.255]} renderOrder={21}>
+            <sphereGeometry args={[0.012, 12, 10]} />
+            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
           </mesh>
           <pointLight position={[-0.12, 0.10, 0.24]} color={'#00E5FF'} intensity={1.0} distance={3} />
           <pointLight position={[0.12, 0.10, 0.24]} color={'#00E5FF'} intensity={1.0} distance={3} />
@@ -586,13 +738,23 @@ const Robot = forwardRef((props, ref) => {
       ) : (
         <group>
           {/* Cyberpunk eyes (fallback) */}
-          <mesh position={[-0.12, 1.72, 0.92]}>
+          <mesh ref={leftEyeGlowRef} position={[-0.12, 1.72, 0.92]}>
             <sphereGeometry args={[0.035, 14, 14]} />
             <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
           </mesh>
-          <mesh position={[0.12, 1.72, 0.92]}>
+          <mesh ref={rightEyeGlowRef} position={[0.12, 1.72, 0.92]}>
             <sphereGeometry args={[0.035, 14, 14]} />
             <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
+          </mesh>
+
+          {/* Pupils (fallback) */}
+          <mesh ref={leftPupilRef} position={[-0.12, 1.72, 0.955]} renderOrder={21}>
+            <sphereGeometry args={[0.012, 12, 10]} />
+            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
+          </mesh>
+          <mesh ref={rightPupilRef} position={[0.12, 1.72, 0.955]} renderOrder={21}>
+            <sphereGeometry args={[0.012, 12, 10]} />
+            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
           </mesh>
           <pointLight position={[-0.12, 1.72, 0.94]} color={'#00E5FF'} intensity={1.0} distance={3} />
           <pointLight position={[0.12, 1.72, 0.94]} color={'#00E5FF'} intensity={1.0} distance={3} />
