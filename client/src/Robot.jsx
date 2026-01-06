@@ -693,11 +693,11 @@ const Robot = forwardRef((props, ref) => {
         <group position={[0, 0.12, 0.00]}>
           <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
             <sphereGeometry args={[1, 12, 10]} />
-            <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
+            <meshPhysicalMaterial color={'#d6b15c'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
           </instancedMesh>
           <instancedMesh ref={hairTorusInstRef} args={[null, null, hairInstances.torus.length]} castShadow>
             <torusGeometry args={[0.030, 0.012, 8, 18]} />
-            <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
+            <meshPhysicalMaterial color={'#d6b15c'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
           </instancedMesh>
         </group>
 

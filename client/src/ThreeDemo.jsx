@@ -11,7 +11,7 @@ import { SCENES } from './context/gameState.js';
 import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from './game/mapTargets.js';
 import { useKeyboard } from './useKeyboard';
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
-import { ForestSky, ForestWorld } from './ForestWorld.jsx';
+import { forestTerrainHeight, FOREST_PATH_SURFACE_LIFT, ForestSky, ForestWorld } from './ForestWorld.jsx';
 
 function smoothstep01(x) {
   const t = Math.max(0, Math.min(1, x));
@@ -713,7 +713,8 @@ function RobotController({
     robot.rotation.y = yaw;
 
     // Place the robot on the route (Google-Maps-ish). Keep Y stable for a smoother adventure feel.
-    robot.position.set(p.x, floorY, p.z);
+    const terrainY = floorY + forestTerrainHeight(p.x, p.z) + FOREST_PATH_SURFACE_LIFT;
+    robot.position.set(p.x, terrainY, p.z);
 
     // Eye contact + greeting trigger.
     if (camera) {
@@ -877,14 +878,18 @@ function SceneAtmosphere({ mode }) {
       fogFar = 120;
     } else if (mode === 'forest') {
       bg = '#bfe6ff';
-      // No fog in forest: user wants foliage colors not to depend on distance.
+      // Forest: use light exponential fog for depth/atmosphere.
       fogColor = '#d9ffe6';
       fogNear = 9999;
       fogFar = 10000;
     }
 
     scene.background = new THREE.Color(bg);
-    scene.fog = mode === 'forest' ? null : new THREE.Fog(fogColor, fogNear, fogFar);
+    if (mode === 'forest') {
+      scene.fog = new THREE.FogExp2(fogColor, 0.018);
+    } else {
+      scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+    }
   }, [mode, scene]);
 
   return null;
@@ -1883,6 +1888,7 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
   const turnRightRef = useRef(new THREE.Vector3());
   const lookAtSmoothedRef = useRef(new THREE.Vector3());
   const lookAtDesiredRef = useRef(new THREE.Vector3());
+  const targetYSmoothedRef = useRef(NaN);
 
   const occludersRef = useRef([]);
   const occluderRefreshRef = useRef(0);
@@ -1919,6 +1925,16 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     const target = targetRef.current;
     const p = target.position;
 
+    // Terrain-following can introduce tiny continuous Y changes.
+    // Dampen Y separately (and ignore sub-centimeter jitter) so the view stays stable while climbing.
+    const ySpeed = boardMode ? 2.2 : 1.4;
+    const yA = 1 - Math.exp(-(delta || 0.016) * ySpeed);
+    if (!Number.isFinite(targetYSmoothedRef.current)) targetYSmoothedRef.current = p.y;
+    const yDeadZone = boardMode ? 0.006 : 0.01;
+    const dy = p.y - targetYSmoothedRef.current;
+    if (Math.abs(dy) > yDeadZone) targetYSmoothedRef.current += dy * yA;
+    const pY = targetYSmoothedRef.current;
+
     if (occlusionEnabled) {
       // Refresh occluder list occasionally (trees/props are static, so this is cheap and stable).
       occluderRefreshRef.current += 1;
@@ -1951,12 +1967,12 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
 
     const aheadBase = boardMode ? (navActive ? 2.2 : 1.6) : (navActive ? 2.6 : 1.9);
     const ahead = aheadBase + turnAmt * (boardMode ? 0.45 : 0.8);
-    scratch.copy(p)
+    scratch.set(p.x, pY, p.z)
       .addScaledVector(tan, ahead)
       .addScaledVector(turnRight, -turnSide * turnAmt * (boardMode ? 0.35 : 0.55));
 
     const zoom = 1 - turnAmt * 0.12;
-    scratch3.copy(p)
+    scratch3.set(p.x, pY, p.z)
       .addScaledVector(isoOffset, zoom)
       .addScaledVector(tan, (boardMode ? 0.45 : 0.8) + turnAmt * (boardMode ? 0.10 : 0.18))
       .addScaledVector(turnRight, -turnSide * turnAmt * (boardMode ? 1.05 : 1.65));
@@ -2025,16 +2041,13 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     camera.position.lerp(scratch2, posA);
 
     const lookAtDesired = lookAtDesiredRef.current;
-    lookAtDesired.set(p.x, p.y + (boardMode ? 1.05 : 1.25), p.z);
+    lookAtDesired.set(p.x, pY + (boardMode ? 1.05 : 1.25), p.z);
     const lookAtSmoothed = lookAtSmoothedRef.current;
     if (!Number.isFinite(lookAtSmoothed.x)) lookAtSmoothed.copy(lookAtDesired);
     const lookSpeed = 11.0;
     const lookA = 1 - Math.exp(-(delta || 0.016) * lookSpeed);
     lookAtSmoothed.lerp(lookAtDesired, lookA);
     camera.lookAt(lookAtSmoothed);
-
-    const rollA = 1 - Math.exp(-(delta || 0.016) * 10);
-    camera.rotation.z = camera.rotation.z + (0 - camera.rotation.z) * rollA;
   });
 
   return null;
@@ -2050,8 +2063,10 @@ function ForestEnvironmentFx({ robotRef, enabled }) {
   useEffect(() => {
     if (!enabled) return;
     if (!scene) return;
-    // Ensure there is a fog object we can tune.
-    if (!scene.fog) scene.fog = new THREE.Fog(baseFog.getHex(), 9999, 10000);
+    // Ensure there is an exponential fog object we can tune.
+    if (!(scene.fog instanceof THREE.FogExp2)) {
+      scene.fog = new THREE.FogExp2(baseFog.getHex(), 0.018);
+    }
   }, [enabled, scene, baseFog]);
 
   useFrame((_, delta) => {
@@ -2066,24 +2081,20 @@ function ForestEnvironmentFx({ robotRef, enabled }) {
     // Targets per path type.
     let targetBg = '#bfe6ff';
     let targetFog = '#d9ffe6';
-    let fogNear = 9999;
-    let fogFar = 10000;
+    let targetDensity = 0.018;
 
     if (kind === 'privacy') {
       targetBg = '#cbbcff';
       targetFog = '#bca5ff';
-      fogNear = 18;
-      fogFar = 78;
+      targetDensity = 0.032;
     } else if (kind === 'shop') {
       targetBg = '#ffe1c8';
       targetFog = '#ffe1c8';
-      fogNear = 26;
-      fogFar = 110;
+      targetDensity = 0.022;
     } else if (kind === 'password') {
       targetBg = '#b7e3cf';
       targetFog = '#b7e3cf';
-      fogNear = 24;
-      fogFar = 95;
+      targetDensity = 0.026;
     }
 
     // Smoothly approach the desired blend.
@@ -2096,13 +2107,12 @@ function ForestEnvironmentFx({ robotRef, enabled }) {
     tmpB.set(targetBg);
     scene.background = tmpA.lerp(tmpB, mix);
 
-    if (!scene.fog) scene.fog = new THREE.Fog(baseFog.getHex(), 9999, 10000);
+    if (!(scene.fog instanceof THREE.FogExp2)) scene.fog = new THREE.FogExp2(baseFog.getHex(), 0.018);
     const fog = scene.fog;
     tmpA.copy(baseFog);
     tmpB.set(targetFog);
     fog.color.copy(tmpA.lerp(tmpB, mix));
-    fog.near = 9999 + (fogNear - 9999) * mix;
-    fog.far = 10000 + (fogFar - 10000) * mix;
+    fog.density = 0.018 + (targetDensity - 0.018) * mix;
   });
 
   return null;

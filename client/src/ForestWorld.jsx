@@ -74,7 +74,7 @@ function makeGrassTexture({ size = 512 } = {}) {
   ctx.fillStyle = '#2e7d32';
   ctx.fillRect(0, 0, size, size);
 
-  // Noise + blades.
+  // Noise.
   for (let i = 0; i < 5000; i += 1) {
     const x = (i * 73) % size;
     const y = (i * 149) % size;
@@ -83,8 +83,6 @@ function makeGrassTexture({ size = 512 } = {}) {
     ctx.fillStyle = c;
     ctx.fillRect(x, y, 1, 1);
   }
-
-  // Light “blade streaks”.
   ctx.globalAlpha = 0.16;
   for (let i = 0; i < 420; i += 1) {
     const x = prand(i + 20) * size;
@@ -109,7 +107,7 @@ function makeGrassTexture({ size = 512 } = {}) {
   return tex;
 }
 
-function buildRibbonGeometry(points, { width = 2.6, y = 0 } = {}) {
+function buildRibbonGeometry(points, { width = 2.6, y } = {}) {
   const half = width / 2;
   const positions = [];
   const uvs = [];
@@ -140,7 +138,10 @@ function buildRibbonGeometry(points, { width = 2.6, y = 0 } = {}) {
     const rx = p0.x - left.x * half;
     const rz = p0.z - left.z * half;
 
-    positions.push(lx, y, lz, rx, y, rz);
+    // If a constant `y` is provided, force the entire ribbon to that height.
+    // Otherwise, follow the per-point height (so paths can climb terrain).
+    const yy = Number.isFinite(y) ? y : p0.y;
+    positions.push(lx, yy, lz, rx, yy, rz);
 
     const v = i / Math.max(1, points.length - 1);
     uvs.push(0, v, 1, v);
@@ -160,6 +161,35 @@ function buildRibbonGeometry(points, { width = 2.6, y = 0 } = {}) {
   geo.setIndex(indices);
   geo.computeVertexNormals();
   return geo;
+}
+
+// Forest path tuning (shared between world + robot).
+export const FOREST_PATH_SURFACE_LIFT = 0.18;
+export const FOREST_PATH_RIBBON_LIFT = 0.19;
+export const FOREST_PATH_DETAIL_LIFT = 0.195;
+
+// These match the grassy mound meshes rendered in ForestWorld.
+// Height is computed as the top surface of an ellipsoid (scaled sphere), then clamped to >= 0.
+export const FOREST_TERRAIN_HILLS = Object.freeze([
+  { x: -26, y: 0.55, z: 18, r: 16, sx: 1.35, sy: 0.09, sz: 1.35 },
+  { x: 28, y: 0.45, z: -14, r: 18, sx: 1.25, sy: 0.08, sz: 1.25 },
+  { x: 6, y: 0.38, z: 34, r: 14, sx: 1.2, sy: 0.075, sz: 1.2 },
+  { x: -38, y: 0.42, z: -30, r: 15, sx: 1.18, sy: 0.08, sz: 1.18 },
+  { x: 40, y: 0.35, z: 28, r: 13, sx: 1.12, sy: 0.065, sz: 1.12 },
+]);
+
+export function forestTerrainHeight(x, z) {
+  let best = 0;
+  for (let i = 0; i < FOREST_TERRAIN_HILLS.length; i += 1) {
+    const h = FOREST_TERRAIN_HILLS[i];
+    const X = (x - h.x) / (h.sx || 1);
+    const Z = (z - h.z) / (h.sz || 1);
+    const inside = (h.r * h.r) - (X * X) - (Z * Z);
+    if (inside <= 0) continue;
+    const ySurface = h.y + (h.sy || 1) * Math.sqrt(inside);
+    if (ySurface > best) best = ySurface;
+  }
+  return Math.max(0, best);
 }
 
 function makePoiIconTexture({ emoji, size = 256 } = {}) {
@@ -494,22 +524,23 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
   const lakeMaskTex = useMemo(() => makeSoftCircleMaskTexture(), []);
 
   // Raise the trail noticeably above the grass (and keep all trail-adjacent items in sync).
-  const pathSurfaceY = floorY + 0.18;
-  const pathRibbonY = floorY + 0.19;
-  const pathDetailY = floorY + 0.195;
+  const pathSurfaceLift = FOREST_PATH_SURFACE_LIFT;
+  const pathRibbonLift = FOREST_PATH_RIBBON_LIFT;
+  const pathDetailLift = FOREST_PATH_DETAIL_LIFT;
 
   const pathPoints = useMemo(() => {
     if (!curveData?.curve) return [];
     const pts = curveData.curve.getPoints(260);
-    // Lift the whole road slightly above the grass so it reads as a constructed trail.
-    for (const p of pts) p.y = pathSurfaceY;
+    // Lift the whole road slightly above the terrain so it reads as a constructed trail.
+    for (const p of pts) p.y = floorY + forestTerrainHeight(p.x, p.z) + pathSurfaceLift;
     return pts;
-  }, [curveData, pathSurfaceY]);
+  }, [curveData, floorY, pathSurfaceLift]);
 
   const pathGeo = useMemo(() => {
     if (!pathPoints.length) return null;
-    return buildRibbonGeometry(pathPoints, { width: 2.9, y: pathRibbonY });
-  }, [pathPoints, pathRibbonY]);
+    // Follow the per-point heights (the points already include the terrain height + lift).
+    return buildRibbonGeometry(pathPoints, { width: 2.9, y: undefined });
+  }, [pathPoints]);
 
   const portals = useMemo(() => {
     if (!curveData?.curve || !Array.isArray(roomPortals) || roomPortals.length === 0) return [];
@@ -567,8 +598,8 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
       const spurCurve = new THREE.CatmullRomCurve3(curvePts, false, 'catmullrom', isPrivacy ? 0.45 : 0.6);
       const spurPts = spurCurve.getPoints(58);
-      for (const sp of spurPts) sp.y = pathRibbonY;
-      const spurGeo = buildRibbonGeometry(spurPts, { width: spurWidth, y: pathRibbonY });
+      for (const sp of spurPts) sp.y = floorY + forestTerrainHeight(sp.x, sp.z) + pathRibbonLift;
+      const spurGeo = buildRibbonGeometry(spurPts, { width: spurWidth, y: undefined });
 
       // Occluding hills: placed along the early part of the spur to hide the portal until the
       // robot commits to the bend. These are purely visual (no collision), but they create the
@@ -594,7 +625,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         const o2 = n.clone().multiplyScalar(-offset);
         hills.push({
           x: cp.x + o1.x,
-          y: pathSurfaceY + baseR * 0.40,
+          y: (floorY + forestTerrainHeight(cp.x + o1.x, cp.z + o1.z) + pathSurfaceLift) + baseR * 0.40,
           z: cp.z + o1.z,
           r: baseR * (bigSide > 0 ? 1.18 : 1.0),
           sx: 1.25,
@@ -604,7 +635,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         });
         hills.push({
           x: cp.x + o2.x,
-          y: pathSurfaceY + baseR * 0.36,
+          y: (floorY + forestTerrainHeight(cp.x + o2.x, cp.z + o2.z) + pathSurfaceLift) + baseR * 0.36,
           z: cp.z + o2.z,
           r: baseR * (bigSide < 0 ? 1.18 : 1.0),
           sx: 1.2,
@@ -626,7 +657,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         const cp = spurCurve.getPointAt(tt);
         crumbs.push({
           x: cp.x,
-          y: pathSurfaceY + 0.06,
+          y: floorY + forestTerrainHeight(cp.x, cp.z) + pathSurfaceLift + 0.06,
           z: cp.z,
           s: (isPassword ? 0.12 : 0.14) * (0.9 + 0.25 * prand(idx * 100 + i * 17)),
           a: r.accent || '#7afcff',
@@ -637,6 +668,9 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       const pEnd = spurCurve.getPointAt(1);
       const yaw = Math.atan2(p0.x - pEnd.x, p0.z - pEnd.z);
 
+      const junctionY = floorY + forestTerrainHeight(p0.x, p0.z) + pathSurfaceLift;
+      const platformY = floorY + forestTerrainHeight(pEnd.x, pEnd.z) + pathSurfaceLift;
+
       return {
         ...r,
         side,
@@ -646,14 +680,14 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         spurPts,
         hills,
         crumbs,
-        junction: new THREE.Vector3(p0.x, pathSurfaceY, p0.z),
+        junction: new THREE.Vector3(p0.x, junctionY, p0.z),
         junctionYaw: Math.atan2(-tan.x, -tan.z),
-        platform: new THREE.Vector3(pEnd.x, pathSurfaceY, pEnd.z),
+        platform: new THREE.Vector3(pEnd.x, platformY, pEnd.z),
         entranceYaw,
         yaw,
       };
     });
-  }, [curveData, roomPortals, pathRibbonY, pathSurfaceY]);
+  }, [curveData, roomPortals, floorY, pathRibbonLift, pathSurfaceLift]);
 
   const signTextures = useMemo(() => {
     const typeForScene = (scene) => {
@@ -728,13 +762,13 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       accent: '#fff44f',
       x: start.x + left0.x * 4.1,
       z: start.z + left0.z * 4.1,
-      y: pathSurfaceY,
+      y: floorY + forestTerrainHeight(start.x + left0.x * 4.1, start.z + left0.z * 4.1) + pathSurfaceLift,
       yaw: Math.atan2(-tan0.x, -tan0.z),
       s: 1.35,
     });
 
     return out;
-  }, [curveData, portals, floorY]);
+  }, [curveData, portals, floorY, pathSurfaceLift]);
 
   const portalGroupRefs = useRef([]);
   const spurMatRefs = useRef([]);
@@ -796,7 +830,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       }
 
       // Emerge from the ground (slightly elevated above grass when fully revealed).
-      g.position.y = pathSurfaceY - (1 - anim.reveal) * 1.15;
+        g.position.y = portal.platform.y - (1 - anim.reveal) * 1.15;
       const s = 0.90 + anim.reveal * 0.10;
       g.scale.set(s, s, s);
 
@@ -2120,7 +2154,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
     const quat = new THREE.Quaternion();
     const sc = new THREE.Vector3();
     treeData.pathPebbles.forEach((p, idx) => {
-      pos.set(p.x, pathDetailY, p.z);
+      pos.set(p.x, floorY + forestTerrainHeight(p.x, p.z) + pathDetailLift, p.z);
       quat.setFromEuler(new THREE.Euler(0, prand(idx + 65000) * Math.PI * 2, 0));
       sc.set(p.s, p.s * (0.55 + prand(idx + 65100) * 0.9), p.s);
       m.compose(pos, quat, sc);
@@ -2137,7 +2171,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       const quat2 = new THREE.Quaternion();
       const sc2 = new THREE.Vector3();
       treeData.edgeStones.forEach((s, idx) => {
-        pos2.set(s.x, pathDetailY, s.z);
+        pos2.set(s.x, floorY + forestTerrainHeight(s.x, s.z) + pathDetailLift, s.z);
         quat2.setFromEuler(new THREE.Euler(0, prand(idx + 66000) * Math.PI * 2, 0));
         sc2.set(s.s, s.s * (0.55 + prand(idx + 66100) * 0.9), s.s);
         m2.compose(pos2, quat2, sc2);
@@ -2155,7 +2189,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       const quat3 = new THREE.Quaternion();
       const sc3 = new THREE.Vector3();
       treeData.leafPiles.forEach((p, idx) => {
-        pos3.set(p.x, pathDetailY, p.z);
+        pos3.set(p.x, floorY + forestTerrainHeight(p.x, p.z) + pathDetailLift, p.z);
         quat3.setFromEuler(new THREE.Euler(0, p.yaw, 0));
         // Flatten into a little mound.
         sc3.set(p.s, p.s * (0.20 + prand(idx + 67100) * 0.16), p.s);
@@ -2166,7 +2200,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       piles.instanceMatrix.needsUpdate = true;
       if (piles.instanceColor) piles.instanceColor.needsUpdate = true;
     }
-  }, [treeData, floorY]);
+  }, [treeData, floorY, pathDetailLift]);
 
   useFrame(({ clock }, delta) => {
     const t = clock.getElapsedTime();
@@ -2484,16 +2518,36 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
   return (
     <group>
-      {/* Grass ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
-        <planeGeometry args={[140, 140, 1, 1]} />
-        <meshStandardMaterial
-          color={'#43c75a'}
-          map={grassTex || undefined}
-          roughness={1}
-          metalness={0}
-        />
-      </mesh>
+      {/* Grass ground + gentle hills (visual-only mounds layered over the plane) */}
+      <group>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
+          <planeGeometry args={[140, 140, 1, 1]} />
+          <meshStandardMaterial color={'#43c75a'} map={grassTex || undefined} roughness={1} metalness={0} />
+        </mesh>
+
+        <group position={[0, floorY, 0]}>
+          <mesh position={[-26, 0.55, 18]} scale={[1.35, 0.09, 1.35]} castShadow receiveShadow>
+            <sphereGeometry args={[16, 28, 20]} />
+            <meshStandardMaterial color={'#43c75a'} map={grassTex || undefined} roughness={1} metalness={0} />
+          </mesh>
+          <mesh position={[28, 0.45, -14]} scale={[1.25, 0.08, 1.25]} castShadow receiveShadow>
+            <sphereGeometry args={[18, 28, 20]} />
+            <meshStandardMaterial color={'#43c75a'} map={grassTex || undefined} roughness={1} metalness={0} />
+          </mesh>
+          <mesh position={[6, 0.38, 34]} scale={[1.2, 0.075, 1.2]} castShadow receiveShadow>
+            <sphereGeometry args={[14, 26, 18]} />
+            <meshStandardMaterial color={'#43c75a'} map={grassTex || undefined} roughness={1} metalness={0} />
+          </mesh>
+          <mesh position={[-38, 0.42, -30]} scale={[1.18, 0.08, 1.18]} castShadow receiveShadow>
+            <sphereGeometry args={[15, 26, 18]} />
+            <meshStandardMaterial color={'#43c75a'} map={grassTex || undefined} roughness={1} metalness={0} />
+          </mesh>
+          <mesh position={[40, 0.35, 28]} scale={[1.12, 0.065, 1.12]} castShadow receiveShadow>
+            <sphereGeometry args={[13, 24, 16]} />
+            <meshStandardMaterial color={'#43c75a'} map={grassTex || undefined} roughness={1} metalness={0} />
+          </mesh>
+        </group>
+      </group>
 
       {/* Dirt path */}
       {pathGeo ? (
@@ -2563,7 +2617,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
             const leftZ = -Math.sin(yaw);
             const x = p.junction.x + leftX * 0.95 * side;
             const z = p.junction.z + leftZ * 0.95 * side;
-            const y = pathSurfaceY + 0.012;
+            const y = floorY + forestTerrainHeight(x, z) + pathSurfaceLift + 0.012;
             const accent = p.accent || '#7afcff';
             return (
               <group
@@ -2635,7 +2689,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
               {/* Entrance gate + discovery breadcrumbs */}
               {p.junction ? (
-                <group position={[p.junction.x, pathSurfaceY, p.junction.z]} rotation={[0, p.entranceYaw || 0, 0]}>
+                <group position={[p.junction.x, p.junction.y, p.junction.z]} rotation={[0, p.entranceYaw || 0, 0]}>
                   {/* Gate style: privacy = between two hills; shop = wide arch; password = "hidden" mound */}
                   {p.scene === 'privacy' ? (
                     <group>
@@ -2697,7 +2751,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
                 ref={(el) => {
                   portalGroupRefs.current[idx] = el;
                 }}
-                position={[p.platform.x, pathSurfaceY - 1.15, p.platform.z]}
+                position={[p.platform.x, p.platform.y - 1.15, p.platform.z]}
                 rotation={[0, p.yaw, 0]}
               >
                 {/* Platform base */}
