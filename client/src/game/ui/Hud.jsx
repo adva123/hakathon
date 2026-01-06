@@ -7,15 +7,6 @@ export default function Hud() {
 
   return (
     <div className={styles.hud}>
-      <div className={styles.hudBlock}>
-        <button
-          type="button"
-          className={`${styles.button} ${audioMuted ? styles.muted : ''}`}
-          onClick={() => setAudioMuted((m) => !m)}
-        >
-          {audioMuted ? 'Music: Off' : 'Music: On'}
-        </button>
-      </div>
     </div>
   );
 }

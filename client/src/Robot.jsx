@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unknown-property */
 /* eslint-disable react-hooks/immutability */
-import { useEffect, useMemo, forwardRef, useImperativeHandle, useRef } from "react";
+import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from "react";
 import PropTypes from 'prop-types';
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
@@ -12,7 +12,7 @@ const Robot = forwardRef((props, ref) => {
   const gltf = useGLTF("/models/RobotExpressive.glb");
   const { scene, animations } = gltf;
 
-  const { faceTextureUrl, laptopCanvas, ...rest } = props;
+  const { faceTextureUrl, ...rest } = props;
 
   const groupRef = useRef(null);
   useImperativeHandle(ref, () => groupRef.current);
@@ -30,13 +30,11 @@ const Robot = forwardRef((props, ref) => {
   const waveRig = useRef({
     ready: false,
     inner: null,
-    shell: null,
     base: null,
   });
 
-  // Two clones: inner (core) + outer (glass shell)
+  // Single clone: the playable walking robot
   const innerScene = useMemo(() => clone(scene), [scene]);
-  const shellScene = useMemo(() => clone(scene), [scene]);
 
   const { actions, names } = useAnimations(animations, innerScene);
 
@@ -56,143 +54,7 @@ const Robot = forwardRef((props, ref) => {
   const faceTextureRef = useRef(null);
   const faceShaderRef = useRef(null);
 
-  // === Laptop screen (route map) ===
-  const laptopTexRef = useRef(null);
-  const laptopMatRef = useRef(null);
-
-  const defaultTabletCanvas = useMemo(() => {
-    if (typeof document === 'undefined') return null;
-    const size = 512;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.fillStyle = '#061221';
-    ctx.fillRect(0, 0, size, size);
-
-    // Tablet screen (bright cyan glow)
-    const sx = size * 0.16;
-    const sy = size * 0.20;
-    const sw = size * 0.68;
-    const sh = size * 0.58;
-    const rr = 34;
-    const roundRect = (x, y, ww, hh, r) => {
-      const r2 = Math.max(0, Math.min(r, Math.min(ww, hh) / 2));
-      ctx.beginPath();
-      ctx.moveTo(x + r2, y);
-      ctx.lineTo(x + ww - r2, y);
-      ctx.quadraticCurveTo(x + ww, y, x + ww, y + r2);
-      ctx.lineTo(x + ww, y + hh - r2);
-      ctx.quadraticCurveTo(x + ww, y + hh, x + ww - r2, y + hh);
-      ctx.lineTo(x + r2, y + hh);
-      ctx.quadraticCurveTo(x, y + hh, x, y + hh - r2);
-      ctx.lineTo(x, y + r2);
-      ctx.quadraticCurveTo(x, y, x + r2, y);
-      ctx.closePath();
-    };
-
-    // Outer device frame hint
-    ctx.save();
-    ctx.strokeStyle = 'rgba(26,26,46,0.9)';
-    ctx.lineWidth = 10;
-    roundRect(sx - 10, sy - 10, sw + 20, sh + 20, rr + 10);
-    ctx.stroke();
-    ctx.restore();
-
-    // Screen glow field
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.shadowColor = '#00E5FF';
-    ctx.shadowBlur = 30;
-    const glow = ctx.createRadialGradient(size * 0.5, size * 0.5, 10, size * 0.5, size * 0.5, size * 0.52);
-    glow.addColorStop(0, 'rgba(255,255,255,0.55)');
-    glow.addColorStop(0.55, 'rgba(0,229,255,0.55)');
-    glow.addColorStop(1, 'rgba(0,229,255,0.0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(size * 0.5, size * 0.5, size * 0.52, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Screen surface
-    ctx.save();
-    ctx.shadowColor = '#00E5FF';
-    ctx.shadowBlur = 30;
-    const sg = ctx.createLinearGradient(sx, sy, sx + sw, sy + sh);
-    sg.addColorStop(0, 'rgba(255,255,255,0.25)');
-    sg.addColorStop(0.35, 'rgba(0,229,255,0.85)');
-    sg.addColorStop(1, 'rgba(0,229,255,0.25)');
-    ctx.fillStyle = sg;
-    roundRect(sx, sy, sw, sh, rr);
-    ctx.fill();
-    ctx.restore();
-
-    // Interface blocks
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = 'rgba(26,26,46,0.55)';
-    roundRect(sx + 26, sy + 26, sw * 0.62, 22, 10);
-    ctx.fill();
-    roundRect(sx + 26, sy + 62, sw * 0.42, 18, 10);
-    ctx.fill();
-    roundRect(sx + 26, sy + 94, sw * 0.52, 18, 10);
-    ctx.fill();
-    roundRect(sx + 26, sy + 128, sw * 0.30, 18, 10);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    roundRect(sx + sw * 0.72, sy + 26, sw * 0.18, 18, 8);
-    ctx.fill();
-    ctx.restore();
-
-    // Scanlines
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    for (let y = 0; y < size; y += 6) ctx.fillRect(0, y, size, 1);
-    ctx.globalAlpha = 1;
-
-    return canvas;
-  }, []);
-
-  useEffect(() => {
-    // Dispose old texture when canvas changes.
-    if (laptopTexRef.current) {
-      try {
-        laptopTexRef.current.dispose();
-      } catch {
-        // ignore
-      }
-      laptopTexRef.current = null;
-    }
-
-    const canvas = laptopCanvas || defaultTabletCanvas;
-    if (!canvas) return;
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.anisotropy = 8;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    laptopTexRef.current = tex;
-
-    if (laptopMatRef.current) {
-      laptopMatRef.current.map = tex;
-      laptopMatRef.current.needsUpdate = true;
-    }
-
-    return () => {
-      if (tex) {
-        try {
-          tex.dispose();
-        } catch {
-          // ignore
-        }
-      }
-    };
-  }, [laptopCanvas, defaultTabletCanvas]);
+  // Laptop prop intentionally disabled.
 
   useEffect(() => {
     // Candy toon-ish filter: posterize + soft vignette (keeps photo readable).
@@ -361,65 +223,7 @@ const Robot = forwardRef((props, ref) => {
     });
   }, [innerScene, toonMaterial]);
 
-  // Outer shell: glass-morphism surface over the same silhouette.
-  useEffect(() => {
-    // Try to derive a stable "body" tint so the head can match it.
-    let bodyTint = null;
-    const orange = new THREE.Color('#FF6B35');
-    shellScene.traverse((obj) => {
-      if (bodyTint || !obj.isMesh) return;
-      const name = (obj.name || '').toLowerCase();
-      const isHeadLike = name.includes('head') || name.includes('face');
-      if (isHeadLike) return;
-
-      const src = obj.material;
-      const srcMat = Array.isArray(src) ? src[0] : src;
-      const base = srcMat?.color ? srcMat.color.clone() : new THREE.Color('#ffd6ff');
-      bodyTint = base.multiply(orange);
-    });
-
-    const glass = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color('#ffffff'),
-      transparent: true,
-      opacity: 0.18,
-      transmission: 0.95,
-      thickness: 0.85,
-      roughness: 0.08,
-      metalness: 0.05,
-      ior: 1.45,
-      clearcoat: 1,
-      clearcoatRoughness: 0.08,
-    });
-
-    const solidHead = new THREE.MeshPhysicalMaterial({
-      color: bodyTint ? bodyTint.clone() : new THREE.Color('#8b5a2b'),
-      transparent: false,
-      opacity: 1,
-      transmission: 0,
-      thickness: 0,
-      roughness: 0.42,
-      metalness: 0.30,
-      clearcoat: 1,
-      clearcoatRoughness: 0.12,
-    });
-
-    shellScene.traverse((obj) => {
-      if (!obj.isMesh) return;
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-      const skinned = obj.isSkinnedMesh;
-
-      obj.visible = true;
-      const name = (obj.name || '').toLowerCase();
-      const isHeadLike = name.includes('head') || name.includes('face');
-
-      const m = (isHeadLike ? solidHead : glass).clone();
-      if (skinned) m.skinning = true;
-      obj.material = m;
-    });
-  }, [shellScene]);
-
-  // Cache bones for a simple wave gesture (right arm/forearm/hand) on both rigs.
+  // Cache bones for a simple wave gesture (right arm/forearm/hand).
   useEffect(() => {
     const pickRightBones = (root) => {
       const out = { arm: null, forearm: null, hand: null };
@@ -436,32 +240,24 @@ const Robot = forwardRef((props, ref) => {
     };
 
     const inner = pickRightBones(innerScene);
-    const shell = pickRightBones(shellScene);
-    const ok = inner.arm && inner.forearm && inner.hand && shell.arm && shell.forearm && shell.hand;
+    const ok = inner.arm && inner.forearm && inner.hand;
 
     if (ok) {
       waveRig.current.ready = true;
       waveRig.current.inner = inner;
-      waveRig.current.shell = shell;
       waveRig.current.base = {
         inner: {
           arm: inner.arm.rotation.clone(),
           forearm: inner.forearm.rotation.clone(),
           hand: inner.hand.rotation.clone(),
         },
-        shell: {
-          arm: shell.arm.rotation.clone(),
-          forearm: shell.forearm.rotation.clone(),
-          hand: shell.hand.rotation.clone(),
-        },
       };
     } else {
       waveRig.current.ready = false;
       waveRig.current.inner = null;
-      waveRig.current.shell = null;
       waveRig.current.base = null;
     }
-  }, [innerScene, shellScene]);
+  }, [innerScene]);
 
   // === שליטה באנימציות (Idle / Walking) ===
   useEffect(() => {
@@ -520,7 +316,6 @@ const Robot = forwardRef((props, ref) => {
 
       // שומר את הפונקציה ב־userData כדי ש-ThreeDemo תוכל להפעיל אותה
       innerScene.userData.setAction = setAction;
-      shellScene.userData.setAction = setAction;
       if (groupRef.current) groupRef.current.userData.setAction = setAction;
 
       // Forward the same API on the group root.
@@ -531,7 +326,7 @@ const Robot = forwardRef((props, ref) => {
       // ברירת מחדל: Idle
       setAction("Idle");
     }
-  }, [actions, names, innerScene, shellScene]);
+  }, [actions, names, innerScene]);
 
   // חיוך + מצמוץ עדין (כמו קודם)
   useFrame(({ clock }) => {
@@ -608,7 +403,6 @@ const Robot = forwardRef((props, ref) => {
       };
 
       apply(waveRig.current.inner, waveRig.current.base.inner);
-      apply(waveRig.current.shell, waveRig.current.base.shell);
     }
 
     innerScene.traverse((obj) => {
@@ -638,61 +432,16 @@ const Robot = forwardRef((props, ref) => {
     if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = clock.getElapsedTime();
   });
 
-  // Keep laptop texture fresh if a canvas is provided.
-  useFrame(() => {
-    const tex = laptopTexRef.current;
-    if (tex) tex.needsUpdate = true;
-  });
-
-  // Pulse an inner “core” light so it feels alive.
-  const corePhaseRef = useRef(0);
-  useEffect(() => {
-    corePhaseRef.current = Math.random() * Math.PI * 2;
-  }, []);
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    const pulse = 0.65 + 0.35 * Math.sin(t * 2.0 + corePhaseRef.current);
-    innerScene.traverse((obj) => {
-      if (!obj.isMesh || !obj.material) return;
-      const m = obj.material;
-      if ('emissiveIntensity' in m) m.emissiveIntensity = 0.22 + 0.55 * pulse;
-    });
-  });
-
   // Render a group so movement/rotation applies to both layers.
   return (
     <group ref={groupRef} {...rest}>
       <primitive object={innerScene} />
-      <primitive object={shellScene} scale={1.006} />
 
-      {/* Laptop prop: simple base + glowing screen showing the live route map */}
-      <group position={[0, 1.08, 0.52]} rotation={[-0.55, 0, 0]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.52, 0.03, 0.34]} />
-          <meshStandardMaterial color={'#0b0f18'} roughness={0.35} metalness={0.6} />
-        </mesh>
-        <mesh position={[0, 0.16, -0.16]} rotation={[0.85, 0, 0]} renderOrder={19}>
-          <planeGeometry args={[0.52, 0.34]} />
-          <meshBasicMaterial
-            color={'#ffffff'}
-            transparent
-            opacity={0.12}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh position={[0, 0.16, -0.155]} rotation={[0.85, 0, 0]} renderOrder={20}>
-          <planeGeometry args={[0.48, 0.30]} />
-          <meshBasicMaterial
-            ref={laptopMatRef}
-            map={laptopTexRef.current || undefined}
-            toneMapped={false}
-            transparent
-            opacity={0.98}
-          />
-        </mesh>
-      </group>
+      {/* Visible head proxy (ensures the character has a head even if the GLB head is missing/too subtle). */}
+      <mesh position={[0, 1.82, 0.12]} castShadow receiveShadow>
+        <sphereGeometry args={[0.26, 20, 16]} />
+        <meshStandardMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} />
+      </mesh>
 
       {/* Face "screen": attach to head node if found, else fallback to fixed position */}
       {faceParent ? (
@@ -777,22 +526,6 @@ const Robot = forwardRef((props, ref) => {
         </group>
       )}
 
-      {/* Internal core */}
-      <mesh position={[0, 1.15, 0.15]}>
-        <sphereGeometry args={[0.18, 18, 18]} />
-        <meshStandardMaterial
-          color="#00E5FF"
-          emissive="#00E5FF"
-          emissiveIntensity={3.2}
-          transparent
-          opacity={0.55}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <pointLight position={[0, 1.15, 0.15]} color="#00E5FF" intensity={1.15} distance={4.5} />
-      <pointLight position={[0, 1.05, -0.05]} color="#FF6B35" intensity={0.65} distance={4.0} />
     </group>
   );
 });
@@ -801,7 +534,6 @@ Robot.displayName = 'Robot';
 
 Robot.propTypes = {
   faceTextureUrl: PropTypes.string,
-  laptopCanvas: PropTypes.any,
 };
 
 useGLTF.preload("/models/RobotExpressive.glb");

@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { Bloom, EffectComposer, GodRays } from '@react-three/postprocessing';
 import RobotModel from './RobotModel.jsx';
 import { SCENES } from './context/gameState.js';
-import { CANDY_PATH_POINTS, MAP_Y } from './game/mapTargets.js';
+import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from './game/mapTargets.js';
 import { useKeyboard } from './useKeyboard';
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 import { ForestSky, ForestWorld } from './ForestWorld.jsx';
@@ -2338,6 +2338,28 @@ export default function ThreeDemo({
 
   const curveData = useMemo(() => buildCurveData(CANDY_PATH_POINTS), []);
 
+  const roomPortals = useMemo(() => {
+    const defs = [
+      { scene: SCENES.password, label: 'Passwords', accent: '#7afcff' },
+      { scene: SCENES.privacy, label: 'Privacy', accent: '#a78bff' },
+      { scene: SCENES.shop, label: 'Shop', accent: '#ff6ec7' },
+    ];
+
+    return defs
+      .map((d, idx) => {
+        const node = MAP_NODES?.[d.scene];
+        if (!Array.isArray(node) || node.length < 3) return null;
+        const p = new THREE.Vector3(node[0], node[1], node[2]);
+        const t = closestTOnSamples(p, curveData.sampleTs, curveData.samplePts);
+        return {
+          ...d,
+          t,
+          side: idx % 2 === 0 ? 1 : -1,
+        };
+      })
+      .filter(Boolean);
+  }, [curveData]);
+
   function SunRig() {
     const sunFollow = useRef({
       fwd: new THREE.Vector3(),
@@ -2429,7 +2451,14 @@ export default function ThreeDemo({
         <ForestSky />
 
         <group ref={worldRef}>
-          <ForestWorld floorY={floorY} curveData={curveData} />
+          <ForestWorld
+            floorY={floorY}
+            curveData={curveData}
+            robotRef={robotRef}
+            gestureRef={gestureRef}
+            roomPortals={roomPortals}
+            completion={completion}
+          />
         </group>
 
         <RobotController

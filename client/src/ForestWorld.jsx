@@ -360,6 +360,34 @@ function makeMirrorFakeTexture({ width = 512, height = 512 } = {}) {
   return tex;
 }
 
+function makeSoftCircleMaskTexture({ size = 256 } = {}) {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.48;
+
+  const g = ctx.createRadialGradient(cx, cy, r * 0.62, cx, cy, r);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
 export function ForestSky() {
   const tex = useMemo(() => makeForestSkyTexture(), []);
   if (!tex) return null;
@@ -372,7 +400,144 @@ export function ForestSky() {
   );
 }
 
-export function ForestWorld({ floorY, curveData }) {
+function smoothstep01(t) {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
+function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.30;
+
+  // Soft neon glow backdrop
+  const glow = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r * 1.3);
+  glow.addColorStop(0, 'rgba(255,255,255,0.55)');
+  glow.addColorStop(0.45, 'rgba(122,252,255,0.18)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  const strokeMain = 'rgba(255,255,255,0.92)';
+  const strokeAccent = type === 'shop'
+    ? 'rgba(255,110,199,0.90)'
+    : type === 'privacy'
+      ? 'rgba(167,139,255,0.92)'
+      : type === 'hub'
+        ? 'rgba(255,244,79,0.90)'
+        : 'rgba(122,252,255,0.92)';
+
+  ctx.lineWidth = size * 0.06;
+  ctx.strokeStyle = strokeAccent;
+  ctx.shadowColor = strokeAccent;
+  ctx.shadowBlur = size * 0.10;
+
+  if (type === 'privacy') {
+    // Eye
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 1.05, r * 0.70, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = strokeMain;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (type === 'key') {
+    // Key
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.25, cy, r * 0.32, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.02, cy);
+    ctx.lineTo(cx + r * 0.95, cy);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.45, cy);
+    ctx.lineTo(cx + r * 0.45, cy + r * 0.25);
+    ctx.moveTo(cx + r * 0.65, cy);
+    ctx.lineTo(cx + r * 0.65, cy + r * 0.18);
+    ctx.stroke();
+  } else if (type === 'hub') {
+    // Beacon / compass
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.82, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.95);
+    ctx.lineTo(cx + r * 0.25, cy + r * 0.1);
+    ctx.lineTo(cx, cy + r * 0.35);
+    ctx.lineTo(cx - r * 0.25, cy + r * 0.1);
+    ctx.closePath();
+    ctx.fillStyle = strokeMain;
+    ctx.globalAlpha = 0.82;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else {
+    // Shop: a t-shirt
+    const w = r * 1.35;
+    const h = r * 1.55;
+    const x = cx - w / 2;
+    const y = cy - h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.22, y);
+    ctx.lineTo(x + w * 0.02, y + h * 0.22);
+    ctx.lineTo(x + w * 0.18, y + h * 0.34);
+    ctx.lineTo(x + w * 0.18, y + h);
+    ctx.lineTo(x + w * 0.82, y + h);
+    ctx.lineTo(x + w * 0.82, y + h * 0.34);
+    ctx.lineTo(x + w * 0.98, y + h * 0.22);
+    ctx.lineTo(x + w * 0.78, y);
+    ctx.quadraticCurveTo(cx, y + h * 0.28, x + w * 0.22, y);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = size * 0.03;
+    ctx.strokeStyle = strokeMain;
+    ctx.globalAlpha = 0.82;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Minimal label (optional)
+  if (label) {
+    ctx.shadowBlur = size * 0.08;
+    ctx.shadowColor = strokeAccent;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `700 ${Math.floor(size * 0.11)}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.92;
+    ctx.fillText(label, cx, size * 0.86);
+    ctx.globalAlpha = 1;
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPortals, completion }) {
   // Global scaling: make the world feel bigger (robot handled elsewhere).
   const WORLD_SCALE = 1.35;
   const TREE_HEIGHT = 1.55;
@@ -383,22 +548,272 @@ export function ForestWorld({ floorY, curveData }) {
   const softShadowTex = useMemo(() => makeSoftShadowTexture(), []);
   const rainbowTex = useMemo(() => makeRainbowStripTexture(), []);
   const mirrorTex = useMemo(() => makeMirrorFakeTexture(), []);
+  const lakeMaskTex = useMemo(() => makeSoftCircleMaskTexture(), []);
+
+  // Raise the trail noticeably above the grass (and keep all trail-adjacent items in sync).
+  const pathSurfaceY = floorY + 0.18;
+  const pathRibbonY = floorY + 0.19;
+  const pathDetailY = floorY + 0.195;
 
   const pathPoints = useMemo(() => {
     if (!curveData?.curve) return [];
     const pts = curveData.curve.getPoints(260);
-    for (const p of pts) p.y = floorY + 0.02;
+    // Lift the whole road slightly above the grass so it reads as a constructed trail.
+    for (const p of pts) p.y = pathSurfaceY;
     return pts;
-  }, [curveData, floorY]);
+  }, [curveData, pathSurfaceY]);
 
   const pathGeo = useMemo(() => {
     if (!pathPoints.length) return null;
-    return buildRibbonGeometry(pathPoints, { width: 2.9, y: floorY + 0.03 });
-  }, [pathPoints, floorY]);
+    return buildRibbonGeometry(pathPoints, { width: 2.9, y: pathRibbonY });
+  }, [pathPoints, pathRibbonY]);
+
+  const portals = useMemo(() => {
+    if (!curveData?.curve || !Array.isArray(roomPortals) || roomPortals.length === 0) return [];
+
+    return roomPortals.map((r, idx) => {
+      const t = Number(r.t ?? 0);
+      const p = curveData.curve.getPointAt(t);
+      const tan = curveData.curve.getTangentAt(t);
+      tan.y = 0;
+      if (tan.lengthSq() < 1e-9) tan.set(0, 0, 1);
+      tan.normalize();
+      const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
+
+      const side = typeof r.side === 'number' ? Math.sign(r.side) || 1 : (idx % 2 === 0 ? 1 : -1);
+
+      // Start slightly off the main ribbon edge, then arc outward to the portal platform.
+      const p0 = p.clone().addScaledVector(left, 1.65 * side);
+      const p1 = p.clone().addScaledVector(left, 3.9 * side).addScaledVector(tan, 0.65);
+      const p2 = p.clone().addScaledVector(left, 6.15 * side).addScaledVector(tan, 1.05);
+
+      const spurCurve = new THREE.CatmullRomCurve3([p0, p1, p2], false, 'catmullrom', 0.6);
+      const spurPts = spurCurve.getPoints(46);
+      for (const sp of spurPts) sp.y = pathRibbonY;
+      const spurGeo = buildRibbonGeometry(spurPts, { width: 2.35, y: pathRibbonY });
+
+      // Face the gate back toward the spur start.
+      const yaw = Math.atan2(p0.x - p2.x, p0.z - p2.z);
+
+      return {
+        ...r,
+        side,
+        spurGeo,
+        junction: new THREE.Vector3(p0.x, pathSurfaceY, p0.z),
+        junctionYaw: Math.atan2(-tan.x, -tan.z),
+        platform: new THREE.Vector3(p2.x, pathSurfaceY, p2.z),
+        yaw,
+      };
+    });
+  }, [curveData, roomPortals, pathRibbonY, pathSurfaceY]);
+
+  const signTextures = useMemo(() => {
+    const key = makeRoomSignTexture({ type: 'key', label: 'Passwords' });
+    const privacy = makeRoomSignTexture({ type: 'privacy', label: 'Privacy' });
+    const shop = makeRoomSignTexture({ type: 'shop', label: 'Shop' });
+    const hub = makeRoomSignTexture({ type: 'hub', label: 'Start' });
+    return { key, privacy, shop, hub };
+  }, []);
+
+  const signs = useMemo(() => {
+    if (!curveData?.curve) return [];
+
+    const resolveType = (scene) => {
+      if (scene === 'password') return 'key';
+      if (scene === 'privacy') return 'privacy';
+      return 'shop';
+    };
+
+    const out = [];
+
+    // One sign per room at the spur junction.
+    portals.forEach((portal) => {
+      if (!portal?.junction) return;
+      out.push({
+        kind: 'room',
+        scene: portal.scene,
+        type: resolveType(portal.scene),
+        accent: portal.accent,
+        x: portal.junction.x,
+        z: portal.junction.z,
+        y: portal.junction.y,
+        yaw: portal.junctionYaw ?? 0,
+        s: 1.05,
+      });
+    });
+
+    // One main entrance sign near the start of the road.
+    const start = curveData.curve.getPointAt(0);
+    const tan0 = curveData.curve.getTangentAt(0);
+    tan0.y = 0;
+    if (tan0.lengthSq() < 1e-9) tan0.set(0, 0, 1);
+    tan0.normalize();
+    const left0 = new THREE.Vector3(0, 1, 0).cross(tan0).normalize();
+    out.push({
+      kind: 'hub',
+      scene: 'hub',
+      type: 'hub',
+      accent: '#fff44f',
+      x: start.x + left0.x * 4.1,
+      z: start.z + left0.z * 4.1,
+      y: pathSurfaceY,
+      yaw: Math.atan2(-tan0.x, -tan0.z),
+      s: 1.35,
+    });
+
+    return out;
+  }, [curveData, portals, floorY]);
+
+  const portalGroupRefs = useRef([]);
+  const spurMatRefs = useRef([]);
+  const screenMatRefs = useRef([]);
+  const ringMatRefs = useRef([]);
+  const signGroupRefs = useRef([]);
+  const signPanelMatRefs = useRef([]);
+  const signGlowMatRefs = useRef([]);
+  const markerMatRefs = useRef([]);
+  const portalAnim = useRef([]);
+  const tmpV = useRef(new THREE.Vector3());
+
+  useFrame((_, delta) => {
+    if (!portals.length) return;
+    const robot = robotRef?.current;
+    if (!robot) return;
+    const gesture = gestureRef?.current?.gesture || 'none';
+
+    const aReveal = 1 - Math.exp(-delta * 4.5);
+    const aOpen = 1 - Math.exp(-delta * 8.5);
+
+    for (let i = 0; i < portals.length; i += 1) {
+      const portal = portals[i];
+      const g = portalGroupRefs.current[i];
+      const spurMat = spurMatRefs.current[i];
+      const screenMat = screenMatRefs.current[i];
+      const ringMat = ringMatRefs.current[i];
+      if (!portal || !g) continue;
+
+      tmpV.current.copy(portal.platform);
+      const dx = robot.position.x - tmpV.current.x;
+      const dz = robot.position.z - tmpV.current.z;
+      const dist = Math.hypot(dx, dz);
+
+      portalAnim.current[i] = portalAnim.current[i] || { reveal: 0, open: 0 };
+      const anim = portalAnim.current[i];
+
+      const targetReveal = smoothstep01(1 - (dist - 2.0) / 12.0);
+      anim.reveal += (targetReveal - anim.reveal) * aReveal;
+
+      const nearGate = dist < 2.4;
+      const completed = Boolean(completion?.[portal.scene]);
+      const wantsOpen = nearGate && (gesture === 'openPalm' || gesture === 'thumbUp');
+      const targetOpen = completed ? 1 : (wantsOpen ? 1 : 0);
+      anim.open += (targetOpen - anim.open) * aOpen;
+
+      // Emerge from the ground (slightly elevated above grass when fully revealed).
+      g.position.y = pathSurfaceY - (1 - anim.reveal) * 1.15;
+      const s = 0.90 + anim.reveal * 0.10;
+      g.scale.set(s, s, s);
+
+      // Neon halo on the spur.
+      if (spurMat) {
+        spurMat.emissiveIntensity = 0.05 + anim.reveal * 0.85;
+        spurMat.opacity = 0.94;
+      }
+
+      // Ring glow.
+      if (ringMat) {
+        ringMat.emissiveIntensity = 0.18 + anim.reveal * 1.15;
+      }
+
+      // Energy screen becomes more transparent as it "opens".
+      if (screenMat) {
+        const base = 0.78 - anim.open * 0.55;
+        screenMat.opacity = Math.max(0.12, Math.min(0.88, base));
+      }
+    }
+
+    // Just-in-time holographic signage (keeps the scene clean).
+    if (Array.isArray(signs) && signs.length) {
+      const a = 1 - Math.exp(-delta * 10);
+      for (let i = 0; i < signs.length; i += 1) {
+        const s = signs[i];
+        const g = signGroupRefs.current[i];
+        const panel = signPanelMatRefs.current[i];
+        const glow = signGlowMatRefs.current[i];
+        if (!s || !g) continue;
+
+        const dx = robot.position.x - s.x;
+        const dz = robot.position.z - s.z;
+        const dist = Math.hypot(dx, dz);
+
+        // Fade out when far; brighten when close.
+        const targetVis = smoothstep01(1 - (dist - 3.0) / 14.0);
+        const cur = g.userData._vis ?? 0;
+        const vis = cur + (targetVis - cur) * a;
+        g.userData._vis = vis;
+
+        const baseS = s.s || 1;
+        g.scale.setScalar(baseS * (0.92 + vis * 0.10));
+        if (panel) panel.opacity = 0.02 + vis * 0.86;
+        if (glow) glow.opacity = vis * 0.26;
+      }
+    }
+
+    // Ground markers: only noticeable near the junction.
+    if (Array.isArray(markerMatRefs.current) && markerMatRefs.current.length) {
+      const a2 = 1 - Math.exp(-delta * 10);
+      for (let i = 0; i < markerMatRefs.current.length; i += 1) {
+        const mm = markerMatRefs.current[i];
+        const meta = mm?.userData?._meta;
+        if (!mm || !meta) continue;
+        const dx = robot.position.x - meta.x;
+        const dz = robot.position.z - meta.z;
+        const dist = Math.hypot(dx, dz);
+        const near = smoothstep01(1 - (dist - 2.0) / 12.0);
+        const target = 0.02 + near * 0.26;
+        const cur = mm.opacity ?? 0;
+        mm.opacity = cur + (target - cur) * a2;
+      }
+    }
+  });
 
   const treeData = useMemo(() => {
     const curvePts = pathPoints.length ? pathPoints : [];
     const curvePts2 = curvePts.map((p) => new THREE.Vector3(p.x, 0, p.z));
+
+    const isInsideLake = (x, z, lk, pad = 1.08) => {
+      if (!lk) return false;
+      const px = x - lk.x;
+      const pz = z - lk.z;
+      const c = Math.cos(lk.yaw || 0);
+      const s = Math.sin(lk.yaw || 0);
+      const lx = c * px + s * pz;
+      const lz = -s * px + c * pz;
+
+      // Organic lakes: same inside-test drives rendering + duck placement.
+      if (lk.kind === 'organic') {
+        const theta = Math.atan2(lz, lx);
+        const w1 = 0.55;
+        const w2 = 0.30;
+        const w3 = 0.15;
+        const seed = lk.seed || 0;
+        const f1 = lk.f1 || 3.0;
+        const f2 = lk.f2 || 5.0;
+        const f3 = lk.f3 || 8.0;
+        const amp = lk.amp ?? 0.18;
+        const n =
+          (Math.sin(theta * f1 + seed * 0.001) * w1 + Math.sin(theta * f2 - seed * 0.002) * w2 + Math.sin(theta * f3 + seed * 0.003) * w3) /
+          (w1 + w2 + w3);
+        const baseR = lk.r ?? lk.rx ?? 1;
+        const shoreR = baseR * (1 + amp * n);
+        const r = Math.hypot(lx, lz);
+        return r < shoreR * pad;
+      }
+
+      const dx = lx / (lk.rx * pad);
+      const dz = lz / (lk.rz * pad);
+      return dx * dx + dz * dz < 1;
+    };
 
     const minDist2ToCurve = (x, z) => {
       let best = Infinity;
@@ -436,17 +851,42 @@ export function ForestWorld({ floorY, curveData }) {
     const bounds = 58;
     const clearance = 4.8; // keep path clear (bigger objects)
     const clearance2 = clearance * clearance;
+    // Keep trees noticeably farther from the trail so the near-path zone reads as shrubs.
+    const treeClearance = 11.5;
+    const treeClearance2 = treeClearance * treeClearance;
 
-    // Trees (multiple types).
+    // Lakes (central features). Keep vegetation/props out of the water area.
+    const lakeR = ((6.2 * 1.22) + (4.8 * 1.22)) / 2;
+    const lake = { x: 0, z: 0, rx: lakeR, rz: lakeR, yaw: 0 };
+    const lake2R = (5.2 + 3.9) / 2;
+    // Slightly organic shoreline (not a perfect circle), with soft edge handled by the alpha mask.
+    const lake2 = {
+      x: 9.5,
+      z: -6.5,
+      r: lake2R,
+      rx: lake2R,
+      rz: lake2R,
+      yaw: 0.42,
+      kind: 'organic',
+      amp: 0.20,
+      f1: 3.0,
+      f2: 5.0,
+      f3: 9.0,
+      seed: 9123,
+    };
+
+    // Trees (multiple types). Densely forested before; now thinned significantly.
+    const treeTarget = 160;
     let attempts = 0;
-    while (pines.length + rounds.length + birches.length < 520 && attempts < 4200) {
+    while (pines.length + rounds.length + birches.length < treeTarget && attempts < 4200) {
       attempts += 1;
       const i = attempts;
       const x = (prand(i + 100) - 0.5) * bounds * 2;
       const z = (prand(i + 200) - 0.5) * bounds * 2;
       const d2 = curvePts2.length ? minDist2ToCurve(x, z) : 999;
-      if (d2 < clearance2) continue;
-      if (x * x + z * z < 18) continue; // keep center a bit open
+      if (d2 < treeClearance2) continue;
+      if (isInsideLake(x, z, lake) || isInsideLake(x, z, lake2)) continue;
+      if (x * x + z * z < 18) continue; // keep the absolute center a bit open
 
       const typeRoll = prand(i + 777);
       const s = (0.72 + prand(i + 300) * 0.9) * WORLD_SCALE;
@@ -498,13 +938,14 @@ export function ForestWorld({ floorY, curveData }) {
 
     // Palm trees (bright, lighter green). Keep them a bit further out for variety.
     attempts = 0;
-    while (palms.length < 150 && attempts < 2800) {
+    while (palms.length < 55 && attempts < 2800) {
       attempts += 1;
       const i = attempts;
       const x = (prand(i + 2100) - 0.5) * bounds * 2;
       const z = (prand(i + 2200) - 0.5) * bounds * 2;
       const d2 = curvePts2.length ? minDist2ToCurve(x, z) : 999;
-      if (d2 < (clearance + 1.6) * (clearance + 1.6)) continue;
+      if (d2 < (treeClearance + 1.6) * (treeClearance + 1.6)) continue;
+      if (isInsideLake(x, z, lake) || isInsideLake(x, z, lake2)) continue;
       if (x * x + z * z < 22) continue;
 
       // Prefer outskirts (gives skyline variety).
@@ -530,7 +971,7 @@ export function ForestWorld({ floorY, curveData }) {
     }
 
     // Bushes + small plants near path edges.
-    const edgeCount = 220;
+    const edgeCount = 320;
     if (!curveData?.curve || curveData.curve?.points?.length < 2) {
       // No path curve available yet.
       return {
@@ -554,7 +995,8 @@ export function ForestWorld({ floorY, curveData }) {
         edgeStones,
         leafPiles,
         pathRoots,
-        lake: { x: 0, z: 0, rx: 6.2 * 1.22, rz: 4.8 * 1.22, yaw: 0 },
+        lake,
+        lake2,
       };
     }
 
@@ -567,10 +1009,13 @@ export function ForestWorld({ floorY, curveData }) {
       const left = new THREE.Vector3(0, 1, 0).cross(tan).normalize();
 
       const side = i % 2 === 0 ? 1 : -1;
-      const off = 2.6 + prand(i + 900) * 2.6;
+      // Keep shrubs fairly close to the path (creates a readable corridor).
+      const off = 2.0 + prand(i + 900) * 2.3;
       const x = p.x + left.x * off * side;
       const z = p.z + left.z * off * side;
-      const s = (0.45 + prand(i + 920) * 0.6) * WORLD_SCALE;
+      if (isInsideLake(x, z, lake, 1.02) || isInsideLake(x, z, lake2, 1.02)) continue;
+      // Smaller shrubs near the trail.
+      const s = (0.26 + prand(i + 920) * 0.34) * WORLD_SCALE;
       bushes.push({ x, z, s });
 
       // Flowers a bit further from the path.
@@ -578,6 +1023,7 @@ export function ForestWorld({ floorY, curveData }) {
         const off2 = off + 1.4 + prand(i + 940) * 1.8;
         const fx = p.x + left.x * off2 * side;
         const fz = p.z + left.z * off2 * side;
+        if (isInsideLake(fx, fz, lake, 1.02) || isInsideLake(fx, fz, lake2, 1.02)) continue;
         const fs = (0.22 + prand(i + 960) * 0.22) * WORLD_SCALE;
         const hue = 0.92 + prand(i + 980) * 0.12; // pink/purple
         const col = new THREE.Color().setHSL(hue % 1, 0.75, 0.68);
@@ -589,6 +1035,7 @@ export function ForestWorld({ floorY, curveData }) {
         const offS = off + 2.2 + prand(i + 1210) * 2.4;
         const sx = p.x + left.x * offS * side;
         const sz = p.z + left.z * offS * side;
+        if (isInsideLake(sx, sz, lake, 1.02) || isInsideLake(sx, sz, lake2, 1.02)) continue;
         const ss = (0.45 + prand(i + 1220) * 0.55) * WORLD_SCALE;
         const yaw = prand(i + 1230) * Math.PI * 2;
         const petalCol = new THREE.Color().setHSL(0.13 + prand(i + 1240) * 0.04, 0.92, 0.60);
@@ -600,6 +1047,7 @@ export function ForestWorld({ floorY, curveData }) {
         const offC = off + 1.2 + prand(i + 1510) * 2.2;
         const cx = p.x + left.x * offC * side + (prand(i + 1520) - 0.5) * 0.9;
         const cz = p.z + left.z * offC * side + (prand(i + 1530) - 0.5) * 0.9;
+        if (isInsideLake(cx, cz, lake, 1.02) || isInsideLake(cx, cz, lake2, 1.02)) continue;
         const cs = (0.55 + prand(i + 1540) * 0.75) * WORLD_SCALE;
         const yaw = prand(i + 1550) * Math.PI * 2;
         // Pink range.
@@ -622,6 +1070,7 @@ export function ForestWorld({ floorY, curveData }) {
         const offG = off + 2.6 + prand(i + 1710) * 3.2;
         const gx = p.x + left.x * offG * side + (prand(i + 1720) - 0.5) * 1.1;
         const gz = p.z + left.z * offG * side + (prand(i + 1730) - 0.5) * 1.1;
+        if (isInsideLake(gx, gz, lake, 1.02) || isInsideLake(gx, gz, lake2, 1.02)) continue;
         const baseS = (0.20 + prand(i + 1740) * 0.22) * WORLD_SCALE;
         const count = 16 + Math.floor(prand(i + 1750) * 18);
         for (let k = 0; k < count; k += 1) {
@@ -689,19 +1138,11 @@ export function ForestWorld({ floorY, curveData }) {
       const z = (prand(i + 5100) - 0.5) * bounds * 2;
       const d2 = curvePts2.length ? minDist2ToCurve(x, z) : 999;
       if (d2 < (clearance + 0.8) * (clearance + 0.8)) continue;
+      if (isInsideLake(x, z, lake) || isInsideLake(x, z, lake2)) continue;
       if (x * x + z * z < 16) continue;
       const s = (0.22 + prand(i + 5200) * 0.55) * WORLD_SCALE;
       rocks.push({ x, z, s });
     }
-
-    // Single lake in the middle.
-    const lake = {
-      x: 0,
-      z: 0,
-      rx: 6.2 * 1.22,
-      rz: 4.8 * 1.22,
-      yaw: 0,
-    };
 
     // Small pebbles sprinkled on the path to break the smoothness.
     // Keep this relatively sparse so the robot path stays readable.
@@ -721,10 +1162,15 @@ export function ForestWorld({ floorY, curveData }) {
       const z = p.z + left.z * off + tan.z * along;
       if (x * x + z * z < 7.2 * 7.2) continue;
 
-      const s = (0.06 + prand(i + 60400) * 0.10) * WORLD_SCALE;
-      const hue = 0.06 + prand(i + 60500) * 0.06;
-      const light = 0.28 + prand(i + 60600) * 0.20;
-      const col = new THREE.Color().setHSL(hue, 0.18, light);
+      // Tiny pebbles + random light-brown variants (avoid dark).
+      const s = (0.010 + prand(i + 60400) * 0.022) * WORLD_SCALE;
+      // Match the path hue closely so pebbles blend into the road.
+      const col = new THREE.Color('#a58b63');
+      col.offsetHSL(
+        (prand(i + 60510) - 0.5) * 0.015,
+        (prand(i + 60520) - 0.5) * 0.06,
+        (prand(i + 60530) - 0.5) * 0.05
+      );
       pathPebbles.push({ x, z, s, col });
     }
 
@@ -746,10 +1192,14 @@ export function ForestWorld({ floorY, curveData }) {
       const z = p.z + left.z * off * side + tan.z * along;
       if (x * x + z * z < 8.4 * 8.4) continue;
 
-      const s = (0.10 + prand(i + 71400) * 0.28) * WORLD_SCALE;
-      const hue = 0.06 + prand(i + 71500) * 0.06;
-      const light = 0.22 + prand(i + 71600) * 0.24;
-      const col = new THREE.Color().setHSL(hue, 0.14, light);
+      // Much smaller edge stones + light-brown variants (avoid dark).
+      const s = (0.018 + prand(i + 71400) * 0.045) * WORLD_SCALE;
+      const col = new THREE.Color('#a58b63');
+      col.offsetHSL(
+        (prand(i + 71510) - 0.5) * 0.015,
+        (prand(i + 71520) - 0.5) * 0.06,
+        (prand(i + 71530) - 0.5) * 0.05
+      );
       edgeStones.push({ x, z, s, col });
     }
 
@@ -866,8 +1316,335 @@ export function ForestWorld({ floorY, curveData }) {
       leafPiles,
       pathRoots,
       lake,
+      lake2,
     };
   }, [curveData, pathPoints, floorY, TREE_COLOR_REV]);
+
+  const lake2WaterGeo = useMemo(() => {
+    const lk = treeData?.lake2;
+    if (!lk || lk.kind !== 'organic') return null;
+    const w1 = 0.55;
+    const w2 = 0.30;
+    const w3 = 0.15;
+    const seed = lk.seed || 0;
+    const f1 = lk.f1 || 3.0;
+    const f2 = lk.f2 || 5.0;
+    const f3 = lk.f3 || 8.0;
+    const amp = lk.amp ?? 0.18;
+    const baseR = lk.r ?? lk.rx ?? 1;
+
+    const segs = 160;
+    const shape = new THREE.Shape();
+    for (let i = 0; i <= segs; i += 1) {
+      const t = (i / segs) * Math.PI * 2;
+      const n =
+        (Math.sin(t * f1 + seed * 0.001) * w1 + Math.sin(t * f2 - seed * 0.002) * w2 + Math.sin(t * f3 + seed * 0.003) * w3) /
+        (w1 + w2 + w3);
+      const r = baseR * (1 + amp * n);
+      const x = Math.cos(t) * r;
+      const y = Math.sin(t) * r;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    }
+    const geo = new THREE.ShapeGeometry(shape, 16);
+    geo.computeVertexNormals();
+    return geo;
+  }, [treeData?.lake2]);
+
+  const lake2MaskTex = useMemo(() => {
+    const lk = treeData?.lake2;
+    if (!lk || lk.kind !== 'organic') return null;
+
+    const w1 = 0.55;
+    const w2 = 0.30;
+    const w3 = 0.15;
+    const seed = lk.seed || 0;
+    const f1 = lk.f1 || 3.0;
+    const f2 = lk.f2 || 5.0;
+    const f3 = lk.f3 || 8.0;
+    const amp = lk.amp ?? 0.18;
+    const baseR = lk.r ?? lk.rx ?? 1;
+
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, size, size);
+
+    const maxR = baseR * (1 + amp);
+    const rToPx = (size * 0.45) / maxR;
+    const cx = size * 0.5;
+    const cy = size * 0.5;
+
+    const segs = 180;
+    ctx.beginPath();
+    for (let i = 0; i <= segs; i += 1) {
+      const t = (i / segs) * Math.PI * 2;
+      const n =
+        (Math.sin(t * f1 + seed * 0.001) * w1 + Math.sin(t * f2 - seed * 0.002) * w2 + Math.sin(t * f3 + seed * 0.003) * w3) /
+        (w1 + w2 + w3);
+      const r = baseR * (1 + amp * n);
+      const x = cx + Math.cos(t) * r * rToPx;
+      const y = cy + Math.sin(t) * r * rToPx;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    // Soft edge: paint a blurred fill, then a crisp fill on top.
+    ctx.save();
+    ctx.shadowColor = 'white';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = 'white';
+    ctx.fill();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 8;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, [treeData?.lake2]);
+
+  const hammocks = useMemo(() => {
+    if (!treeData) return [];
+
+    const all = [
+      ...(treeData.pines || []).map((t, idx) => ({ ...t, _type: 'pine', _idx: idx })),
+      ...(treeData.rounds || []).map((t, idx) => ({ ...t, _type: 'round', _idx: idx })),
+      ...(treeData.birches || []).map((t, idx) => ({ ...t, _type: 'birch', _idx: idx })),
+    ];
+    if (all.length < 2) return [];
+
+    const pts = Array.isArray(pathPoints) ? pathPoints : [];
+    const minDist2ToPath = (x, z) => {
+      if (!pts.length) return 999;
+      let best = Infinity;
+      for (let i = 0; i < pts.length; i += 1) {
+        const dx = pts[i].x - x;
+        const dz = pts[i].z - z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < best) best = d2;
+      }
+      return best;
+    };
+
+    const attachY = (t) => {
+      const f = t._type === 'birch' ? 1.35 : 1.10;
+      return floorY + f * t.s * TREE_HEIGHT;
+    };
+
+    const isInsideLakeLocal = (x, z, lk, pad = 1.08) => {
+      if (!lk) return false;
+      const px = x - lk.x;
+      const pz = z - lk.z;
+      const c = Math.cos(lk.yaw || 0);
+      const s = Math.sin(lk.yaw || 0);
+      const lx = c * px + s * pz;
+      const lz = -s * px + c * pz;
+
+      if (lk.kind === 'organic') {
+        const theta = Math.atan2(lz, lx);
+        const w1 = 0.55;
+        const w2 = 0.30;
+        const w3 = 0.15;
+        const seed = lk.seed || 0;
+        const f1 = lk.f1 || 3.0;
+        const f2 = lk.f2 || 5.0;
+        const f3 = lk.f3 || 8.0;
+        const amp = lk.amp ?? 0.18;
+        const n =
+          (Math.sin(theta * f1 + seed * 0.001) * w1 + Math.sin(theta * f2 - seed * 0.002) * w2 + Math.sin(theta * f3 + seed * 0.003) * w3) /
+          (w1 + w2 + w3);
+        const baseR = lk.r ?? lk.rx ?? 1;
+        const shoreR = baseR * (1 + amp * n);
+        const r = Math.hypot(lx, lz);
+        return r < shoreR * pad;
+      }
+
+      const dx = lx / (lk.rx * pad);
+      const dz = lz / (lk.rz * pad);
+      return dx * dx + dz * dz < 1;
+    };
+
+    const used = new Set();
+    const res = [];
+    let guard = 0;
+
+    const makeBedGeom = (len, seedBase) => {
+      const width = 1.05;
+      const sag = 0.70 + prand(seedBase) * 0.25;
+      const geom = new THREE.PlaneGeometry(len, width, 22, 1);
+      geom.rotateX(-Math.PI / 2);
+      const pos = geom.attributes.position;
+      for (let i = 0; i < pos.count; i += 1) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        const u = x / len + 0.5;
+        const edge = Math.abs(z) / (width * 0.5);
+        const edgeLift = 0.92 - 0.18 * edge;
+        const drop = Math.sin(Math.PI * u) * sag * edgeLift;
+        pos.setY(i, -drop);
+      }
+      pos.needsUpdate = true;
+      geom.computeVertexNormals();
+      return geom;
+    };
+
+    // Base set: was 7; now generate 12 (adds +5 hammocks).
+    while (res.length < 12 && guard < 2400) {
+      guard += 1;
+
+      const aIdx = Math.floor(prand(99000 + guard * 11) * all.length);
+      const A = all[aIdx];
+      if (!A || used.has(`${A._type}:${A._idx}`)) continue;
+
+      const ax = A.x;
+      const az = A.z;
+      // Prefer hammocks away from the path corridor (keeps the trail readable).
+      if (minDist2ToPath(ax, az) < 15 * 15) continue;
+
+      const Ay = attachY(A);
+
+      // Find a nearby tree to tie to.
+      let B = null;
+      for (let tries = 0; tries < 60; tries += 1) {
+        const bIdx = Math.floor(prand(99500 + guard * 37 + tries * 13) * all.length);
+        const cand = all[bIdx];
+        if (!cand) continue;
+        if (cand === A) continue;
+        if (used.has(`${cand._type}:${cand._idx}`)) continue;
+
+        const bx = cand.x;
+        const bz = cand.z;
+        const dx = bx - ax;
+        const dz = bz - az;
+        const d = Math.hypot(dx, dz);
+        if (d < 4.6 || d > 7.6) continue;
+        if (minDist2ToPath((ax + bx) * 0.5, (az + bz) * 0.5) < 14 * 14) continue;
+
+        const By = attachY(cand);
+        if (Math.abs(By - Ay) > 0.9) continue;
+
+        B = { ...cand, _attachY: By };
+        break;
+      }
+      if (!B) continue;
+
+      const bx = B.x;
+      const bz = B.z;
+      const By = B._attachY;
+
+      const dx = bx - ax;
+      const dz = bz - az;
+      const len = Math.hypot(dx, dz);
+      const yaw = Math.atan2(dz, dx);
+      const mx = (ax + bx) * 0.5;
+      const mz = (az + bz) * 0.5;
+      const my = (Ay + By) * 0.5;
+
+      const geom = makeBedGeom(len, 99700 + guard * 19);
+
+      res.push({ ax, az, Ay, bx, bz, By, mx, my, mz, len, yaw, geom, variant: res.length % 2 });
+      used.add(`${A._type}:${A._idx}`);
+      used.add(`${B._type}:${B._idx}`);
+    }
+
+    // Add 3 extra hammocks near the center (2 pink + 1 orange).
+    const centerColors = ['#ff7eb6', '#ff7eb6', '#ff8f2b'];
+    const centerTrees = all.filter((t) => {
+      const r = Math.hypot(t.x, t.z);
+      if (r < 18 || r > 34) return false;
+      // Keep off the immediate trail corridor.
+      if (minDist2ToPath(t.x, t.z) < 11 * 11) return false;
+      // Avoid lakes.
+      if (treeData.lake && isInsideLakeLocal(t.x, t.z, treeData.lake, 1.22)) return false;
+      if (treeData.lake2 && isInsideLakeLocal(t.x, t.z, treeData.lake2, 1.22)) return false;
+      return true;
+    });
+
+    for (let ci = 0; ci < centerColors.length; ci += 1) {
+      const bedColor = centerColors[ci];
+      let found = null;
+      let foundB = null;
+
+      for (let tries = 0; tries < 160 && !found; tries += 1) {
+        const aIdx = Math.floor(prand(130000 + ci * 991 + tries * 17) * Math.max(1, centerTrees.length));
+        const A = centerTrees[aIdx];
+        if (!A) continue;
+        if (used.has(`${A._type}:${A._idx}`)) continue;
+        const ax = A.x;
+        const az = A.z;
+
+        for (let j = 0; j < 240; j += 1) {
+          const bIdx = Math.floor(prand(131000 + ci * 887 + tries * 29 + j * 13) * Math.max(1, centerTrees.length));
+          const B = centerTrees[bIdx];
+          if (!B || B === A) continue;
+          if (used.has(`${B._type}:${B._idx}`)) continue;
+          const bx = B.x;
+          const bz = B.z;
+          const dx = bx - ax;
+          const dz = bz - az;
+          const d = Math.hypot(dx, dz);
+          if (d < 4.6 || d > 7.6) continue;
+          const mx = (ax + bx) * 0.5;
+          const mz = (az + bz) * 0.5;
+          // Keep these hammocks actually near the central forest area.
+          if (Math.hypot(mx, mz) > 30) continue;
+          if (minDist2ToPath(mx, mz) < 10 * 10) continue;
+
+          const Ay = attachY(A);
+          const By = attachY(B);
+          if (Math.abs(By - Ay) > 0.9) continue;
+
+          found = { A, ax, az, Ay };
+          foundB = { B, bx, bz, By };
+          break;
+        }
+      }
+
+      if (!found || !foundB) continue;
+
+      const dx = foundB.bx - found.ax;
+      const dz = foundB.bz - found.az;
+      const len = Math.hypot(dx, dz);
+      const yaw = Math.atan2(dz, dx);
+      const mx = (found.ax + foundB.bx) * 0.5;
+      const mz = (found.az + foundB.bz) * 0.5;
+      const my = (found.Ay + foundB.By) * 0.5;
+      const geom = makeBedGeom(len, 132200 + ci * 101);
+
+      res.push({
+        ax: found.ax,
+        az: found.az,
+        Ay: found.Ay,
+        bx: foundB.bx,
+        bz: foundB.bz,
+        By: foundB.By,
+        mx,
+        my,
+        mz,
+        len,
+        yaw,
+        geom,
+        bedColor,
+      });
+
+      used.add(`${found.A._type}:${found.A._idx}`);
+      used.add(`${foundB.B._type}:${foundB.B._idx}`);
+    }
+
+    return res;
+  }, [treeData, pathPoints, floorY]);
 
   const trunkMat = useMemo(
     () =>
@@ -1136,11 +1913,29 @@ export function ForestWorld({ floorY, curveData }) {
       new THREE.MeshStandardMaterial({
         color: '#67d5ff',
         transparent: true,
-        opacity: 0.72,
+        opacity: 0.74,
+        alphaMap: lakeMaskTex || undefined,
         roughness: 0.06,
         metalness: 0.12,
+        depthWrite: false,
+        side: THREE.DoubleSide,
       }),
-    []
+    [lakeMaskTex]
+  );
+
+  const waterMat2 = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#67d5ff',
+        transparent: true,
+        opacity: 0.74,
+        alphaMap: lake2MaskTex || undefined,
+        roughness: 0.06,
+        metalness: 0.12,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    [lake2MaskTex]
   );
 
   const woodMat = useMemo(
@@ -1241,7 +2036,7 @@ export function ForestWorld({ floorY, curveData }) {
     const quat = new THREE.Quaternion();
     const sc = new THREE.Vector3();
     treeData.pathPebbles.forEach((p, idx) => {
-      pos.set(p.x, floorY + 0.035, p.z);
+      pos.set(p.x, pathDetailY, p.z);
       quat.setFromEuler(new THREE.Euler(0, prand(idx + 65000) * Math.PI * 2, 0));
       sc.set(p.s, p.s * (0.55 + prand(idx + 65100) * 0.9), p.s);
       m.compose(pos, quat, sc);
@@ -1258,7 +2053,7 @@ export function ForestWorld({ floorY, curveData }) {
       const quat2 = new THREE.Quaternion();
       const sc2 = new THREE.Vector3();
       treeData.edgeStones.forEach((s, idx) => {
-        pos2.set(s.x, floorY + 0.036, s.z);
+        pos2.set(s.x, pathDetailY, s.z);
         quat2.setFromEuler(new THREE.Euler(0, prand(idx + 66000) * Math.PI * 2, 0));
         sc2.set(s.s, s.s * (0.55 + prand(idx + 66100) * 0.9), s.s);
         m2.compose(pos2, quat2, sc2);
@@ -1276,7 +2071,7 @@ export function ForestWorld({ floorY, curveData }) {
       const quat3 = new THREE.Quaternion();
       const sc3 = new THREE.Vector3();
       treeData.leafPiles.forEach((p, idx) => {
-        pos3.set(p.x, floorY + 0.034, p.z);
+        pos3.set(p.x, pathDetailY, p.z);
         quat3.setFromEuler(new THREE.Euler(0, p.yaw, 0));
         // Flatten into a little mound.
         sc3.set(p.s, p.s * (0.20 + prand(idx + 67100) * 0.16), p.s);
@@ -1623,6 +2418,247 @@ export function ForestWorld({ floorY, curveData }) {
         </mesh>
       ) : null}
 
+      {/* Minimal, holographic, just-in-time signage */}
+      {signs?.length ? (
+        <group>
+          {signs.map((s, idx) => {
+            const tex = signTextures?.[s.type] || null;
+            const accent = s.accent || '#7afcff';
+            return (
+              <group
+                // eslint-disable-next-line react/no-array-index-key
+                key={`sign-${idx}`}
+                ref={(el) => {
+                  signGroupRefs.current[idx] = el;
+                }}
+                position={[s.x, s.y, s.z]}
+                rotation={[0, s.yaw, 0]}
+                scale={[s.s, s.s, s.s]}
+              >
+                {/* Post (grounded, not floating) */}
+                <mesh position={[0, 0.55, 0]} castShadow receiveShadow>
+                  <cylinderGeometry args={[0.06, 0.07, 1.10, 10, 1]} />
+                  <primitive object={woodMat} attach="material" />
+                </mesh>
+
+                {/* Hologram panel */}
+                <mesh position={[0, 1.08, -0.02]} renderOrder={8}>
+                  <planeGeometry args={[0.78, 0.78]} />
+                  <meshBasicMaterial
+                    ref={(m) => {
+                      signPanelMatRefs.current[idx] = m;
+                    }}
+                    map={tex || undefined}
+                    transparent
+                    opacity={0.0}
+                    toneMapped={false}
+                    depthWrite={false}
+                  />
+                </mesh>
+
+                {/* Additive glow (proximity driven) */}
+                <mesh position={[0, 1.08, -0.03]} renderOrder={7}>
+                  <planeGeometry args={[0.92, 0.92]} />
+                  <meshBasicMaterial
+                    ref={(m) => {
+                      signGlowMatRefs.current[idx] = m;
+                    }}
+                    color={accent}
+                    transparent
+                    opacity={0.0}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                    toneMapped={false}
+                  />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
+      ) : null}
+
+      {/* Subtle ground wayfinding markers near each junction */}
+      {portals?.length ? (
+        <group>
+          {portals.map((p, idx) => {
+            if (!p?.junction) return null;
+            const yaw = p.junctionYaw ?? 0;
+            const side = typeof p.side === 'number' ? Math.sign(p.side) || 1 : 1;
+            const leftX = Math.cos(yaw);
+            const leftZ = -Math.sin(yaw);
+            const x = p.junction.x + leftX * 0.95 * side;
+            const z = p.junction.z + leftZ * 0.95 * side;
+            const y = pathSurfaceY + 0.012;
+            const accent = p.accent || '#7afcff';
+            return (
+              <group
+                // eslint-disable-next-line react/no-array-index-key
+                key={`marker-${idx}`}
+                position={[x, y, z]}
+                rotation={[0, yaw, 0]}
+              >
+                <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={6}>
+                  <planeGeometry args={[0.95, 0.18]} />
+                  <meshBasicMaterial
+                    ref={(m) => {
+                      markerMatRefs.current[idx] = m;
+                      if (m) m.userData._meta = { x, z };
+                    }}
+                    color={accent}
+                    transparent
+                    opacity={0.0}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                    toneMapped={false}
+                  />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
+      ) : null}
+
+      {/* Active Rooms: spur paths + portals emerging from the ground */}
+      {portals.length ? (
+        <group>
+          {portals.map((p, idx) => (
+            <group key={`room-${p.scene || idx}`}>
+              {/* Spur path */}
+              <mesh geometry={p.spurGeo} receiveShadow>
+                <meshStandardMaterial
+                  ref={(m) => {
+                    spurMatRefs.current[idx] = m;
+                  }}
+                  color={'#a58b63'}
+                  roughness={0.92}
+                  metalness={0}
+                  emissive={'#a58b63'}
+                  emissiveIntensity={0.05}
+                  transparent
+                  opacity={0.94}
+                />
+              </mesh>
+
+              {/* Portal platform + room volume */}
+              <group
+                ref={(el) => {
+                  portalGroupRefs.current[idx] = el;
+                }}
+                position={[p.platform.x, pathSurfaceY - 1.15, p.platform.z]}
+                rotation={[0, p.yaw, 0]}
+              >
+                {/* Platform base */}
+                <mesh position={[0, 0.08, 0]} castShadow receiveShadow>
+                  <cylinderGeometry args={[2.35, 2.55, 0.16, 24, 1]} />
+                  <meshStandardMaterial color={'#a58b63'} roughness={0.95} metalness={0} />
+                </mesh>
+
+                {/* Neon ring */}
+                <mesh position={[0, 0.17, 0]} rotation={[Math.PI / 2, 0, 0]} renderOrder={3}>
+                  <torusGeometry args={[2.05, 0.08, 10, 40]} />
+                  <meshStandardMaterial
+                    ref={(m) => {
+                      ringMatRefs.current[idx] = m;
+                    }}
+                    color={'#ffffff'}
+                    roughness={0.25}
+                    metalness={0.15}
+                    emissive={p.accent || '#7afcff'}
+                    emissiveIntensity={0.25}
+                  />
+                </mesh>
+
+                {/* Frosted-glass room volume (teaser) */}
+                <mesh position={[0, 0.85, 0.55]} castShadow receiveShadow>
+                  <boxGeometry args={[3.15, 1.55, 2.55]} />
+                  <meshPhysicalMaterial
+                    color={'#ffffff'}
+                    roughness={0.22}
+                    metalness={0.02}
+                    clearcoat={1}
+                    clearcoatRoughness={0.35}
+                    transparent
+                    opacity={0.18}
+                  />
+                </mesh>
+
+                {/* Gate frame */}
+                <group position={[0, 0.16, -1.30]}>
+                  <mesh position={[-1.05, 1.05, 0]} castShadow>
+                    <boxGeometry args={[0.18, 2.2, 0.18]} />
+                    <meshStandardMaterial
+                      color={'#0e0f14'}
+                      roughness={0.35}
+                      metalness={0.45}
+                      emissive={p.accent || '#7afcff'}
+                      emissiveIntensity={0.35}
+                    />
+                  </mesh>
+                  <mesh position={[1.05, 1.05, 0]} castShadow>
+                    <boxGeometry args={[0.18, 2.2, 0.18]} />
+                    <meshStandardMaterial
+                      color={'#0e0f14'}
+                      roughness={0.35}
+                      metalness={0.45}
+                      emissive={p.accent || '#7afcff'}
+                      emissiveIntensity={0.35}
+                    />
+                  </mesh>
+                  <mesh position={[0, 2.16, 0]} castShadow>
+                    <boxGeometry args={[2.35, 0.18, 0.18]} />
+                    <meshStandardMaterial
+                      color={'#0e0f14'}
+                      roughness={0.35}
+                      metalness={0.45}
+                      emissive={p.accent || '#7afcff'}
+                      emissiveIntensity={0.35}
+                    />
+                  </mesh>
+
+                  {/* Energy screen */}
+                  <mesh position={[0, 1.10, 0.02]} renderOrder={6}>
+                    <planeGeometry args={[2.05, 2.05, 1, 1]} />
+                    <meshBasicMaterial
+                      ref={(m) => {
+                        screenMatRefs.current[idx] = m;
+                      }}
+                      color={p.accent || '#7afcff'}
+                      transparent
+                      opacity={0.78}
+                      blending={THREE.AdditiveBlending}
+                      depthWrite={false}
+                      toneMapped={false}
+                    />
+                  </mesh>
+                </group>
+
+                {/* Grounded bushes to blend the platform into the forest */}
+                {Array.from({ length: 12 }, (_, i) => {
+                  const a = (i / 12) * Math.PI * 2;
+                  const rr = 2.55 + prand(i + idx * 999 + 8000) * 0.55;
+                  const x = Math.cos(a) * rr;
+                  const z = Math.sin(a) * rr;
+                  const s = 0.28 + prand(i + idx * 999 + 8100) * 0.22;
+                  return (
+                    <mesh
+                      // eslint-disable-next-line react/no-array-index-key
+                      key={`blend-${idx}-${i}`}
+                      position={[x, 0.12, z]}
+                      scale={[s, 0.55 + s, s]}
+                      castShadow
+                      receiveShadow
+                    >
+                      <dodecahedronGeometry args={[0.55, 0]} />
+                      <meshStandardMaterial color={'#2f8a4a'} roughness={1} metalness={0} />
+                    </mesh>
+                  );
+                })}
+              </group>
+            </group>
+          ))}
+        </group>
+      ) : null}
+
       {/* Path details: small pebbles */}
       {treeData.pathPebbles?.length ? (
         <instancedMesh ref={pathPebbleRef} args={[null, null, treeData.pathPebbles.length]} frustumCulled={false} castShadow receiveShadow>
@@ -1663,59 +2699,86 @@ export function ForestWorld({ floorY, curveData }) {
         ))
         : null}
 
-      {/* Water (single lake) */}
-      {treeData.lake ? (
+      {/* Water (two lakes) */}
+      {treeData.lake || treeData.lake2 ? (
         <group>
-          <mesh
-            rotation={[-Math.PI / 2, treeData.lake.yaw, 0]}
-            position={[treeData.lake.x, floorY + 0.031, treeData.lake.z]}
-            scale={[treeData.lake.rx, treeData.lake.rz, 1]}
-            receiveShadow
-          >
-            <circleGeometry args={[1, 48]} />
-            <primitive object={waterMat} attach="material" />
-          </mesh>
+          {[treeData.lake, treeData.lake2].filter(Boolean).map((lk, idx) => (
+            <group key={`lake-${idx}`}>
+              {lk.kind === 'organic' && lake2WaterGeo ? (
+                <mesh rotation={[-Math.PI / 2, lk.yaw, 0]} position={[lk.x, floorY + 0.031, lk.z]} receiveShadow>
+                  <primitive object={lake2WaterGeo} attach="geometry" />
+                  <primitive object={waterMat2} attach="material" />
+                </mesh>
+              ) : (
+                <mesh rotation={[-Math.PI / 2, lk.yaw, 0]} position={[lk.x, floorY + 0.031, lk.z]} scale={[lk.rx, lk.rz, 1]} receiveShadow>
+                  <circleGeometry args={[1, 96]} />
+                  <primitive object={waterMat} attach="material" />
+                </mesh>
+              )}
 
-          {/* Sun glint reflection */}
-          {lakeGlintTex ? (
-            <mesh
-              rotation={[-Math.PI / 2, treeData.lake.yaw + 0.35, 0]}
-              position={[treeData.lake.x, floorY + 0.033, treeData.lake.z]}
-              scale={[treeData.lake.rx * 0.72, treeData.lake.rz * 0.34, 1]}
-              renderOrder={5}
-            >
-              <circleGeometry args={[1, 48]} />
-              <meshBasicMaterial
-                map={lakeGlintTex}
-                transparent
-                opacity={0.16}
-                blending={THREE.AdditiveBlending}
-                depthWrite={false}
-                toneMapped={false}
-              />
-            </mesh>
-          ) : null}
+              {/* Sun glint reflection */}
+              {lakeGlintTex ? (
+                <mesh
+                  rotation={[-Math.PI / 2, lk.yaw + 0.35, 0]}
+                  position={[lk.x, floorY + 0.033, lk.z]}
+                  scale={[(lk.rx ?? lk.r ?? 1) * 0.72, (lk.rz ?? lk.r ?? 1) * 0.34, 1]}
+                  renderOrder={5}
+                >
+                  <circleGeometry args={[1, 96]} />
+                  <meshBasicMaterial
+                    map={lakeGlintTex}
+                    alphaMap={(lk.kind === 'organic' ? lake2MaskTex : lakeMaskTex) || undefined}
+                    transparent
+                    opacity={0.15}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                    toneMapped={false}
+                  />
+                </mesh>
+              ) : null}
 
-          {/* Subtle rainbow arc on the lake */}
-          {rainbowTex ? (
-            <mesh
-              rotation={[-Math.PI / 2, treeData.lake.yaw - 0.15, 0]}
-              position={[treeData.lake.x, floorY + 0.034, treeData.lake.z]}
-              scale={[treeData.lake.rx * 0.92, treeData.lake.rz * 0.92, 1]}
-              renderOrder={6}
-            >
-              <ringGeometry args={[0.62, 1.0, 96, 1, Math.PI * 0.05, Math.PI * 0.80]} />
-              <meshBasicMaterial
-                map={rainbowTex}
-                transparent
-                opacity={0.06}
-                blending={THREE.AdditiveBlending}
-                depthWrite={false}
-                toneMapped={false}
-              />
-            </mesh>
-          ) : null}
+              {/* Subtle rainbow arc on the main lake only */}
+              {idx === 0 && rainbowTex ? (
+                <mesh
+                  rotation={[-Math.PI / 2, lk.yaw - 0.15, 0]}
+                  position={[lk.x, floorY + 0.034, lk.z]}
+                  scale={[(lk.rx ?? lk.r ?? 1) * 0.92, (lk.rz ?? lk.r ?? 1) * 0.92, 1]}
+                  renderOrder={6}
+                >
+                  <ringGeometry args={[0.62, 1.0, 96, 1, Math.PI * 0.05, Math.PI * 0.80]} />
+                  <meshBasicMaterial
+                    map={rainbowTex}
+                    transparent
+                    opacity={0.06}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                    toneMapped={false}
+                  />
+                </mesh>
+              ) : null}
+            </group>
+          ))}
+        </group>
+      ) : null}
 
+      {/* Hammocks (orange/pink) tied between trees */}
+      {hammocks?.length ? (
+        <group>
+          {hammocks.map((h, idx) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <group key={`hammock-${idx}`} position={[h.mx, h.my, h.mz]} rotation={[0, h.yaw, 0]}>
+              {/* hammock bed */}
+              <mesh castShadow receiveShadow>
+                <primitive object={h.geom} attach="geometry" />
+                <meshStandardMaterial color={h.bedColor || (h.variant === 0 ? '#ff7eb6' : '#ff8f2b')} roughness={0.85} metalness={0.0} />
+              </mesh>
+              {/* simple rope line */}
+              <mesh position={[0, 0.03, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+                <cylinderGeometry args={[0.018, 0.018, h.len, 8, 1, true]} />
+                <meshStandardMaterial color={'#f1eadf'} roughness={0.92} metalness={0.0} />
+              </mesh>
+            </group>
+          ))}
         </group>
       ) : null}
 
@@ -2085,6 +3148,18 @@ ForestWorld.propTypes = {
   curveData: PropTypes.shape({
     curve: PropTypes.any,
   }),
+  robotRef: PropTypes.shape({ current: PropTypes.any }),
+  gestureRef: PropTypes.shape({ current: PropTypes.any }),
+  roomPortals: PropTypes.arrayOf(
+    PropTypes.shape({
+      scene: PropTypes.string,
+      label: PropTypes.string,
+      accent: PropTypes.string,
+      t: PropTypes.number,
+      side: PropTypes.number,
+    })
+  ),
+  completion: PropTypes.object,
 };
 
 export function RobotEyeCamera({ targetRef, enabled = true }) {

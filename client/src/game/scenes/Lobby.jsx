@@ -24,9 +24,6 @@ export default function Lobby() {
       <BadgeWall />
 
       <div className={styles.hud} style={{ top: 86, pointerEvents: 'none' }}>
-        <div className={styles.hudBlock} style={{ pointerEvents: 'auto' }}>
-          <img src={portrait} alt="Robot" width={46} height={46} />
-        </div>
       </div>
     </>
   );
