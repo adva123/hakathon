@@ -22,6 +22,7 @@ const Robot = forwardRef((props, ref) => {
   const rightEyeGlowRef = useRef(null);
   const leftPupilRef = useRef(null);
   const rightPupilRef = useRef(null);
+  const headAttachmentRef = useRef(null);
 
   const gazeTmp = useRef(new THREE.Vector3());
   const gazeDir = useRef(new THREE.Vector3());
@@ -43,8 +44,8 @@ const Robot = forwardRef((props, ref) => {
     () =>
       new THREE.MeshStandardMaterial({
         color: new THREE.Color('#0a0e1a'),
-        emissive: new THREE.Color('#00ffff'),
-        emissiveIntensity: 0.85,
+        emissive: new THREE.Color('#00cbe6'),
+        emissiveIntensity: 0.25,
         roughness: 0.22,
         metalness: 0.25,
         side: THREE.DoubleSide,
@@ -82,17 +83,63 @@ const Robot = forwardRef((props, ref) => {
     };
   }, [faceMaterial]);
 
-  const faceParent = useMemo(() => {
-    let found = null;
-    // Try to find a head/face-related node in the cloned rig.
+  const headAnchor = useMemo(() => {
+    // Prefer a real head/neck/face bone (or node) from the cloned rig.
+    // If not found, fall back to the highest bone in the skeleton.
+    const tmp = new THREE.Vector3();
+    innerScene.updateMatrixWorld(true);
+
+    const headLike = [];
+    const bones = [];
+
     innerScene.traverse((obj) => {
-      if (found) return;
-      const name = (obj.name || '').toLowerCase();
-      if (!name) return;
-      if (name.includes('head') || name.includes('face')) found = obj;
+      if (!obj) return;
+      const name = String(obj.name || '').toLowerCase();
+      const isBone = !!obj.isBone;
+      if (isBone) bones.push(obj);
+
+      const isHeadish = name.includes('head') || name.includes('neck') || name.includes('face');
+      if (isHeadish) headLike.push(obj);
     });
-    return found;
+
+    const pickHighest = (list) => {
+      let best = null;
+      let bestScore = -Infinity;
+      for (const obj of list) {
+        obj.getWorldPosition(tmp);
+        const name = String(obj.name || '').toLowerCase();
+        const bonus = (obj.isBone ? 2 : 0) + (name.includes('head') ? 2 : 0) + (name.includes('neck') ? 1 : 0) + (name.includes('face') ? 1 : 0);
+        const score = tmp.y + bonus * 0.25;
+        if (score > bestScore) {
+          bestScore = score;
+          best = obj;
+        }
+      }
+      return best;
+    };
+
+    return pickHighest(headLike) || pickHighest(bones) || null;
   }, [innerScene]);
+
+  useEffect(() => {
+    const attachment = headAttachmentRef.current;
+    if (!attachment) return;
+
+    if (headAnchor) {
+      headAnchor.add(attachment);
+      attachment.position.set(0, 0, 0);
+      attachment.rotation.set(0, 0, 0);
+      attachment.scale.set(1, 1, 1);
+    }
+
+    return () => {
+      try {
+        if (headAnchor) headAnchor.remove(attachment);
+      } catch {
+        // ignore
+      }
+    };
+  }, [headAnchor]);
 
   useEffect(() => {
     // Clear previous
@@ -348,9 +395,9 @@ const Robot = forwardRef((props, ref) => {
     const isWinkingNow = t < winkState.current.activeUntil;
 
     // Eye gaze: move pupils toward camera in face-local space.
-    if (lookAt && faceParent) {
+    if (lookAt && headAnchor) {
       gazeTmp.current.copy(lookAt);
-      faceParent.worldToLocal(gazeTmp.current);
+      headAnchor.worldToLocal(gazeTmp.current);
 
       const setPupil = (ref, baseX) => {
         const p = ref.current;
@@ -437,94 +484,54 @@ const Robot = forwardRef((props, ref) => {
     <group ref={groupRef} {...rest}>
       <primitive object={innerScene} />
 
-      {/* Visible head proxy (ensures the character has a head even if the GLB head is missing/too subtle). */}
-      <mesh position={[0, 1.82, 0.12]} castShadow receiveShadow>
-        <sphereGeometry args={[0.26, 20, 16]} />
-        <meshStandardMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} />
-      </mesh>
+      {/* Head/face overlay that follows the animated head bone (no reparenting of the bone itself). */}
+      <group ref={headAttachmentRef} position={headAnchor ? [0, 0, 0] : [0, 1.82, 0.12]}>
+        {/* Head (simple proxy, tinted to match the dark-brown body) */}
+        <mesh position={[0, 0.02, 0.02]} castShadow receiveShadow>
+          <sphereGeometry args={[0.26, 20, 16]} />
+          <meshStandardMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} />
+        </mesh>
 
-      {/* Face "screen": attach to head node if found, else fallback to fixed position */}
-      {faceParent ? (
-        <primitive object={faceParent}>
-          {/* Cyberpunk eyes (glow) */}
-          <mesh ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.22]}>
-            <sphereGeometry args={[0.035, 14, 14]} />
-            <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
-          </mesh>
-          <mesh ref={rightEyeGlowRef} position={[0.12, 0.10, 0.22]}>
-            <sphereGeometry args={[0.035, 14, 14]} />
-            <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
-          </mesh>
+        {/* Eyes (kept subtle to avoid bloom/shimmer) */}
+        <mesh ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.22]}>
+          <sphereGeometry args={[0.028, 14, 14]} />
+          <meshStandardMaterial
+            color={'#00cbe6'}
+            emissive={'#00cbe6'}
+            emissiveIntensity={0.55}
+            roughness={0.35}
+            metalness={0.25}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh ref={rightEyeGlowRef} position={[0.12, 0.10, 0.22]}>
+          <sphereGeometry args={[0.028, 14, 14]} />
+          <meshStandardMaterial
+            color={'#00cbe6'}
+            emissive={'#00cbe6'}
+            emissiveIntensity={0.55}
+            roughness={0.35}
+            metalness={0.25}
+            toneMapped={false}
+          />
+        </mesh>
 
-          {/* Pupils (gaze) */}
-          <mesh ref={leftPupilRef} position={[-0.12, 0.10, 0.255]} renderOrder={21}>
-            <sphereGeometry args={[0.012, 12, 10]} />
-            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
-          </mesh>
-          <mesh ref={rightPupilRef} position={[0.12, 0.10, 0.255]} renderOrder={21}>
-            <sphereGeometry args={[0.012, 12, 10]} />
-            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
-          </mesh>
-          <pointLight position={[-0.12, 0.10, 0.24]} color={'#00E5FF'} intensity={1.0} distance={3} />
-          <pointLight position={[0.12, 0.10, 0.24]} color={'#00E5FF'} intensity={1.0} distance={3} />
+        {/* Pupils (gaze) */}
+        <mesh ref={leftPupilRef} position={[-0.12, 0.10, 0.255]} renderOrder={21}>
+          <sphereGeometry args={[0.012, 12, 10]} />
+          <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
+        </mesh>
+        <mesh ref={rightPupilRef} position={[0.12, 0.10, 0.255]} renderOrder={21}>
+          <sphereGeometry args={[0.012, 12, 10]} />
+          <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
+        </mesh>
 
-          <mesh position={[0, 0.04, 0.175]} renderOrder={19}>
-            <planeGeometry args={[0.565, 0.445]} />
-            <meshBasicMaterial
-              color="#ffffff"
-              transparent
-              opacity={0.95}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </mesh>
-          <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
-            <planeGeometry args={[0.52, 0.4]} />
-            <primitive object={faceMaterial} attach="material" />
-          </mesh>
-        </primitive>
-      ) : (
-        <group>
-          {/* Cyberpunk eyes (fallback) */}
-          <mesh ref={leftEyeGlowRef} position={[-0.12, 1.72, 0.92]}>
-            <sphereGeometry args={[0.035, 14, 14]} />
-            <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
-          </mesh>
-          <mesh ref={rightEyeGlowRef} position={[0.12, 1.72, 0.92]}>
-            <sphereGeometry args={[0.035, 14, 14]} />
-            <meshStandardMaterial color={'#00E5FF'} emissive={'#00E5FF'} emissiveIntensity={3.0} roughness={0.2} metalness={0.8} toneMapped={false} />
-          </mesh>
-
-          {/* Pupils (fallback) */}
-          <mesh ref={leftPupilRef} position={[-0.12, 1.72, 0.955]} renderOrder={21}>
-            <sphereGeometry args={[0.012, 12, 10]} />
-            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
-          </mesh>
-          <mesh ref={rightPupilRef} position={[0.12, 1.72, 0.955]} renderOrder={21}>
-            <sphereGeometry args={[0.012, 12, 10]} />
-            <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
-          </mesh>
-          <pointLight position={[-0.12, 1.72, 0.94]} color={'#00E5FF'} intensity={1.0} distance={3} />
-          <pointLight position={[0.12, 1.72, 0.94]} color={'#00E5FF'} intensity={1.0} distance={3} />
-
-          <mesh position={[0, 1.62, 0.715]} renderOrder={19}>
-            <planeGeometry args={[0.565, 0.445]} />
-            <meshBasicMaterial
-              color="#ffffff"
-              transparent
-              opacity={0.95}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </mesh>
-          <mesh position={[0, 1.62, 0.72]} renderOrder={20}>
-            <planeGeometry args={[0.52, 0.4]} />
-            <primitive object={faceMaterial} attach="material" />
-          </mesh>
-        </group>
-      )}
+        {/* Face screen (no point lights / no additive plane to prevent weird blue shimmer) */}
+        <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
+          <planeGeometry args={[0.52, 0.4]} />
+          <primitive object={faceMaterial} attach="material" />
+        </mesh>
+      </group>
 
     </group>
   );
