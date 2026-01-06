@@ -886,7 +886,7 @@ function SceneAtmosphere({ mode }) {
 
     scene.background = new THREE.Color(bg);
     if (mode === 'forest') {
-      scene.fog = new THREE.FogExp2(fogColor, 0.018);
+      scene.fog = new THREE.FogExp2(fogColor, 0.02);
     } else {
       scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
     }
@@ -2065,7 +2065,7 @@ function ForestEnvironmentFx({ robotRef, enabled }) {
     if (!scene) return;
     // Ensure there is an exponential fog object we can tune.
     if (!(scene.fog instanceof THREE.FogExp2)) {
-      scene.fog = new THREE.FogExp2(baseFog.getHex(), 0.018);
+      scene.fog = new THREE.FogExp2(baseFog.getHex(), 0.02);
     }
   }, [enabled, scene, baseFog]);
 
@@ -2107,7 +2107,7 @@ function ForestEnvironmentFx({ robotRef, enabled }) {
     tmpB.set(targetBg);
     scene.background = tmpA.lerp(tmpB, mix);
 
-    if (!(scene.fog instanceof THREE.FogExp2)) scene.fog = new THREE.FogExp2(baseFog.getHex(), 0.018);
+    if (!(scene.fog instanceof THREE.FogExp2)) scene.fog = new THREE.FogExp2(baseFog.getHex(), 0.02);
     const fog = scene.fog;
     tmpA.copy(baseFog);
     tmpB.set(targetFog);

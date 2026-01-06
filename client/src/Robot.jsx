@@ -91,9 +91,10 @@ const Robot = forwardRef((props, ref) => {
         emissive: src.emissive?.clone?.() ?? new THREE.Color('#000000'),
         emissiveMap: src.emissiveMap ?? null,
         emissiveIntensity: Number.isFinite(src.emissiveIntensity) ? src.emissiveIntensity : 0,
-        roughness: Number.isFinite(src.roughness) ? src.roughness : 0.55,
+        // Spec: glossy Pixar/Fortnite-ish body material.
+        roughness: 0.15,
         roughnessMap: src.roughnessMap ?? null,
-        metalness: Number.isFinite(src.metalness) ? src.metalness : 0,
+        metalness: 0.5,
         metalnessMap: src.metalnessMap ?? null,
         normalMap: src.normalMap ?? null,
         aoMap: src.aoMap ?? null,
@@ -158,8 +159,8 @@ const Robot = forwardRef((props, ref) => {
       return s - Math.floor(s);
     };
 
-    const sphereCount = 60;
-    const torusCount = 20;
+    const sphereCount = 40;
+    const torusCount = 0;
     const sphere = [];
     const torus = [];
 
@@ -393,64 +394,6 @@ const Robot = forwardRef((props, ref) => {
       }
     );
   }, [faceTextureUrl, faceMaterial]);
-
-  // חומרים בסגנון Toon
-  const toonMaterial = useMemo(
-    () =>
-      new THREE.MeshToonMaterial({
-        color: new THREE.Color("#ffd6ff"), // פסטלי-ורדרד
-        skinning: true,
-      }),
-    []
-  );
-
-  // Inner/core look: keep original shading, boost emissive to feel like energy inside.
-  useEffect(() => {
-    let referenceBodyColor = null;
-
-    innerScene.traverse((obj) => {
-      if (!obj.isMesh) return;
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-      const skinned = obj.isSkinnedMesh;
-
-      const name = (obj.name || '').toLowerCase();
-      const isHeadLike = name.includes('head') || name.includes('face');
-
-      const src = obj.material;
-      const srcMat = Array.isArray(src) ? src[0] : src;
-      const baseColor = srcMat?.color ? srcMat.color.clone() : new THREE.Color('#ffd6ff');
-
-      const orange = new THREE.Color('#FF6B35');
-      const m = new THREE.MeshPhysicalMaterial({
-        color: baseColor.multiply(orange),
-        roughness: 0.38,
-        metalness: 0.35,
-        clearcoat: 1,
-        clearcoatRoughness: 0.12,
-        emissive: new THREE.Color('#1A1A2E'),
-        emissiveIntensity: 0.08,
-      });
-
-      // Capture a reference body color from the first non-head mesh.
-      if (!referenceBodyColor && !isHeadLike) {
-        referenceBodyColor = m.color.clone();
-      }
-
-      // Force head/face meshes to match the body color.
-      if (referenceBodyColor && isHeadLike) {
-        m.color.copy(referenceBodyColor);
-      }
-
-      // Preserve normal/roughness for shading, but keep a strong orange tint.
-      if (srcMat?.normalMap) m.normalMap = srcMat.normalMap;
-      if (srcMat?.roughnessMap) m.roughnessMap = srcMat.roughnessMap;
-      m.envMapIntensity = 1.15;
-
-      if (skinned) m.skinning = true;
-      obj.material = m;
-    });
-  }, [innerScene, toonMaterial]);
 
   // Cache bones for a simple wave gesture (right arm/forearm/hand).
   useEffect(() => {
@@ -695,10 +638,12 @@ const Robot = forwardRef((props, ref) => {
             <sphereGeometry args={[1, 12, 10]} />
             <meshPhysicalMaterial color={'#d6b15c'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
           </instancedMesh>
-          <instancedMesh ref={hairTorusInstRef} args={[null, null, hairInstances.torus.length]} castShadow>
-            <torusGeometry args={[0.030, 0.012, 8, 18]} />
-            <meshPhysicalMaterial color={'#d6b15c'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
-          </instancedMesh>
+          {hairInstances.torus.length > 0 ? (
+            <instancedMesh ref={hairTorusInstRef} args={[null, null, hairInstances.torus.length]} castShadow>
+              <torusGeometry args={[0.030, 0.012, 8, 18]} />
+              <meshPhysicalMaterial color={'#d6b15c'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
+            </instancedMesh>
+          ) : null}
         </group>
 
         {/* Eyes: layered (sclera + iris + pupil + catch-light) */}

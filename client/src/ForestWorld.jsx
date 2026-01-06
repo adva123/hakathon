@@ -1143,8 +1143,13 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         const fz = p.z + left.z * off2 * side;
         if (isInsideLake(fx, fz, lake, 1.02) || isInsideLake(fx, fz, lake2, 1.02)) continue;
         const fs = (0.22 + prand(i + 960) * 0.22) * WORLD_SCALE;
-        const hue = 0.92 + prand(i + 980) * 0.12; // pink/purple
-        const col = new THREE.Color().setHSL(hue % 1, 0.75, 0.68);
+        // Pastel palette: pink / sky-blue / yellow.
+        const hues = [0.92, 0.58, 0.13];
+        const baseHue = hues[Math.floor(prand(i + 980) * hues.length) % hues.length];
+        const hue = (baseHue + (prand(i + 981) - 0.5) * 0.035 + 1) % 1;
+        const sat = 0.62 + prand(i + 982) * 0.12;
+        const light = 0.72 + prand(i + 983) * 0.08;
+        const col = new THREE.Color().setHSL(hue, sat, light);
         flowers.push({ x: fx, z: fz, s: fs, col });
       }
 
@@ -1191,13 +1196,14 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         if (isInsideLake(gx, gz, lake, 1.02) || isInsideLake(gx, gz, lake2, 1.02)) continue;
         const baseS = (0.20 + prand(i + 1740) * 0.22) * WORLD_SCALE;
         const count = 16 + Math.floor(prand(i + 1750) * 18);
+        const hues = [0.92, 0.58, 0.13];
         for (let k = 0; k < count; k += 1) {
           const ox = (prand(i * 50 + k + 1760) - 0.5) * 0.85;
           const oz = (prand(i * 50 + k + 1770) - 0.5) * 0.85;
           const s = baseS * (0.55 + prand(i * 50 + k + 1780) * 0.8);
-          const hue = prand(i * 50 + k + 1790);
-          // Pastel-ish palette.
-          const col = new THREE.Color().setHSL(hue, 0.65, 0.76);
+          const baseHue = hues[Math.floor(prand(i * 50 + k + 1790) * hues.length) % hues.length];
+          const hue = (baseHue + (prand(i * 50 + k + 1791) - 0.5) * 0.05 + 1) % 1;
+          const col = new THREE.Color().setHSL(hue, 0.58, 0.80);
           gypsophila.push({ x: gx + ox, z: gz + oz, s, col });
         }
       }
