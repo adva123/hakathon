@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unknown-property */
 
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 
@@ -11,15 +11,25 @@ const DollBot = forwardRef((props, ref) => {
   const groupRef = useRef(null);
   const rigRef = useRef(null);
   const headRef = useRef(null);
+  const leftBrowRef = useRef(null);
+  const rightBrowRef = useRef(null);
   const leftArmRef = useRef(null);
   const rightArmRef = useRef(null);
   const leftLegRef = useRef(null);
   const rightLegRef = useRef(null);
 
+  const hairSphereInstRef = useRef(null);
+  const hairTorusInstRef = useRef(null);
+
   const prevWorldPosRef = useRef(new THREE.Vector3());
   const worldPosRef = useRef(new THREE.Vector3());
   const gaitPhaseRef = useRef(0);
   const gaitAmountRef = useRef(0);
+
+  const tmpM4 = useRef(new THREE.Matrix4());
+  const tmpQ = useRef(new THREE.Quaternion());
+  const tmpV3 = useRef(new THREE.Vector3());
+  const tmpE = useRef(new THREE.Euler());
 
   useImperativeHandle(ref, () => groupRef.current);
 
@@ -111,6 +121,96 @@ const DollBot = forwardRef((props, ref) => {
     return { skin, hair, hoodie, shorts, hat, hatBand, backpack, strap, boots };
   }, []);
 
+  const hairInstances = useMemo(() => {
+    // Deterministic pseudo-random for consistent curls placement.
+    const rand01 = (seed) => {
+      const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return s - Math.floor(s);
+    };
+
+    const sphereCount = 68; // 50-100 curls total (mix of spheres + torus "donuts")
+    const torusCount = 22;
+
+    const sphere = [];
+    const torus = [];
+
+    // Head local-space placement (head sphere radius ~0.34). Keep curls mostly under the hat.
+    const baseR = 0.30;
+    const centerY = 0.18;
+
+    for (let i = 0; i < sphereCount; i += 1) {
+      const u = rand01(i * 17.1 + 3.2);
+      const v = rand01(i * 29.7 + 9.1);
+      const theta = u * Math.PI * 2;
+      // Bias towards the top hemisphere so hair sits on the crown.
+      const phi = (0.35 + 0.55 * v) * (Math.PI / 2);
+      const rr = baseR * (0.92 + 0.18 * rand01(i * 11.7 + 2.9));
+
+      const x = Math.cos(theta) * Math.sin(phi) * rr;
+      const y = centerY + Math.cos(phi) * rr * 0.85;
+      const z = Math.sin(theta) * Math.sin(phi) * rr * 0.85;
+
+      // Slight forward bias so curls frame the face.
+      const z2 = z + (0.06 + 0.03 * rand01(i * 8.2)) * (rand01(i * 3.3) > 0.55 ? 1 : -1);
+
+      sphere.push({
+        x,
+        y: Math.min(0.50, y),
+        z: THREE.MathUtils.clamp(z2, -0.26, 0.24),
+        s: 0.045 + 0.030 * rand01(i * 41.7 + 1.7),
+        ry: (rand01(i * 5.7 + 8.8) - 0.5) * 0.9,
+      });
+    }
+
+    for (let i = 0; i < torusCount; i += 1) {
+      const u = rand01(i * 19.9 + 6.1);
+      const v = rand01(i * 31.3 + 2.7);
+      const theta = u * Math.PI * 2;
+      const ringR = baseR * (0.85 + 0.20 * rand01(i * 10.1));
+      const x = Math.cos(theta) * ringR;
+      const z = Math.sin(theta) * ringR * 0.86;
+      const y = 0.30 + 0.14 * v;
+      torus.push({
+        x,
+        y: Math.min(0.52, y),
+        z: THREE.MathUtils.clamp(z, -0.24, 0.22),
+        s: 0.55 + 0.55 * rand01(i * 7.7 + 1.2),
+        rx: (rand01(i * 13.3 + 0.8) - 0.5) * 1.1,
+        rz: (rand01(i * 9.1 + 4.4) - 0.5) * 1.1,
+      });
+    }
+
+    return { sphere, torus };
+  }, []);
+
+  useEffect(() => {
+    const sphereInst = hairSphereInstRef.current;
+    const torusInst = hairTorusInstRef.current;
+    if (sphereInst) {
+      for (let i = 0; i < hairInstances.sphere.length; i += 1) {
+        const h = hairInstances.sphere[i];
+        tmpE.current.set(0, h.ry || 0, 0);
+        tmpQ.current.setFromEuler(tmpE.current);
+        tmpV3.current.set(h.x, h.y, h.z);
+        tmpM4.current.compose(tmpV3.current, tmpQ.current, new THREE.Vector3(h.s, h.s, h.s));
+        sphereInst.setMatrixAt(i, tmpM4.current);
+      }
+      sphereInst.instanceMatrix.needsUpdate = true;
+    }
+    if (torusInst) {
+      for (let i = 0; i < hairInstances.torus.length; i += 1) {
+        const h = hairInstances.torus[i];
+        tmpE.current.set(h.rx || 0, 0, h.rz || 0);
+        tmpQ.current.setFromEuler(tmpE.current);
+        tmpV3.current.set(h.x, h.y, h.z);
+        const sc = new THREE.Vector3(h.s, h.s, h.s);
+        tmpM4.current.compose(tmpV3.current, tmpQ.current, sc);
+        torusInst.setMatrixAt(i, tmpM4.current);
+      }
+      torusInst.instanceMatrix.needsUpdate = true;
+    }
+  }, [hairInstances]);
+
   useFrame(({ clock }, delta) => {
     const root = groupRef.current;
     const rig = rigRef.current;
@@ -166,6 +266,21 @@ const DollBot = forwardRef((props, ref) => {
       headRef.current.rotation.y = look * (1 - 0.35 * gait);
       headRef.current.rotation.x = nod * (1 - 0.45 * gait) + follow;
       headRef.current.rotation.z = Math.sin(t * 1.05) * 0.03 * (1 - 0.25 * gait);
+
+      // Brows: tiny dynamic expression makes the face feel alive.
+      const curious = (1 - gait) * (0.10 + 0.08 * Math.sin(t * 0.9 + 0.2));
+      const smiley = gait * (0.06 + 0.05 * Math.sin(t * 1.6));
+      const browTilt = curious - smiley;
+      const browLift = 0.015 * curious;
+
+      if (leftBrowRef.current) {
+        leftBrowRef.current.rotation.z = 0.14 + browTilt;
+        leftBrowRef.current.position.y = 0.14 + browLift;
+      }
+      if (rightBrowRef.current) {
+        rightBrowRef.current.rotation.z = -0.14 - browTilt;
+        rightBrowRef.current.position.y = 0.14 + browLift;
+      }
     }
   });
 
@@ -196,21 +311,17 @@ const DollBot = forwardRef((props, ref) => {
           <meshStandardMaterial color={'#ffb3b8'} transparent opacity={0.30} roughness={0.9} />
         </mesh>
 
-        {/* Curly hair puffs */}
-        {Array.from({ length: 18 }).map((_, i) => {
-          const a = (i / 18) * Math.PI * 2;
-          const rr = 0.23 + ((i % 3) * 0.01);
-          const x = Math.cos(a) * rr;
-          const z = Math.sin(a) * rr * 0.92;
-          const y = 0.18 + ((i % 5) * 0.018);
-          const s = 0.065 + ((i % 4) * 0.008);
-          return (
-            <mesh key={i} position={[x, y, z]} castShadow>
-              <sphereGeometry args={[s, 12, 10]} />
-              <primitive object={materials.hair} attach="material" />
-            </mesh>
-          );
-        })}
+        {/* Curly, volumetric hair (50-100 curls) */}
+        <group>
+          <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
+            <sphereGeometry args={[1, 12, 10]} />
+            <primitive object={materials.hair} attach="material" />
+          </instancedMesh>
+          <instancedMesh ref={hairTorusInstRef} args={[null, null, hairInstances.torus.length]} castShadow>
+            <torusGeometry args={[0.055, 0.020, 8, 18]} />
+            <primitive object={materials.hair} attach="material" />
+          </instancedMesh>
+        </group>
 
         {/* Silly hiking hat */}
         <group position={[0, 0.52, 0]}>
@@ -233,50 +344,59 @@ const DollBot = forwardRef((props, ref) => {
           </mesh>
         </group>
 
-        {/* Eyes (curious) */}
-        <mesh position={[-0.125, 0.06, 0.285]}>
-          <sphereGeometry args={[0.075, 18, 14]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.25} metalness={0} />
-        </mesh>
-        <mesh position={[0.125, 0.06, 0.285]}>
-          <sphereGeometry args={[0.075, 18, 14]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.25} metalness={0} />
-        </mesh>
+        {/* Eyes: layered (sclera + iris + pupil + catch-light) */}
+        <group>
+          {/* Left eye */}
+          <group position={[-0.125, 0.06, 0.285]}>
+            {/* Sclera */}
+            <mesh>
+              <sphereGeometry args={[0.075, 18, 14]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.22} metalness={0} />
+            </mesh>
+            {/* Iris (flat layer) */}
+            <mesh position={[0.002, -0.010, 0.072]} rotation={[0, 0, 0]} renderOrder={5}>
+              <circleGeometry args={[0.034, 22]} />
+              <meshStandardMaterial color={'#2b5ea8'} roughness={0.38} metalness={0.02} />
+            </mesh>
+            {/* Pupil (flat layer) */}
+            <mesh position={[0.002, -0.010, 0.074]} renderOrder={6}>
+              <circleGeometry args={[0.016, 18]} />
+              <meshStandardMaterial color="#111827" roughness={0.35} metalness={0.05} />
+            </mesh>
+            {/* Catch-light */}
+            <mesh position={[-0.014, 0.016, 0.078]} renderOrder={7}>
+              <sphereGeometry args={[0.010, 10, 8]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.12} metalness={0} />
+            </mesh>
+          </group>
 
-        {/* Iris */}
-        <mesh position={[-0.12, 0.05, 0.333]}>
-          <sphereGeometry args={[0.035, 14, 12]} />
-          <meshStandardMaterial color={'#2b5ea8'} roughness={0.35} metalness={0.05} />
-        </mesh>
-        <mesh position={[0.12, 0.05, 0.333]}>
-          <sphereGeometry args={[0.035, 14, 12]} />
-          <meshStandardMaterial color={'#2b5ea8'} roughness={0.35} metalness={0.05} />
-        </mesh>
-
-        {/* Pupil + sparkle */}
-        <mesh position={[-0.12, 0.045, 0.355]}>
-          <sphereGeometry args={[0.017, 12, 10]} />
-          <meshStandardMaterial color="#111827" roughness={0.3} metalness={0.1} />
-        </mesh>
-        <mesh position={[0.12, 0.045, 0.355]}>
-          <sphereGeometry args={[0.017, 12, 10]} />
-          <meshStandardMaterial color="#111827" roughness={0.3} metalness={0.1} />
-        </mesh>
-        <mesh position={[-0.135, 0.075, 0.352]}>
-          <sphereGeometry args={[0.012, 10, 8]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0} />
-        </mesh>
-        <mesh position={[0.105, 0.075, 0.352]}>
-          <sphereGeometry args={[0.012, 10, 8]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0} />
-        </mesh>
+          {/* Right eye */}
+          <group position={[0.125, 0.06, 0.285]}>
+            <mesh>
+              <sphereGeometry args={[0.075, 18, 14]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.22} metalness={0} />
+            </mesh>
+            <mesh position={[-0.002, -0.010, 0.072]} renderOrder={5}>
+              <circleGeometry args={[0.034, 22]} />
+              <meshStandardMaterial color={'#2b5ea8'} roughness={0.38} metalness={0.02} />
+            </mesh>
+            <mesh position={[-0.002, -0.010, 0.074]} renderOrder={6}>
+              <circleGeometry args={[0.016, 18]} />
+              <meshStandardMaterial color="#111827" roughness={0.35} metalness={0.05} />
+            </mesh>
+            <mesh position={[0.014, 0.016, 0.078]} renderOrder={7}>
+              <sphereGeometry args={[0.010, 10, 8]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.12} metalness={0} />
+            </mesh>
+          </group>
+        </group>
 
         {/* Brows */}
-        <mesh position={[-0.12, 0.14, 0.23]} rotation={[0, 0, 0.18]}>
+        <mesh ref={leftBrowRef} position={[-0.12, 0.14, 0.23]} rotation={[0, 0, 0.18]}>
           <torusGeometry args={[0.06, 0.008, 8, 16, Math.PI]} />
           <primitive object={materials.hair} attach="material" />
         </mesh>
-        <mesh position={[0.12, 0.14, 0.23]} rotation={[0, 0, -0.18]}>
+        <mesh ref={rightBrowRef} position={[0.12, 0.14, 0.23]} rotation={[0, 0, -0.18]}>
           <torusGeometry args={[0.06, 0.008, 8, 16, Math.PI]} />
           <primitive object={materials.hair} attach="material" />
         </mesh>

@@ -7,6 +7,8 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
+const GOLD_COLOR = '#d4af37';
+
 // מוסיף forwardRef כדי ש-ThreeDemo יוכל לשלוט עליו
 const Robot = forwardRef((props, ref) => {
   const gltf = useGLTF("/models/RobotExpressive.glb");
@@ -22,7 +24,16 @@ const Robot = forwardRef((props, ref) => {
   const rightEyeGlowRef = useRef(null);
   const leftPupilRef = useRef(null);
   const rightPupilRef = useRef(null);
+  const leftBrowRef = useRef(null);
+  const rightBrowRef = useRef(null);
   const headAttachmentRef = useRef(null);
+
+  const hairSphereInstRef = useRef(null);
+  const hairTorusInstRef = useRef(null);
+  const tmpM4 = useRef(new THREE.Matrix4());
+  const tmpQ = useRef(new THREE.Quaternion());
+  const tmpV3 = useRef(new THREE.Vector3());
+  const tmpE = useRef(new THREE.Euler());
 
   const gazeTmp = useRef(new THREE.Vector3());
   const gazeDir = useRef(new THREE.Vector3());
@@ -42,18 +53,189 @@ const Robot = forwardRef((props, ref) => {
   // === Face "screen" material (user avatar) ===
   const faceMaterial = useMemo(
     () =>
-      new THREE.MeshStandardMaterial({
+      new THREE.MeshPhysicalMaterial({
         color: new THREE.Color('#0a0e1a'),
         emissive: new THREE.Color('#00cbe6'),
         emissiveIntensity: 0.25,
         roughness: 0.22,
         metalness: 0.25,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.06,
         side: THREE.DoubleSide,
       }),
     []
   );
   const faceTextureRef = useRef(null);
   const faceShaderRef = useRef(null);
+
+  // Upgrade GLB materials to glossy physical, and tint joints to gold.
+  useEffect(() => {
+    const created = [];
+    const cache = new Map();
+
+    const goldMat = new THREE.MeshPhysicalMaterial({
+      color: GOLD_COLOR,
+      metalness: 0.9,
+      roughness: 0.1,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.06,
+    });
+
+    const toPhysical = (src, key) => {
+      if (!src) return null;
+      if (cache.has(key)) return cache.get(key);
+
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: src.color?.clone?.() ?? new THREE.Color('#ffffff'),
+        map: src.map ?? null,
+        emissive: src.emissive?.clone?.() ?? new THREE.Color('#000000'),
+        emissiveMap: src.emissiveMap ?? null,
+        emissiveIntensity: Number.isFinite(src.emissiveIntensity) ? src.emissiveIntensity : 0,
+        roughness: Number.isFinite(src.roughness) ? src.roughness : 0.55,
+        roughnessMap: src.roughnessMap ?? null,
+        metalness: Number.isFinite(src.metalness) ? src.metalness : 0,
+        metalnessMap: src.metalnessMap ?? null,
+        normalMap: src.normalMap ?? null,
+        aoMap: src.aoMap ?? null,
+        aoMapIntensity: Number.isFinite(src.aoMapIntensity) ? src.aoMapIntensity : 1,
+        transparent: Boolean(src.transparent),
+        opacity: Number.isFinite(src.opacity) ? src.opacity : 1,
+        side: src.side,
+        toneMapped: src.toneMapped,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.08,
+      });
+
+      cache.set(key, mat);
+      created.push(mat);
+      return mat;
+    };
+
+    innerScene.traverse((obj) => {
+      if (!obj?.isMesh) return;
+      const mat = obj.material;
+      if (!mat) return;
+
+      const name = `${obj.name || ''} ${(Array.isArray(mat) ? '' : (mat.name || ''))}`;
+      const isJoint = /(joint|hinge|elbow|knee|ankle|wrist|shoulder|hip)/i.test(name);
+
+      const applyOne = (m) => {
+        if (!m) return m;
+        if (isJoint) return goldMat;
+        // Leave unlit materials alone.
+        if (m.isMeshBasicMaterial) return m;
+        const key = `${m.uuid}|phys`;
+        return toPhysical(m, key) || m;
+      };
+
+      if (Array.isArray(mat)) obj.material = mat.map(applyOne);
+      else obj.material = applyOne(mat);
+
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    });
+
+    return () => {
+      try {
+        goldMat.dispose();
+      } catch {
+        // ignore
+      }
+      created.forEach((m) => {
+        try {
+          m.dispose();
+        } catch {
+          // ignore
+        }
+      });
+    };
+  }, [innerScene]);
+
+  const hairInstances = useMemo(() => {
+    // Deterministic pseudo-random so curls don't "shuffle" between renders.
+    const rand01 = (seed) => {
+      const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return s - Math.floor(s);
+    };
+
+    const sphereCount = 60;
+    const torusCount = 20;
+    const sphere = [];
+    const torus = [];
+
+    // Head overlay sphere radius is ~0.26; place curls on crown.
+    const baseR = 0.245;
+    const centerY = 0.16;
+
+    for (let i = 0; i < sphereCount; i += 1) {
+      const u = rand01(i * 19.7 + 2.3);
+      const v = rand01(i * 31.1 + 8.1);
+      const theta = u * Math.PI * 2;
+      const phi = (0.35 + 0.55 * v) * (Math.PI / 2);
+      const rr = baseR * (0.92 + 0.22 * rand01(i * 7.9 + 1.4));
+
+      const x = Math.cos(theta) * Math.sin(phi) * rr;
+      const y = centerY + Math.cos(phi) * rr * 0.95;
+      const z = Math.sin(theta) * Math.sin(phi) * rr * 0.85;
+
+      sphere.push({
+        x,
+        y: Math.min(0.30, y),
+        z: THREE.MathUtils.clamp(z, -0.18, 0.12),
+        s: 0.020 + 0.018 * rand01(i * 41.7 + 4.2),
+        ry: (rand01(i * 5.7 + 8.8) - 0.5) * 1.0,
+      });
+    }
+
+    for (let i = 0; i < torusCount; i += 1) {
+      const u = rand01(i * 17.3 + 6.1);
+      const v = rand01(i * 29.9 + 2.7);
+      const theta = u * Math.PI * 2;
+      const ringR = baseR * (0.80 + 0.18 * rand01(i * 10.1));
+      const x = Math.cos(theta) * ringR;
+      const z = Math.sin(theta) * ringR * 0.82;
+      const y = 0.20 + 0.08 * v;
+      torus.push({
+        x,
+        y: Math.min(0.32, y),
+        z: THREE.MathUtils.clamp(z, -0.18, 0.10),
+        s: 0.55 + 0.55 * rand01(i * 7.7 + 1.2),
+        rx: (rand01(i * 13.3 + 0.8) - 0.5) * 1.1,
+        rz: (rand01(i * 9.1 + 4.4) - 0.5) * 1.1,
+      });
+    }
+
+    return { sphere, torus };
+  }, []);
+
+  useEffect(() => {
+    const sphereInst = hairSphereInstRef.current;
+    const torusInst = hairTorusInstRef.current;
+
+    if (sphereInst) {
+      for (let i = 0; i < hairInstances.sphere.length; i += 1) {
+        const h = hairInstances.sphere[i];
+        tmpE.current.set(0, h.ry || 0, 0);
+        tmpQ.current.setFromEuler(tmpE.current);
+        tmpV3.current.set(h.x, h.y, h.z);
+        tmpM4.current.compose(tmpV3.current, tmpQ.current, new THREE.Vector3(h.s, h.s, h.s));
+        sphereInst.setMatrixAt(i, tmpM4.current);
+      }
+      sphereInst.instanceMatrix.needsUpdate = true;
+    }
+
+    if (torusInst) {
+      for (let i = 0; i < hairInstances.torus.length; i += 1) {
+        const h = hairInstances.torus[i];
+        tmpE.current.set(h.rx || 0, 0, h.rz || 0);
+        tmpQ.current.setFromEuler(tmpE.current);
+        tmpV3.current.set(h.x, h.y, h.z);
+        tmpM4.current.compose(tmpV3.current, tmpQ.current, new THREE.Vector3(h.s, h.s, h.s));
+        torusInst.setMatrixAt(i, tmpM4.current);
+      }
+      torusInst.instanceMatrix.needsUpdate = true;
+    }
+  }, [hairInstances]);
 
   // Laptop prop intentionally disabled.
 
@@ -430,6 +612,21 @@ const Robot = forwardRef((props, ref) => {
       leftEyeGlowRef.current.scale.y = 1;
     }
 
+    // Brows: tiny dynamic tilt/lift adds "soul".
+    const curious = (lookAt ? 1 : 0) * 0.10 + 0.06 * Math.sin(t * 0.9 + 0.2);
+    const smiley = (greetActive ? 1 : 0) * 0.10;
+    const browTilt = curious - smiley;
+    const browLift = 0.010 + (lookAt ? 0.008 : 0) + (greetActive ? 0.006 : 0);
+
+    if (leftBrowRef.current) {
+      leftBrowRef.current.rotation.z = 0.20 + browTilt;
+      leftBrowRef.current.position.y = 0.17 + browLift;
+    }
+    if (rightBrowRef.current) {
+      rightBrowRef.current.rotation.z = -0.20 - browTilt;
+      rightBrowRef.current.position.y = 0.17 + browLift;
+    }
+
     // Wave gesture: raise right arm and wave forearm/hand.
     if (waveRig.current.ready && waveRig.current.base) {
       const wave = Math.sin(t * 6.0);
@@ -489,41 +686,74 @@ const Robot = forwardRef((props, ref) => {
         {/* Head (simple proxy, tinted to match the dark-brown body) */}
         <mesh position={[0, 0.02, 0.02]} castShadow receiveShadow>
           <sphereGeometry args={[0.26, 20, 16]} />
-          <meshStandardMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} />
+          <meshPhysicalMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
         </mesh>
 
-        {/* Eyes (kept subtle to avoid bloom/shimmer) */}
-        <mesh ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.22]}>
-          <sphereGeometry args={[0.028, 14, 14]} />
-          <meshStandardMaterial
-            color={'#00cbe6'}
-            emissive={'#00cbe6'}
-            emissiveIntensity={0.55}
-            roughness={0.35}
-            metalness={0.25}
-            toneMapped={false}
-          />
-        </mesh>
-        <mesh ref={rightEyeGlowRef} position={[0.12, 0.10, 0.22]}>
-          <sphereGeometry args={[0.028, 14, 14]} />
-          <meshStandardMaterial
-            color={'#00cbe6'}
-            emissive={'#00cbe6'}
-            emissiveIntensity={0.55}
-            roughness={0.35}
-            metalness={0.25}
-            toneMapped={false}
-          />
-        </mesh>
+        {/* Curly hair (volumetric curls via for-loop/instancing) */}
+        <group position={[0, 0.12, 0.00]}>
+          <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
+            <sphereGeometry args={[1, 12, 10]} />
+            <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
+          </instancedMesh>
+          <instancedMesh ref={hairTorusInstRef} args={[null, null, hairInstances.torus.length]} castShadow>
+            <torusGeometry args={[0.030, 0.012, 8, 18]} />
+            <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
+          </instancedMesh>
+        </group>
 
-        {/* Pupils (gaze) */}
-        <mesh ref={leftPupilRef} position={[-0.12, 0.10, 0.255]} renderOrder={21}>
-          <sphereGeometry args={[0.012, 12, 10]} />
-          <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
+        {/* Eyes: layered (sclera + iris + pupil + catch-light) */}
+        <group ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.22]}>
+          {/* Sclera */}
+          <mesh>
+            <sphereGeometry args={[0.040, 16, 14]} />
+            <meshPhysicalMaterial color={'#f8fbff'} roughness={0.22} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.04} />
+          </mesh>
+          {/* Iris + pupil (moves for gaze) */}
+          <group ref={leftPupilRef} position={[0, 0, 0.035]} renderOrder={21}>
+            <mesh position={[0, 0, 0.002]}>
+              <circleGeometry args={[0.018, 20]} />
+              <meshPhysicalMaterial color={'#2b5ea8'} roughness={0.35} metalness={0.02} clearcoat={1.0} clearcoatRoughness={0.06} />
+            </mesh>
+            <mesh position={[0, 0, 0.004]}>
+              <circleGeometry args={[0.0088, 18]} />
+              <meshPhysicalMaterial color={'#0b0f18'} roughness={0.5} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
+            </mesh>
+            <mesh position={[-0.006, 0.006, 0.008]}>
+              <sphereGeometry args={[0.0042, 10, 8]} />
+              <meshPhysicalMaterial color={'#ffffff'} roughness={0.12} metalness={0} clearcoat={1.0} clearcoatRoughness={0.04} />
+            </mesh>
+          </group>
+        </group>
+
+        <group ref={rightEyeGlowRef} position={[0.12, 0.10, 0.22]}>
+          <mesh>
+            <sphereGeometry args={[0.040, 16, 14]} />
+            <meshPhysicalMaterial color={'#f8fbff'} roughness={0.22} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.04} />
+          </mesh>
+          <group ref={rightPupilRef} position={[0, 0, 0.035]} renderOrder={21}>
+            <mesh position={[0, 0, 0.002]}>
+              <circleGeometry args={[0.018, 20]} />
+              <meshPhysicalMaterial color={'#2b5ea8'} roughness={0.35} metalness={0.02} clearcoat={1.0} clearcoatRoughness={0.06} />
+            </mesh>
+            <mesh position={[0, 0, 0.004]}>
+              <circleGeometry args={[0.0088, 18]} />
+              <meshPhysicalMaterial color={'#0b0f18'} roughness={0.5} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
+            </mesh>
+            <mesh position={[0.006, 0.006, 0.008]}>
+              <sphereGeometry args={[0.0042, 10, 8]} />
+              <meshPhysicalMaterial color={'#ffffff'} roughness={0.12} metalness={0} clearcoat={1.0} clearcoatRoughness={0.04} />
+            </mesh>
+          </group>
+        </group>
+
+        {/* Brows (dynamic tilt handled in useFrame) */}
+        <mesh ref={leftBrowRef} position={[-0.12, 0.17, 0.19]} rotation={[0, 0, 0.20]}>
+          <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
+          <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
         </mesh>
-        <mesh ref={rightPupilRef} position={[0.12, 0.10, 0.255]} renderOrder={21}>
-          <sphereGeometry args={[0.012, 12, 10]} />
-          <meshStandardMaterial color={'#0b0f18'} roughness={0.6} metalness={0.05} />
+        <mesh ref={rightBrowRef} position={[0.12, 0.17, 0.19]} rotation={[0, 0, -0.20]}>
+          <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
+          <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
         </mesh>
 
         {/* Face screen (no point lights / no additive plane to prevent weird blue shimmer) */}

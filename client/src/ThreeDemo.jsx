@@ -13,6 +13,15 @@ import { useKeyboard } from './useKeyboard';
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 import { ForestSky, ForestWorld } from './ForestWorld.jsx';
 
+function smoothstep01(x) {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * (3 - 2 * t);
+}
+function dampAngle(current, target, alpha) {
+  const d = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + d * alpha;
+}
+
 function ScreenTintOverlay({ color = '#6B5B95', opacity = 0.15 }) {
   const meshRef = useRef(null);
   const { camera } = useThree();
@@ -549,6 +558,7 @@ function RobotController({
   gestureRef,
   floorY,
   curveData,
+  roomPortals,
   autoWalkTarget,
   onAutoWalkArrived,
   idlePatrolEnabled,
@@ -560,6 +570,7 @@ function RobotController({
   const keys = useKeyboard();
   const scratch2 = useRef(new THREE.Vector3());
   const scratch3 = useRef(new THREE.Vector3());
+  const tmpV = useRef(new THREE.Vector3());
   const prevP = useRef(new THREE.Vector3());
   const hasPrev = useRef(false);
   const prevYaw = useRef(0);
@@ -602,12 +613,18 @@ function RobotController({
         state.x += dirX * moveInput * walkSpeed * delta;
         state.z += dirZ * moveInput * walkSpeed * delta;
 
-        // Sync leg cadence with input magnitude.
-        const speedScale = Math.max(0.2, Math.min(2.2, Math.abs(moveInput) * 1.2));
-        robot.userData.setSpeedScale?.(speedScale);
+        // Sync leg cadence with input magnitude (smoothed to avoid jitter).
+        const targetScale = Math.max(0.2, Math.min(2.2, Math.abs(moveInput) * 1.2));
+        robot.userData._speedScaleSmoothed = robot.userData._speedScaleSmoothed ?? 1;
+        const aS = 1 - Math.exp(-(delta || 0.016) * 10);
+        robot.userData._speedScaleSmoothed += (targetScale - robot.userData._speedScaleSmoothed) * aS;
+        robot.userData.setSpeedScale?.(robot.userData._speedScaleSmoothed);
       } else {
         robot.userData.setAction?.('Idle');
-        robot.userData.setSpeedScale?.(1);
+        robot.userData._speedScaleSmoothed = robot.userData._speedScaleSmoothed ?? 1;
+        const aS = 1 - Math.exp(-(delta || 0.016) * 10);
+        robot.userData._speedScaleSmoothed += (1 - robot.userData._speedScaleSmoothed) * aS;
+        robot.userData.setSpeedScale?.(robot.userData._speedScaleSmoothed);
       }
 
       // Keep robot within a small playable band so the framing stays consistent.
@@ -688,13 +705,15 @@ function RobotController({
     tan.normalize();
 
     scratch2.current.copy(tan);
-    const yaw = Math.atan2(scratch2.current.x, scratch2.current.z);
+    const yawTarget = Math.atan2(scratch2.current.x, scratch2.current.z);
+    robot.userData._yawSmoothed = typeof robot.userData._yawSmoothed === 'number' ? robot.userData._yawSmoothed : yawTarget;
+    const yawA = 1 - Math.exp(-(delta || 0.016) * 14);
+    robot.userData._yawSmoothed = dampAngle(robot.userData._yawSmoothed, yawTarget, yawA);
+    const yaw = robot.userData._yawSmoothed;
     robot.rotation.y = yaw;
 
-    const bob = Math.sin(time * 7.2) * 0.045;
-
-    // Place the robot on the route (Google-Maps-ish).
-    robot.position.set(p.x, floorY + bob, p.z);
+    // Place the robot on the route (Google-Maps-ish). Keep Y stable for a smoother adventure feel.
+    robot.position.set(p.x, floorY, p.z);
 
     // Eye contact + greeting trigger.
     if (camera) {
@@ -731,17 +750,63 @@ function RobotController({
         const turnRate = Math.abs(dyaw) / delta; // rad/sec
 
         // Base cadence follows speed; add a small boost on sharper turns.
-        const speedScale = Math.max(0.25, Math.min(2.75, (speed / baseSpeed) * (1 + Math.min(0.35, turnRate * 0.10))));
-        robot.userData.setSpeedScale?.(speedScale);
+        const targetScale = Math.max(0.25, Math.min(2.75, (speed / baseSpeed) * (1 + Math.min(0.35, turnRate * 0.10))));
+        robot.userData._speedScaleSmoothed = robot.userData._speedScaleSmoothed ?? 1;
+        const aS = 1 - Math.exp(-(delta || 0.016) * 8.5);
+        robot.userData._speedScaleSmoothed += (targetScale - robot.userData._speedScaleSmoothed) * aS;
+        robot.userData.setSpeedScale?.(robot.userData._speedScaleSmoothed);
 
         prevP.current.copy(p);
         prevYaw.current = yaw;
       }
     }
 
-    // Subtle squash & stretch while walking.
-    const targetSX = 1.0 + 0.025 * Math.sin(time * 10.0);
-    const targetSY = 1.0 - 0.02 * Math.sin(time * 10.0);
+    // Transition FX near spur junctions: camera tilt/zoom + slow environmental tint.
+    if (Array.isArray(roomPortals) && roomPortals.length) {
+      let bestDist = Infinity;
+      let bestSide = 0;
+      let bestScene = '';
+
+      const pAt = scratch2.current; // reuse scratch
+      const tanAt = scratch3.current;
+      const leftAt = tmpV.current;
+
+      for (let i = 0; i < roomPortals.length; i += 1) {
+        const r = roomPortals[i];
+        const rt = Number(r?.t ?? 0);
+        curveData.curve.getPointAt(rt, pAt);
+        curveData.curve.getTangentAt(rt, tanAt);
+        tanAt.y = 0;
+        if (tanAt.lengthSq() < 1e-9) tanAt.set(0, 0, 1);
+        tanAt.normalize();
+        leftAt.set(0, 1, 0).cross(tanAt).normalize();
+
+        const side = typeof r?.side === 'number' ? Math.sign(r.side) || 1 : (i % 2 === 0 ? 1 : -1);
+        const isPassword = r?.scene === 'password';
+        const jx = pAt.x + leftAt.x * (isPassword ? 1.25 : 1.65) * side + tanAt.x * (isPassword ? -0.85 : 0);
+        const jz = pAt.z + leftAt.z * (isPassword ? 1.25 : 1.65) * side + tanAt.z * (isPassword ? -0.85 : 0);
+
+        const dx = robot.position.x - jx;
+        const dz = robot.position.z - jz;
+        const d = Math.hypot(dx, dz);
+        if (d < bestDist) {
+          bestDist = d;
+          bestSide = side;
+          bestScene = String(r?.scene || '');
+        }
+      }
+
+      const amt = smoothstep01(1 - (bestDist - 1.8) / 7.0);
+      robot.userData.turnFx = { side: bestSide, amount: amt };
+      robot.userData.envFx = { scene: bestScene, amount: amt };
+    } else {
+      robot.userData.turnFx = { side: 0, amount: 0 };
+      robot.userData.envFx = { scene: '', amount: 0 };
+    }
+
+    // Keep animation stable: avoid high-frequency scale wobble that reads as jitter.
+    const targetSX = 1.0 + 0.008 * Math.sin(time * 2.5);
+    const targetSY = 1.0 - 0.006 * Math.sin(time * 2.5);
     const lerp = 1 - Math.exp(-delta * 10);
     robot.scale.x = robot.scale.x + (targetSX - robot.scale.x) * lerp;
     robot.scale.y = robot.scale.y + (targetSY - robot.scale.y) * lerp;
@@ -775,6 +840,7 @@ RobotController.propTypes = {
     sampleTs: PropTypes.any,
     samplePts: PropTypes.any,
   }),
+  roomPortals: PropTypes.arrayOf(PropTypes.any),
   autoWalkTarget: PropTypes.arrayOf(PropTypes.number),
   onAutoWalkArrived: PropTypes.func,
   idlePatrolEnabled: PropTypes.bool,
@@ -1326,9 +1392,9 @@ function CandyRoad({ curveData, texture, gestureRef }) {
     }
 
     // Like gesture: full rainbow neon ribbon.
-    const hue = (t * 0.22) % 1;
-    mat.emissive.setHSL(hue, 0.9, 0.58);
-    mat.emissiveIntensity = 0.35 + 0.18 * Math.sin(t * 10.0);
+    // const hue = (t * 0.22) % 1;
+    // mat.emissive.setHSL(hue, 0.9, 0.58);
+    // mat.emissiveIntensity = 0.35 + 0.18 * Math.sin(t * 10.0);
   });
 
   if (!geom) return null;
@@ -1814,6 +1880,9 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
   const scratch2Ref = useRef(new THREE.Vector3());
   const scratch3Ref = useRef(new THREE.Vector3());
   const shakeScratchRef = useRef(new THREE.Vector3());
+  const turnRightRef = useRef(new THREE.Vector3());
+  const lookAtSmoothedRef = useRef(new THREE.Vector3());
+  const lookAtDesiredRef = useRef(new THREE.Vector3());
 
   const occludersRef = useRef([]);
   const occluderRefreshRef = useRef(0);
@@ -1821,6 +1890,10 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
   const rayOriginRef = useRef(new THREE.Vector3());
   const rayDirRef = useRef(new THREE.Vector3());
   const occlusionAmtRef = useRef(0);
+
+  // Stability-first: disable raycast-based occlusion camera pushes.
+  // Those tiny hit/no-hit toggles (foliage/props) can read as constant screen shaking.
+  const occlusionEnabled = false;
 
   const rebuildOccluders = () => {
     const root = occluderRootRef?.current || scene;
@@ -1846,10 +1919,14 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     const target = targetRef.current;
     const p = target.position;
 
-    // Refresh occluder list occasionally (trees/props are static, so this is cheap and stable).
-    occluderRefreshRef.current += 1;
-    if (occludersRef.current.length === 0 || occluderRefreshRef.current % 240 === 1) {
-      rebuildOccluders();
+    if (occlusionEnabled) {
+      // Refresh occluder list occasionally (trees/props are static, so this is cheap and stable).
+      occluderRefreshRef.current += 1;
+      if (occludersRef.current.length === 0 || occluderRefreshRef.current % 240 === 1) {
+        rebuildOccluders();
+      }
+    } else {
+      occlusionAmtRef.current = 0;
     }
 
     const t = typeof target.userData?.pathT === 'number'
@@ -1861,91 +1938,180 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     if (tan.lengthSq() < 1e-6) tan.set(0, 0, 1);
     tan.normalize();
 
+    // Keep the view stable: no camera roll/shake/shoulder sway.
+    const turnAmt = 0;
+    const turnSide = 0;
+    const turnRight = turnRightRef.current;
+    turnRight.set(tan.z, 0, -tan.x);
+    if (turnRight.lengthSq() > 1e-9) turnRight.normalize();
+
     const scratch = scratchRef.current;
     const scratch2 = scratch2Ref.current;
     const scratch3 = scratch3Ref.current;
 
-    const ahead = boardMode ? (navActive ? 2.2 : 1.6) : (navActive ? 2.6 : 1.9);
-    scratch.copy(p).addScaledVector(tan, ahead);
-    scratch3.copy(p).add(isoOffset).addScaledVector(tan, boardMode ? 0.45 : 0.8);
+    const aheadBase = boardMode ? (navActive ? 2.2 : 1.6) : (navActive ? 2.6 : 1.9);
+    const ahead = aheadBase + turnAmt * (boardMode ? 0.45 : 0.8);
+    scratch.copy(p)
+      .addScaledVector(tan, ahead)
+      .addScaledVector(turnRight, -turnSide * turnAmt * (boardMode ? 0.35 : 0.55));
 
-    // Robot visibility: if something blocks line-of-sight, lift the camera a bit.
-    const rayOrigin = rayOriginRef.current;
-    rayOrigin.set(p.x, p.y + (boardMode ? 1.05 : 1.25), p.z);
+    const zoom = 1 - turnAmt * 0.12;
+    scratch3.copy(p)
+      .addScaledVector(isoOffset, zoom)
+      .addScaledVector(tan, (boardMode ? 0.45 : 0.8) + turnAmt * (boardMode ? 0.10 : 0.18))
+      .addScaledVector(turnRight, -turnSide * turnAmt * (boardMode ? 1.05 : 1.65));
 
-    const rayDir = rayDirRef.current;
-    rayDir.copy(scratch3).sub(rayOrigin);
-    const dist = rayDir.length();
-    let occluded = false;
-    let hitDist = Infinity;
+    if (occlusionEnabled) {
+      // Robot visibility: if something blocks line-of-sight, lift the camera a bit.
+      const rayOrigin = rayOriginRef.current;
+      rayOrigin.set(p.x, p.y + (boardMode ? 1.05 : 1.25), p.z);
 
-    if (dist > 0.001 && occludersRef.current.length) {
-      rayDir.multiplyScalar(1 / dist);
-      const rc = raycasterRef.current;
-      rc.near = 0.05;
-      rc.far = Math.max(0.1, dist - 0.15);
-      rc.set(rayOrigin, rayDir);
+      const rayDir = rayDirRef.current;
+      rayDir.copy(scratch3).sub(rayOrigin);
+      const dist = rayDir.length();
+      let occluded = false;
+      let hitDist = Infinity;
 
-      const hits = rc.intersectObjects(occludersRef.current, true);
+      if (dist > 0.001 && occludersRef.current.length) {
+        rayDir.multiplyScalar(1 / dist);
+        const rc = raycasterRef.current;
+        rc.near = 0.05;
+        rc.far = Math.max(0.1, dist - 0.15);
+        rc.set(rayOrigin, rayDir);
 
-      const isPartOfTarget = (obj) => {
-        let o = obj;
-        while (o) {
-          if (o === target) return true;
-          o = o.parent;
+        const hits = rc.intersectObjects(occludersRef.current, true);
+
+        const isPartOfTarget = (obj) => {
+          let o = obj;
+          while (o) {
+            if (o === target) return true;
+            o = o.parent;
+          }
+          return false;
+        };
+
+        for (let i = 0; i < hits.length; i += 1) {
+          const h = hits[i];
+          if (!h?.object) continue;
+          if (isPartOfTarget(h.object)) continue;
+          // Ignore tiny/near-ground intersections that aren't actually blocking the robot.
+          if (h.point && h.point.y < p.y + 0.45) continue;
+          occluded = true;
+          hitDist = h.distance;
+          break;
         }
-        return false;
-      };
-
-      for (let i = 0; i < hits.length; i += 1) {
-        const h = hits[i];
-        if (!h?.object) continue;
-        if (isPartOfTarget(h.object)) continue;
-        // Ignore tiny/near-ground intersections that aren't actually blocking the robot.
-        if (h.point && h.point.y < p.y + 0.45) continue;
-        occluded = true;
-        hitDist = h.distance;
-        break;
       }
-    }
 
-    // Smoothly adjust an occlusion amount to avoid camera popping.
-    const targetOcc = occluded ? 1 : 0;
-    const occA = 1 - Math.exp(-(delta || 0.016) * 6.5);
-    occlusionAmtRef.current += (targetOcc - occlusionAmtRef.current) * occA;
+      // Smoothly adjust an occlusion amount to avoid camera popping.
+      const targetOcc = occluded ? 1 : 0;
+      const occA = 1 - Math.exp(-(delta || 0.016) * 6.5);
+      occlusionAmtRef.current += (targetOcc - occlusionAmtRef.current) * occA;
 
-    // Lift when occluded.
-    scratch3.y += occlusionAmtRef.current * (boardMode ? 3.0 : 4.2);
+      // Lift when occluded.
+      scratch3.y += occlusionAmtRef.current * (boardMode ? 3.0 : 4.2);
 
-    // If still occluded, also pull the camera closer to the robot.
-    if (occluded && hitDist !== Infinity) {
-      const safe = Math.max(1.8, hitDist - 0.8);
-      scratch3.copy(rayOrigin).addScaledVector(rayDir, safe);
-      scratch3.y += 0.35 + occlusionAmtRef.current * 0.35;
+      // If still occluded, also pull the camera closer to the robot.
+      if (occluded && hitDist !== Infinity) {
+        const safe = Math.max(1.8, hitDist - 0.8);
+        scratch3.copy(rayOrigin).addScaledVector(rayDir, safe);
+        scratch3.y += 0.35 + occlusionAmtRef.current * 0.35;
+      }
     }
     scratch2.copy(scratch3);
 
-    camera.position.lerp(scratch2, occlusionAmtRef.current > 0.01 ? 0.11 : 0.08);
+    // Smooth follow to avoid jitter (frame-rate independent).
+    const posSpeed = 7.5;
+    const posA = 1 - Math.exp(-(delta || 0.016) * posSpeed);
+    camera.position.lerp(scratch2, posA);
 
-    // Subtle candy shake (triggered externally).
-    const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const shake = target.userData?.cameraShake;
-    if (shake && nowMs < shake.untilMs) {
-      const t01 = 1 - Math.max(0, Math.min(1, (shake.untilMs - nowMs) / shake.durationMs));
-      const falloff = 1 - t01;
-      const amp = shake.amp * (falloff ** 2);
-      const sx = Math.sin(nowMs * 0.03) * amp;
-      const sy = Math.sin(nowMs * 0.041) * amp * 0.6;
-      const sz = Math.cos(nowMs * 0.028) * amp;
-      shakeScratchRef.current.set(sx, sy, sz);
-      camera.position.add(shakeScratchRef.current);
-    }
+    const lookAtDesired = lookAtDesiredRef.current;
+    lookAtDesired.set(p.x, p.y + (boardMode ? 1.05 : 1.25), p.z);
+    const lookAtSmoothed = lookAtSmoothedRef.current;
+    if (!Number.isFinite(lookAtSmoothed.x)) lookAtSmoothed.copy(lookAtDesired);
+    const lookSpeed = 11.0;
+    const lookA = 1 - Math.exp(-(delta || 0.016) * lookSpeed);
+    lookAtSmoothed.lerp(lookAtDesired, lookA);
+    camera.lookAt(lookAtSmoothed);
 
-    camera.lookAt(scratch.x, p.y + (boardMode ? 1.05 : 1.25), scratch.z);
+    const rollA = 1 - Math.exp(-(delta || 0.016) * 10);
+    camera.rotation.z = camera.rotation.z + (0 - camera.rotation.z) * rollA;
   });
 
   return null;
 }
+
+function ForestEnvironmentFx({ robotRef, enabled }) {
+  const { scene } = useThree();
+  const baseBg = useMemo(() => new THREE.Color('#bfe6ff'), []);
+  const baseFog = useMemo(() => new THREE.Color('#d9ffe6'), []);
+  const tmpA = useMemo(() => new THREE.Color(), []);
+  const tmpB = useMemo(() => new THREE.Color(), []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (!scene) return;
+    // Ensure there is a fog object we can tune.
+    if (!scene.fog) scene.fog = new THREE.Fog(baseFog.getHex(), 9999, 10000);
+  }, [enabled, scene, baseFog]);
+
+  useFrame((_, delta) => {
+    if (!enabled) return;
+    const robot = robotRef?.current;
+    if (!robot || !scene) return;
+
+    const fx = robot.userData?.envFx;
+    const amt = Math.max(0, Math.min(1, Number(fx?.amount ?? 0)));
+    const kind = String(fx?.scene || '');
+
+    // Targets per path type.
+    let targetBg = '#bfe6ff';
+    let targetFog = '#d9ffe6';
+    let fogNear = 9999;
+    let fogFar = 10000;
+
+    if (kind === 'privacy') {
+      targetBg = '#cbbcff';
+      targetFog = '#bca5ff';
+      fogNear = 18;
+      fogFar = 78;
+    } else if (kind === 'shop') {
+      targetBg = '#ffe1c8';
+      targetFog = '#ffe1c8';
+      fogNear = 26;
+      fogFar = 110;
+    } else if (kind === 'password') {
+      targetBg = '#b7e3cf';
+      targetFog = '#b7e3cf';
+      fogNear = 24;
+      fogFar = 95;
+    }
+
+    // Smoothly approach the desired blend.
+    robot.userData._envBlend = robot.userData._envBlend ?? 0;
+    const a = 1 - Math.exp(-(delta || 0.016) * 2.8);
+    robot.userData._envBlend += (amt - robot.userData._envBlend) * a;
+    const mix = robot.userData._envBlend;
+
+    tmpA.copy(baseBg);
+    tmpB.set(targetBg);
+    scene.background = tmpA.lerp(tmpB, mix);
+
+    if (!scene.fog) scene.fog = new THREE.Fog(baseFog.getHex(), 9999, 10000);
+    const fog = scene.fog;
+    tmpA.copy(baseFog);
+    tmpB.set(targetFog);
+    fog.color.copy(tmpA.lerp(tmpB, mix));
+    fog.near = 9999 + (fogNear - 9999) * mix;
+    fog.far = 10000 + (fogFar - 10000) * mix;
+  });
+
+  return null;
+}
+
+ForestEnvironmentFx.propTypes = {
+  robotRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
+  enabled: PropTypes.bool,
+};
 
 CandyFollowCamera.propTypes = {
   targetRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
@@ -2293,6 +2459,7 @@ export default function ThreeDemo({
   gestureRef,
   avatarFaceUrl,
   onLobbyPoiNavigate,
+  onLobbyPortalEnter,
   lobbyReturnEvent,
   badges,
   shopState,
@@ -2327,12 +2494,6 @@ export default function ThreeDemo({
   }, []);
 
   const handleAutoWalkArrived = () => {
-    const robot = robotRef.current;
-    if (robot) {
-      const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      robot.userData = robot.userData || {};
-      robot.userData.cameraShake = { untilMs: nowMs + 380, durationMs: 380, amp: 0.22 };
-    }
     if (typeof onAutoWalkArrived === 'function') onAutoWalkArrived();
   };
 
@@ -2345,7 +2506,7 @@ export default function ThreeDemo({
       { scene: SCENES.shop, label: 'Shop', accent: '#ff6ec7' },
     ];
 
-    return defs
+    const base = defs
       .map((d, idx) => {
         const node = MAP_NODES?.[d.scene];
         if (!Array.isArray(node) || node.length < 3) return null;
@@ -2358,6 +2519,32 @@ export default function ThreeDemo({
         };
       })
       .filter(Boolean);
+
+    // לפחות עוד 4 יציאות לאורך השביל.
+    const clamp01 = (v) => Math.max(0.03, Math.min(0.97, v));
+    const tooClose = (a, b) => Math.abs(a - b) < 0.06;
+    const existingTs = base.map((p) => Number(p.t ?? 0)).filter((v) => Number.isFinite(v));
+
+    const findNonOverlappingT = (preferred) => {
+      let t = clamp01(preferred);
+      for (let i = 0; i < 8; i += 1) {
+        const clash = existingTs.some((et) => tooClose(et, t));
+        if (!clash) return t;
+        t = clamp01(t + (i % 2 === 0 ? 0.045 : -0.045));
+      }
+      return t;
+    };
+
+    const shopT = base.find((p) => p.scene === SCENES.shop)?.t;
+
+    const extras = [
+      { scene: SCENES.entry, label: 'Entry', accent: '#ffe36a', t: findNonOverlappingT(0.08), side: -1 },
+      { scene: SCENES.lobby, label: 'Lobby', accent: '#fff44f', t: findNonOverlappingT(0.16), side: 1 },
+      { scene: SCENES.tryAgain, label: 'Try Again', accent: '#ffb7d5', t: findNonOverlappingT(0.86), side: -1 },
+      { scene: SCENES.shop, label: 'Shop (Back)', accent: '#ff6ec7', t: findNonOverlappingT(clamp01(Number(shopT ?? 0.62) + 0.09)), side: 1 },
+    ];
+
+    return [...base, ...extras];
   }, [curveData]);
 
   function SunRig() {
@@ -2413,6 +2600,7 @@ export default function ThreeDemo({
       >
         <SunRig />
         <SceneAtmosphere mode={'forest'} />
+        <ForestEnvironmentFx robotRef={robotRef} enabled />
 
         {/* Forest lighting */}
         <ambientLight intensity={1.25} color={'#f3fff6'} />
@@ -2458,6 +2646,7 @@ export default function ThreeDemo({
             gestureRef={gestureRef}
             roomPortals={roomPortals}
             completion={completion}
+            onPortalEnter={onLobbyPortalEnter}
           />
         </group>
 
@@ -2467,6 +2656,7 @@ export default function ThreeDemo({
           gestureRef={gestureRef}
           floorY={floorY}
           curveData={curveData}
+          roomPortals={roomPortals}
           autoWalkTarget={autoWalkTarget}
           onAutoWalkArrived={handleAutoWalkArrived}
           idlePatrolEnabled={false}
@@ -2495,7 +2685,9 @@ export default function ThreeDemo({
           ) : null}
         </EffectComposer>
 
-        <OrbitControls enablePan={false} enableZoom={false} enableRotate={false} enableKeys={false} />
+
+        {/* Follow camera controls the camera; disable OrbitControls to avoid it overriding lookAt each frame. */}
+        <OrbitControls enabled={false} />
       </Canvas>
     </div>
   );
@@ -2510,6 +2702,7 @@ ThreeDemo.propTypes = {
   gestureRef: PropTypes.shape({ current: PropTypes.any }),
   avatarFaceUrl: PropTypes.string,
   onLobbyPoiNavigate: PropTypes.func,
+  onLobbyPortalEnter: PropTypes.func,
   lobbyReturnEvent: PropTypes.shape({
     nonce: PropTypes.number,
     fromScene: PropTypes.string,

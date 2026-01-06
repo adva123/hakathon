@@ -271,47 +271,6 @@ function makeSoftShadowTexture({ size = 256 } = {}) {
   return tex;
 }
 
-function makeRainbowStripTexture({ width = 512, height = 64 } = {}) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  ctx.clearRect(0, 0, width, height);
-
-  const g = ctx.createLinearGradient(0, 0, width, 0);
-  g.addColorStop(0.00, 'rgba(255,60,60,1)');
-  g.addColorStop(0.16, 'rgba(255,160,60,1)');
-  g.addColorStop(0.33, 'rgba(255,240,90,1)');
-  g.addColorStop(0.50, 'rgba(80,255,140,1)');
-  g.addColorStop(0.66, 'rgba(60,220,255,1)');
-  g.addColorStop(0.82, 'rgba(80,120,255,1)');
-  g.addColorStop(1.00, 'rgba(190,90,255,1)');
-
-  // Soft vertical fade (thin rainbow arc look).
-  const v = ctx.createLinearGradient(0, 0, 0, height);
-  v.addColorStop(0.0, 'rgba(255,255,255,0)');
-  v.addColorStop(0.35, 'rgba(255,255,255,1)');
-  v.addColorStop(0.65, 'rgba(255,255,255,1)');
-  v.addColorStop(1.0, 'rgba(255,255,255,0)');
-
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.globalCompositeOperation = 'destination-in';
-  ctx.fillStyle = v;
-  ctx.fillRect(0, 0, width, height);
-  ctx.globalCompositeOperation = 'source-over';
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.anisotropy = 8;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 function makeMirrorFakeTexture({ width = 512, height = 512 } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -418,32 +377,17 @@ function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
   const cy = size / 2;
   const r = size * 0.30;
 
-  // Soft neon glow backdrop
-  const glow = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r * 1.3);
-  glow.addColorStop(0, 'rgba(255,255,255,0.55)');
-  glow.addColorStop(0.45, 'rgba(122,252,255,0.18)');
-  glow.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 1.25, 0, Math.PI * 2);
-  ctx.fill();
-
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
-  const strokeMain = 'rgba(255,255,255,0.92)';
-  const strokeAccent = type === 'shop'
-    ? 'rgba(255,110,199,0.90)'
-    : type === 'privacy'
-      ? 'rgba(167,139,255,0.92)'
-      : type === 'hub'
-        ? 'rgba(255,244,79,0.90)'
-        : 'rgba(122,252,255,0.92)';
+  // Wood-ink look: single dark brown palette (no neon colors).
+  const ink = 'rgba(42,26,16,0.92)';
+  const inkFill = 'rgba(24,14,8,0.90)';
 
   ctx.lineWidth = size * 0.06;
-  ctx.strokeStyle = strokeAccent;
-  ctx.shadowColor = strokeAccent;
-  ctx.shadowBlur = size * 0.10;
+  ctx.strokeStyle = ink;
+  ctx.shadowColor = 'rgba(0,0,0,0)';
+  ctx.shadowBlur = 0;
 
   if (type === 'privacy') {
     // Eye
@@ -452,7 +396,7 @@ function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
     ctx.stroke();
 
     ctx.shadowBlur = 0;
-    ctx.fillStyle = strokeMain;
+    ctx.fillStyle = inkFill;
     ctx.globalAlpha = 0.85;
     ctx.beginPath();
     ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2);
@@ -485,7 +429,7 @@ function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
     ctx.lineTo(cx, cy + r * 0.35);
     ctx.lineTo(cx - r * 0.25, cy + r * 0.1);
     ctx.closePath();
-    ctx.fillStyle = strokeMain;
+    ctx.fillStyle = inkFill;
     ctx.globalAlpha = 0.82;
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -510,7 +454,7 @@ function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
 
     ctx.shadowBlur = 0;
     ctx.lineWidth = size * 0.03;
-    ctx.strokeStyle = strokeMain;
+    ctx.strokeStyle = inkFill;
     ctx.globalAlpha = 0.82;
     ctx.stroke();
     ctx.globalAlpha = 1;
@@ -518,9 +462,9 @@ function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
 
   // Minimal label (optional)
   if (label) {
-    ctx.shadowBlur = size * 0.08;
-    ctx.shadowColor = strokeAccent;
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'rgba(0,0,0,0)';
+    ctx.fillStyle = ink;
     ctx.font = `700 ${Math.floor(size * 0.11)}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -537,7 +481,7 @@ function makeRoomSignTexture({ type = 'key', label = '', size = 256 } = {}) {
   return tex;
 }
 
-export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPortals, completion }) {
+export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPortals, completion, onPortalEnter }) {
   // Global scaling: make the world feel bigger (robot handled elsewhere).
   const WORLD_SCALE = 1.35;
   const TREE_HEIGHT = 1.55;
@@ -546,7 +490,6 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
   const grassTex = useMemo(() => makeGrassTexture(), []);
   const lakeGlintTex = useMemo(() => makeLakeGlintTexture(), []);
   const softShadowTex = useMemo(() => makeSoftShadowTexture(), []);
-  const rainbowTex = useMemo(() => makeRainbowStripTexture(), []);
   const mirrorTex = useMemo(() => makeMirrorFakeTexture(), []);
   const lakeMaskTex = useMemo(() => makeSoftCircleMaskTexture(), []);
 
@@ -582,38 +525,165 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
       const side = typeof r.side === 'number' ? Math.sign(r.side) || 1 : (idx % 2 === 0 ? 1 : -1);
 
-      // Start slightly off the main ribbon edge, then arc outward to the portal platform.
-      const p0 = p.clone().addScaledVector(left, 1.65 * side);
-      const p1 = p.clone().addScaledVector(left, 3.9 * side).addScaledVector(tan, 0.65);
-      const p2 = p.clone().addScaledVector(left, 6.15 * side).addScaledVector(tan, 1.05);
+      const scene = String(r.scene || '');
+      const isPrivacy = scene === 'privacy';
+      const isPassword = scene === 'password';
+      const isShop = scene === 'shop';
 
-      const spurCurve = new THREE.CatmullRomCurve3([p0, p1, p2], false, 'catmullrom', 0.6);
-      const spurPts = spurCurve.getPoints(46);
+      // Each room gets a distinct "discovery path" shape + width.
+      const spurWidth = isShop ? 3.35 : (isPassword ? 1.55 : 2.35);
+
+      // Start slightly off the main ribbon edge.
+      const p0 = p.clone()
+        .addScaledVector(left, (isPassword ? 1.25 : 1.65) * side)
+        .addScaledVector(tan, isPassword ? -0.85 : 0);
+
+      // Control points:
+      // - Privacy: soft S curve that feels like "hidden" and only reveals at the end.
+      // - Shop: direct, wide, inviting.
+      // - Passwords: narrow, slightly tucked behind a mound (rendered at the entrance).
+      let curvePts;
+      if (isPrivacy) {
+        // Make the spur "disappear" behind a bend before the end reveal.
+        const a1 = p0.clone().addScaledVector(left, 2.6 * side).addScaledVector(tan, -0.95);
+        const a2 = p0.clone().addScaledVector(left, 4.2 * side).addScaledVector(tan, 0.65);
+        const a3 = p0.clone().addScaledVector(left, 3.4 * side).addScaledVector(tan, 2.35);
+        const a4 = p0.clone().addScaledVector(left, 5.9 * side).addScaledVector(tan, 2.85);
+        const p2 = p0.clone().addScaledVector(left, 7.2 * side).addScaledVector(tan, 3.35);
+        curvePts = [p0, a1, a2, a3, a4, p2];
+      } else if (isShop) {
+        // Still smooth (no 90°), but less "straight shot" so it reads as terrain-following.
+        const p1 = p0.clone().addScaledVector(left, 2.8 * side).addScaledVector(tan, -0.55);
+        const p2 = p0.clone().addScaledVector(left, 4.9 * side).addScaledVector(tan, 1.25);
+        const p3 = p0.clone().addScaledVector(left, 6.7 * side).addScaledVector(tan, 2.65);
+        curvePts = [p0, p1, p2, p3];
+      } else {
+        // Default: a gentle "hide then reveal" bend (starts by tucking behind a hill).
+        const p1 = p0.clone().addScaledVector(left, 2.2 * side).addScaledVector(tan, -0.85);
+        const p2 = p0.clone().addScaledVector(left, 4.4 * side).addScaledVector(tan, 0.75);
+        const p3 = p0.clone().addScaledVector(left, 6.6 * side).addScaledVector(tan, 2.25);
+        curvePts = [p0, p1, p2, p3];
+      }
+
+      const spurCurve = new THREE.CatmullRomCurve3(curvePts, false, 'catmullrom', isPrivacy ? 0.45 : 0.6);
+      const spurPts = spurCurve.getPoints(58);
       for (const sp of spurPts) sp.y = pathRibbonY;
-      const spurGeo = buildRibbonGeometry(spurPts, { width: 2.35, y: pathRibbonY });
+      const spurGeo = buildRibbonGeometry(spurPts, { width: spurWidth, y: pathRibbonY });
+
+      // Occluding hills: placed along the early part of the spur to hide the portal until the
+      // robot commits to the bend. These are purely visual (no collision), but they create the
+      // "path disappears behind a hill" moment.
+      const hills = [];
+      const hillSteps = isPrivacy ? [0.18, 0.32, 0.46] : (isShop ? [0.22, 0.36] : [0.2, 0.34, 0.5]);
+      for (let hi = 0; hi < hillSteps.length; hi += 1) {
+        const tt = hillSteps[hi];
+        const cp = spurCurve.getPointAt(tt);
+        const tTan = spurCurve.getTangentAt(tt);
+        tTan.y = 0;
+        if (tTan.lengthSq() < 1e-9) tTan.set(0, 0, 1);
+        tTan.normalize();
+        const n = new THREE.Vector3(0, 1, 0).cross(tTan).normalize();
+        const baseR = (isShop ? 1.7 : (isPassword ? 1.85 : 1.6)) * (0.95 + 0.15 * prand(idx * 77 + hi * 19));
+        const hScale = (isPassword ? 1.55 : (isPrivacy ? 1.75 : 1.65));
+        const offset = (spurWidth * 0.70 + baseR * 0.55);
+
+        // Two hills flanking the spur; bias one side slightly bigger to form a visual "curtain".
+        const bias = (hi % 2 === 0 ? 1 : -1);
+        const bigSide = bias * side;
+        const o1 = n.clone().multiplyScalar(offset);
+        const o2 = n.clone().multiplyScalar(-offset);
+        hills.push({
+          x: cp.x + o1.x,
+          y: pathSurfaceY + baseR * 0.40,
+          z: cp.z + o1.z,
+          r: baseR * (bigSide > 0 ? 1.18 : 1.0),
+          sx: 1.25,
+          sy: hScale * (bigSide > 0 ? 1.2 : 1.0),
+          sz: 1.1,
+          seed: idx * 1000 + hi * 13 + 1,
+        });
+        hills.push({
+          x: cp.x + o2.x,
+          y: pathSurfaceY + baseR * 0.36,
+          z: cp.z + o2.z,
+          r: baseR * (bigSide < 0 ? 1.18 : 1.0),
+          sx: 1.2,
+          sy: hScale,
+          sz: 1.15,
+          seed: idx * 1000 + hi * 13 + 2,
+        });
+      }
+
+      // Entrance direction (for the gate).
+      const p1dir = spurCurve.getPointAt(0.12);
+      const entranceYaw = Math.atan2(p1dir.x - p0.x, p1dir.z - p0.z);
+
+      // Breadcrumb candies (more for privacy S-curve, subtle for passwords).
+      const crumbs = [];
+      const crumbCount = isPrivacy ? 10 : (isPassword ? 6 : 7);
+      for (let i = 1; i <= crumbCount; i += 1) {
+        const tt = 0.10 + (i / (crumbCount + 1)) * 0.82;
+        const cp = spurCurve.getPointAt(tt);
+        crumbs.push({
+          x: cp.x,
+          y: pathSurfaceY + 0.06,
+          z: cp.z,
+          s: (isPassword ? 0.12 : 0.14) * (0.9 + 0.25 * prand(idx * 100 + i * 17)),
+          a: r.accent || '#7afcff',
+        });
+      }
 
       // Face the gate back toward the spur start.
-      const yaw = Math.atan2(p0.x - p2.x, p0.z - p2.z);
+      const pEnd = spurCurve.getPointAt(1);
+      const yaw = Math.atan2(p0.x - pEnd.x, p0.z - pEnd.z);
 
       return {
         ...r,
         side,
         spurGeo,
+        spurWidth,
+        spurCurve,
+        spurPts,
+        hills,
+        crumbs,
         junction: new THREE.Vector3(p0.x, pathSurfaceY, p0.z),
         junctionYaw: Math.atan2(-tan.x, -tan.z),
-        platform: new THREE.Vector3(p2.x, pathSurfaceY, p2.z),
+        platform: new THREE.Vector3(pEnd.x, pathSurfaceY, pEnd.z),
+        entranceYaw,
         yaw,
       };
     });
   }, [curveData, roomPortals, pathRibbonY, pathSurfaceY]);
 
   const signTextures = useMemo(() => {
-    const key = makeRoomSignTexture({ type: 'key', label: 'Passwords' });
-    const privacy = makeRoomSignTexture({ type: 'privacy', label: 'Privacy' });
-    const shop = makeRoomSignTexture({ type: 'shop', label: 'Shop' });
-    const hub = makeRoomSignTexture({ type: 'hub', label: 'Start' });
-    return { key, privacy, shop, hub };
-  }, []);
+    const typeForScene = (scene) => {
+      if (scene === 'password') return 'key';
+      if (scene === 'privacy') return 'privacy';
+      if (scene === 'shop') return 'shop';
+      if (scene === 'lobby' || scene === 'entry' || scene === 'tryAgain') return 'hub';
+      return 'hub';
+    };
+
+    // Keep the original type keys for existing code paths.
+    const out = {
+      key: makeRoomSignTexture({ type: 'key', label: 'Passwords' }),
+      privacy: makeRoomSignTexture({ type: 'privacy', label: 'Privacy' }),
+      shop: makeRoomSignTexture({ type: 'shop', label: 'Shop' }),
+      hub: makeRoomSignTexture({ type: 'hub', label: 'Start' }),
+    };
+
+    // Also generate per-scene textures so each sign can display the correct label.
+    if (Array.isArray(roomPortals)) {
+      roomPortals.forEach((r) => {
+        const scene = String(r?.scene || '');
+        if (!scene) return;
+        const label = typeof r?.label === 'string' ? r.label : '';
+        out[scene] = makeRoomSignTexture({ type: typeForScene(scene), label });
+      });
+    }
+
+    return out;
+  }, [roomPortals]);
 
   const signs = useMemo(() => {
     if (!curveData?.curve) return [];
@@ -621,6 +691,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
     const resolveType = (scene) => {
       if (scene === 'password') return 'key';
       if (scene === 'privacy') return 'privacy';
+      if (scene === 'lobby' || scene === 'entry' || scene === 'tryAgain') return 'hub';
       return 'shop';
     };
 
@@ -634,6 +705,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         scene: portal.scene,
         type: resolveType(portal.scene),
         accent: portal.accent,
+        label: portal.label,
         x: portal.junction.x,
         z: portal.junction.z,
         y: portal.junction.y,
@@ -670,9 +742,9 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
   const ringMatRefs = useRef([]);
   const signGroupRefs = useRef([]);
   const signPanelMatRefs = useRef([]);
-  const signGlowMatRefs = useRef([]);
   const markerMatRefs = useRef([]);
   const portalAnim = useRef([]);
+  const portalEnterCooldownUntilRef = useRef(0);
   const tmpV = useRef(new THREE.Vector3());
 
   useFrame((_, delta) => {
@@ -680,6 +752,8 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
     const robot = robotRef?.current;
     if (!robot) return;
     const gesture = gestureRef?.current?.gesture || 'none';
+
+    const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     const aReveal = 1 - Math.exp(-delta * 4.5);
     const aOpen = 1 - Math.exp(-delta * 8.5);
@@ -708,6 +782,18 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       const wantsOpen = nearGate && (gesture === 'openPalm' || gesture === 'thumbUp');
       const targetOpen = completed ? 1 : (wantsOpen ? 1 : 0);
       anim.open += (targetOpen - anim.open) * aOpen;
+
+      // Enter portal when it is open and the robot is on top of it.
+      if (
+        typeof onPortalEnter === 'function' &&
+        portal?.scene &&
+        anim.open > 0.62 &&
+        dist < 1.35 &&
+        nowMs >= portalEnterCooldownUntilRef.current
+      ) {
+        portalEnterCooldownUntilRef.current = nowMs + 1200;
+        onPortalEnter(portal.scene);
+      }
 
       // Emerge from the ground (slightly elevated above grass when fully revealed).
       g.position.y = pathSurfaceY - (1 - anim.reveal) * 1.15;
@@ -739,7 +825,6 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         const s = signs[i];
         const g = signGroupRefs.current[i];
         const panel = signPanelMatRefs.current[i];
-        const glow = signGlowMatRefs.current[i];
         if (!s || !g) continue;
 
         const dx = robot.position.x - s.x;
@@ -754,8 +839,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
         const baseS = s.s || 1;
         g.scale.setScalar(baseS * (0.92 + vis * 0.10));
-        if (panel) panel.opacity = 0.02 + vis * 0.86;
-        if (glow) glow.opacity = vis * 0.26;
+        if (panel) panel.opacity = 0.15 + vis * 0.85;
       }
     }
 
@@ -2422,8 +2506,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       {signs?.length ? (
         <group>
           {signs.map((s, idx) => {
-            const tex = signTextures?.[s.type] || null;
-            const accent = s.accent || '#7afcff';
+            const tex = signTextures?.[s.scene] || signTextures?.[s.type] || null;
             return (
               <group
                 // eslint-disable-next-line react/no-array-index-key
@@ -2436,41 +2519,33 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
                 scale={[s.s, s.s, s.s]}
               >
                 {/* Post (grounded, not floating) */}
-                <mesh position={[0, 0.55, 0]} castShadow receiveShadow>
-                  <cylinderGeometry args={[0.06, 0.07, 1.10, 10, 1]} />
+                <mesh position={[0, 0.92, 0]} castShadow receiveShadow>
+                  <cylinderGeometry args={[0.06, 0.07, 1.85, 10, 1]} />
                   <primitive object={woodMat} attach="material" />
                 </mesh>
 
-                {/* Hologram panel */}
-                <mesh position={[0, 1.08, -0.02]} renderOrder={8}>
-                  <planeGeometry args={[0.78, 0.78]} />
-                  <meshBasicMaterial
-                    ref={(m) => {
-                      signPanelMatRefs.current[idx] = m;
-                    }}
-                    map={tex || undefined}
-                    transparent
-                    opacity={0.0}
-                    toneMapped={false}
-                    depthWrite={false}
-                  />
+                {/* Wooden sign board (uniform wood color) */}
+                <mesh position={[0, 1.65, -0.02]} castShadow receiveShadow>
+                  <boxGeometry args={[0.92, 0.62, 0.08]} />
+                  <primitive object={woodMat} attach="material" />
                 </mesh>
 
-                {/* Additive glow (proximity driven) */}
-                <mesh position={[0, 1.08, -0.03]} renderOrder={7}>
-                  <planeGeometry args={[0.92, 0.92]} />
-                  <meshBasicMaterial
-                    ref={(m) => {
-                      signGlowMatRefs.current[idx] = m;
-                    }}
-                    color={accent}
-                    transparent
-                    opacity={0.0}
-                    blending={THREE.AdditiveBlending}
-                    depthWrite={false}
-                    toneMapped={false}
-                  />
-                </mesh>
+                {/* Dark wood-ink label (decal) */}
+                {tex ? (
+                  <mesh position={[0, 1.65, 0.03]} renderOrder={8}>
+                    <planeGeometry args={[0.82, 0.58]} />
+                    <meshBasicMaterial
+                      ref={(m) => {
+                        signPanelMatRefs.current[idx] = m;
+                      }}
+                      map={tex}
+                      transparent
+                      opacity={0.92}
+                      toneMapped={false}
+                      depthWrite={false}
+                    />
+                  </mesh>
+                ) : null}
               </group>
             );
           })}
@@ -2522,7 +2597,26 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       {portals.length ? (
         <group>
           {portals.map((p, idx) => (
-            <group key={`room-${p.scene || idx}`}>
+            <group key={`room-${p.scene || 'unknown'}-${idx}`}>
+              {/* Occluding hills along the spur (gradual reveal) */}
+              {Array.isArray(p.hills) && p.hills.length ? (
+                <group>
+                  {p.hills.map((h, hi) => (
+                    <mesh
+                      // eslint-disable-next-line react/no-array-index-key
+                      key={`hill-${idx}-${hi}`}
+                      position={[h.x, h.y, h.z]}
+                      scale={[h.sx || 1, h.sy || 1, h.sz || 1]}
+                      castShadow
+                      receiveShadow
+                    >
+                      <dodecahedronGeometry args={[h.r || 1.5, 0]} />
+                      <meshStandardMaterial color={'#43c75a'} roughness={1} metalness={0} />
+                    </mesh>
+                  ))}
+                </group>
+              ) : null}
+
               {/* Spur path */}
               <mesh geometry={p.spurGeo} receiveShadow>
                 <meshStandardMaterial
@@ -2538,6 +2632,65 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
                   opacity={0.94}
                 />
               </mesh>
+
+              {/* Entrance gate + discovery breadcrumbs */}
+              {p.junction ? (
+                <group position={[p.junction.x, pathSurfaceY, p.junction.z]} rotation={[0, p.entranceYaw || 0, 0]}>
+                  {/* Gate style: privacy = between two hills; shop = wide arch; password = "hidden" mound */}
+                  {p.scene === 'privacy' ? (
+                    <group>
+                      <mesh position={[-1.05, 0.70, -0.55]} scale={[1.05, 1.45, 1.0]} castShadow receiveShadow>
+                        <dodecahedronGeometry args={[0.65, 0]} />
+                        <meshStandardMaterial color={'#4b2616'} roughness={0.95} metalness={0.05} />
+                      </mesh>
+                      <mesh position={[1.05, 0.70, -0.55]} scale={[1.05, 1.45, 1.0]} castShadow receiveShadow>
+                        <dodecahedronGeometry args={[0.65, 0]} />
+                        <meshStandardMaterial color={'#4b2616'} roughness={0.95} metalness={0.05} />
+                      </mesh>
+                    </group>
+                  ) : p.scene === 'shop' ? (
+                    <group position={[0, 1.05, -0.55]}>
+                      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+                        <torusGeometry args={[1.45, 0.16, 10, 36]} />
+                        <meshStandardMaterial color={'#ff7eb6'} roughness={0.35} metalness={0.05} emissive={'#ff7eb6'} emissiveIntensity={0.06} />
+                      </mesh>
+                    </group>
+                  ) : (
+                    <group>
+                      <mesh position={[0, 0.65, -0.55]} scale={[1.6, 1.35, 1.2]} castShadow receiveShadow>
+                        <dodecahedronGeometry args={[0.75, 0]} />
+                        <meshStandardMaterial color={'#4b2616'} roughness={0.98} metalness={0.02} />
+                      </mesh>
+                    </group>
+                  )}
+
+                  {/* Breadcrumb candies */}
+                  {Array.isArray(p.crumbs) && p.crumbs.length ? (
+                    <group>
+                      {p.crumbs.map((c, i) => (
+                        <mesh
+                          // eslint-disable-next-line react/no-array-index-key
+                          key={`crumb-${idx}-${i}`}
+                          position={[c.x - p.junction.x, 0.06, c.z - p.junction.z]}
+                          scale={[c.s, c.s, c.s]}
+                          castShadow
+                        >
+                          <icosahedronGeometry args={[0.22, 0]} />
+                          <meshStandardMaterial
+                            color={c.a}
+                            emissive={c.a}
+                            emissiveIntensity={p.scene === 'password' ? 0.10 : 0.18}
+                            roughness={0.35}
+                            metalness={0.05}
+                            transparent
+                            opacity={0.92}
+                          />
+                        </mesh>
+                      ))}
+                    </group>
+                  ) : null}
+                </group>
+              ) : null}
 
               {/* Portal platform + room volume */}
               <group
@@ -2730,26 +2883,6 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
                     alphaMap={(lk.kind === 'organic' ? lake2MaskTex : lakeMaskTex) || undefined}
                     transparent
                     opacity={0.15}
-                    blending={THREE.AdditiveBlending}
-                    depthWrite={false}
-                    toneMapped={false}
-                  />
-                </mesh>
-              ) : null}
-
-              {/* Subtle rainbow arc on the main lake only */}
-              {idx === 0 && rainbowTex ? (
-                <mesh
-                  rotation={[-Math.PI / 2, lk.yaw - 0.15, 0]}
-                  position={[lk.x, floorY + 0.034, lk.z]}
-                  scale={[(lk.rx ?? lk.r ?? 1) * 0.92, (lk.rz ?? lk.r ?? 1) * 0.92, 1]}
-                  renderOrder={6}
-                >
-                  <ringGeometry args={[0.62, 1.0, 96, 1, Math.PI * 0.05, Math.PI * 0.80]} />
-                  <meshBasicMaterial
-                    map={rainbowTex}
-                    transparent
-                    opacity={0.06}
                     blending={THREE.AdditiveBlending}
                     depthWrite={false}
                     toneMapped={false}

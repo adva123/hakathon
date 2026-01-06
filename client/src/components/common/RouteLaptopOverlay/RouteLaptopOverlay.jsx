@@ -46,6 +46,27 @@ function makeProjector({ w, h, pad, bounds }) {
   };
 }
 
+function drawSmoothPolyline(ctx, points, toPx) {
+  if (points.length < 2) return;
+  const p0 = toPx(points[0][0], points[0][1]);
+  ctx.moveTo(p0.x, p0.y);
+
+  // Quadratic smoothing through midpoints (cheap and stable).
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const prev = points[i];
+    const next = points[i + 1];
+    const midX = (prev[0] + next[0]) * 0.5;
+    const midZ = (prev[1] + next[1]) * 0.5;
+    const cp = toPx(prev[0], prev[1]);
+    const mid = toPx(midX, midZ);
+    ctx.quadraticCurveTo(cp.x, cp.y, mid.x, mid.y);
+  }
+
+  const last = points[points.length - 1];
+  const pl = toPx(last[0], last[1]);
+  ctx.lineTo(pl.x, pl.y);
+}
+
 function drawRouteMap(ctx, { w, h, routeXZ, t, title, markers }) {
   ctx.clearRect(0, 0, w, h);
 
@@ -86,17 +107,14 @@ function drawRouteMap(ctx, { w, h, routeXZ, t, title, markers }) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
+    const now = performance.now();
+
     // Outer glow
     ctx.globalAlpha = 0.8;
     ctx.strokeStyle = 'rgba(0,242,255,0.30)';
     ctx.lineWidth = 10;
     ctx.beginPath();
-    for (let i = 0; i < routeXZ.length; i += 1) {
-      const p = routeXZ[i];
-      const { x, y } = toPx(p[0], p[1]);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
+    drawSmoothPolyline(ctx, routeXZ, toPx);
     ctx.stroke();
 
     // Core line
@@ -104,13 +122,20 @@ function drawRouteMap(ctx, { w, h, routeXZ, t, title, markers }) {
     ctx.strokeStyle = 'rgba(0,242,255,0.92)';
     ctx.lineWidth = 3.2;
     ctx.beginPath();
-    for (let i = 0; i < routeXZ.length; i += 1) {
-      const p = routeXZ[i];
-      const { x, y } = toPx(p[0], p[1]);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
+    drawSmoothPolyline(ctx, routeXZ, toPx);
     ctx.stroke();
+
+    // Flowing light highlight (animated dashed stroke)
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+    ctx.lineWidth = 2.0;
+    ctx.setLineDash([10, 16]);
+    ctx.lineDashOffset = -(now * 0.02);
+    ctx.beginPath();
+    drawSmoothPolyline(ctx, routeXZ, toPx);
+    ctx.stroke();
+    ctx.restore();
 
     ctx.restore();
   }
