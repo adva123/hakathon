@@ -3858,6 +3858,87 @@ function RobotController({
     const length = curveData.length || 1;
     const baseSpeed = 2.2; // relaxed walking pace
 
+    // AUTO-WALK NAVIGATION (for button-triggered room navigation)
+    const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
+    if (navActive) {
+      robot.userData.nav = robot.userData.nav || { targetKey: '', targetT: 0, arrived: false };
+      const key = `${Number(autoWalkTarget[0]).toFixed(3)}|${Number(autoWalkTarget[1]).toFixed(3)}|${Number(autoWalkTarget[2]).toFixed(3)}`;
+      if (robot.userData.nav.targetKey !== key) {
+        robot.userData.nav.targetKey = key;
+        robot.userData.nav.arrived = false;
+        const targetVec = scratch3.current;
+        targetVec.set(Number(autoWalkTarget[0]), Number(autoWalkTarget[1]), Number(autoWalkTarget[2]));
+        robot.userData.nav.targetT = closestTOnSamples(targetVec, curveData.sampleTs, curveData.samplePts);
+        console.log('🎯 Auto-walk target set:', { targetT: robot.userData.nav.targetT, autoWalkTarget });
+      }
+
+      // Move along the loop toward the target T (shortest direction around the ring)
+      const targetT = Number(robot.userData.nav?.targetT ?? 0);
+      const tNow = Number(robot.userData.pathT ?? 0);
+      const forwardDist = ((targetT - tNow) % 1 + 1) % 1;
+      const backwardDist = ((tNow - targetT) % 1 + 1) % 1;
+      const navDir = forwardDist <= backwardDist ? 1 : -1;
+
+      const distT = Math.min(forwardDist, backwardDist);
+      const near01 = 1 - THREE.MathUtils.smoothstep(distT, 0, 0.085);
+      const navSpeedMax = 16.0;
+      const navSpeedMin = 6.5;
+      const navSpeedUnits = THREE.MathUtils.lerp(navSpeedMax, navSpeedMin, near01);
+      const dt = navDir * (navSpeedUnits / length) * delta;
+
+      if (!robot.userData.nav?.arrived) {
+        robot.userData.setAction?.('Walking');
+        robot.userData.pathT = tNow + dt;
+        robot.userData.pathT = ((robot.userData.pathT % 1) + 1) % 1;
+      }
+
+      // Arrival check
+      const tAfter = Number(robot.userData.pathT ?? 0);
+      const forwardAfter = ((targetT - tAfter) % 1 + 1) % 1;
+      const backwardAfter = ((tAfter - targetT) % 1 + 1) % 1;
+      const distAfter = Math.min(forwardAfter, backwardAfter);
+      const pNow = curveData.curve.getPointAt(tAfter);
+      const targetP = curveData.curve.getPointAt(targetT);
+      const arrived = distAfter < 0.01 && pNow.distanceTo(targetP) < 1.1;
+      if (arrived && !robot.userData.nav?.arrived) {
+        robot.userData.nav.arrived = true;
+        hasPrev.current = false;
+        robot.userData.setAction?.('Idle');
+        console.log('🎉 Auto-walk arrived!');
+        if (typeof onAutoWalkArrived === 'function') onAutoWalkArrived();
+      }
+
+      // Skip hand control when auto-walking
+      const t = robot.userData.pathT;
+      const p = curveData.curve.getPointAt(t);
+      const tan = curveData.curve.getTangentAt(t);
+      tan.y = 0;
+      if (tan.lengthSq() < 1e-6) tan.set(0, 0, 1);
+      tan.normalize();
+
+      scratch2.current.copy(tan);
+      const yawTarget = Math.atan2(scratch2.current.x, scratch2.current.z);
+      robot.userData._yawSmoothed = typeof robot.userData._yawSmoothed === 'number' ? robot.userData._yawSmoothed : yawTarget;
+      const yawA = 1 - Math.exp(-(delta || 0.016) * 14);
+      robot.userData._yawSmoothed = dampAngle(robot.userData._yawSmoothed, yawTarget, yawA);
+
+      robot.rotation.y = robot.userData._yawSmoothed;
+      const terrainY = getTerrainY(p.x, p.z);
+      const speedScale = navSpeedUnits / baseSpeed;
+      const walkBlend = robot.userData.nav?.arrived ? 0 : 1;
+      const bobFreq = 6.8 + Math.min(2.2, speedScale) * 1.4;
+      const bobAmp = 0.028 + Math.min(0.02, (speedScale - 1) * 0.008);
+      const bob = Math.sin(time * bobFreq) * bobAmp * walkBlend;
+      robot.position.set(p.x, terrainY + bob, p.z);
+
+      robot.scale.x = 1.0 + 0.008 * Math.sin(time * 2.5);
+      robot.scale.y = 1.0 - 0.006 * Math.sin(time * 2.5);
+      robot.scale.z = robot.scale.x;
+
+      // Early return to skip hand control
+      return;
+    }
+
     // Hand-controlled movement (requested): robot starts stopped and moves only after an "activate" hand gesture.
     // Commands (gestures):
     // - openPalm: activate/start robot

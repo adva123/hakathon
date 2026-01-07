@@ -174,8 +174,8 @@ const Robot = forwardRef((props, ref) => {
       if (obj.name === 'Head_4') {
         console.log('🟢 Changing Head_4 to BRIGHT GREEN');
         obj.material = new THREE.MeshBasicMaterial({
-          color: '#00ff00',
-          emissive: '#00ff00',
+          color: '#000000ff',
+          emissive: '#000000ff',
           emissiveIntensity: 1,
         });
         return;

@@ -255,19 +255,23 @@ export function GameProvider({ children }) {
   }, []);
 
   const onRobotArrived = useCallback(() => {
+    console.log('🎯 Robot arrived! pendingScene:', pendingScene);
     if (!pendingScene) {
       setRobotAutoWalkTarget(null);
       return;
     }
     // Strength is a real scene (not forest overlay), Clothing is overlay like shop.
     if (pendingScene === SCENES.strength) {
+      console.log('📍 Setting strength as scene');
       setActiveOverlayRoom(null);
       setCurrentScene(pendingScene);
     } else if (pendingScene === SCENES.clothing) {
+      console.log('📍 Setting clothing as overlay');
       // Convert score to coins when entering clothing store (1 score = 5 coins)
       setCoins((c) => c + score * 5);
       setActiveOverlayRoom(pendingScene);
     } else {
+      console.log('📍 Setting as overlay:', pendingScene);
       setActiveOverlayRoom(pendingScene);
     }
     setPendingScene(null);

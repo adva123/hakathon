@@ -144,7 +144,7 @@ export default function SideNavigation({
             <button
               type="button"
               className={`${styles.kpi} ${styles.mapPin}`}
-              onClick={() => switchRoomWithRobot(SCENES.strength, MAP_NODES[SCENES.strength])}
+              onClick={() => switchRoomWithRobot(SCENES.password, MAP_NODES[SCENES.password])}
             >
               👍 Password Meter
             </button>

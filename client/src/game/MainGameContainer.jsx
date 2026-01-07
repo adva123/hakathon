@@ -20,7 +20,7 @@ export default function MainGameContainer({ gestureRef } = {}) {
   const overlay = useMemo(() => {
     switch (activeOverlayRoom) {
       case SCENES.password:
-        return <PasswordShield addScore={addScore} awardBadge={awardBadge} />;
+        return <PasswordShield addScore={addScore} awardBadge={awardBadge} gestureRef={gestureRef} />;
       case SCENES.privacy:
         return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.shop:
@@ -46,7 +46,7 @@ export default function MainGameContainer({ gestureRef } = {}) {
           </>
         );
       case SCENES.password:
-        return <PasswordShield addScore={addScore} awardBadge={awardBadge} />;
+        return <PasswordShield addScore={addScore} awardBadge={awardBadge} gestureRef={gestureRef} />;
       case SCENES.privacy:
         return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.shop:
