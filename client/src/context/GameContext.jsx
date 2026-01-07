@@ -217,8 +217,7 @@ export function GameProvider({ children }) {
         (currentScene === SCENES.password ||
           currentScene === SCENES.privacy ||
           currentScene === SCENES.shop ||
-          currentScene === SCENES.strength ||
-          currentScene === SCENES.clothing)
+          currentScene === SCENES.strength)
       ) {
         prepareLobbyReturn(currentScene);
       }
@@ -236,11 +235,10 @@ export function GameProvider({ children }) {
       return;
     }
     if (
+      currentScene === SCENES.strength ||
       currentScene === SCENES.password ||
       currentScene === SCENES.privacy ||
-      currentScene === SCENES.shop ||
-      currentScene === SCENES.strength ||
-      currentScene === SCENES.clothing
+      currentScene === SCENES.shop
     ) {
       prepareLobbyReturn(currentScene);
     }
@@ -261,20 +259,20 @@ export function GameProvider({ children }) {
       setRobotAutoWalkTarget(null);
       return;
     }
-    // Strength and Clothing are real scenes (not forest overlays).
-    if (pendingScene === SCENES.strength || pendingScene === SCENES.clothing) {
+    // Strength is a real scene (not forest overlay), Clothing is overlay like shop.
+    if (pendingScene === SCENES.strength) {
       setActiveOverlayRoom(null);
       setCurrentScene(pendingScene);
+    } else if (pendingScene === SCENES.clothing) {
       // Convert score to coins when entering clothing store (1 score = 5 coins)
-      if (pendingScene === SCENES.clothing) {
-        setCoins((c) => c + score * 5);
-      }
+      setCoins((c) => c + score * 5);
+      setActiveOverlayRoom(pendingScene);
     } else {
       setActiveOverlayRoom(pendingScene);
     }
     setPendingScene(null);
     setRobotAutoWalkTarget(null);
-  }, [pendingScene]);
+  }, [pendingScene, score]);
 
   const addScore = useCallback((delta) => {
     setScore((s) => Math.max(0, s + delta));

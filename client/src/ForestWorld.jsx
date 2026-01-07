@@ -378,13 +378,21 @@ function makeSoftCircleMaskTexture({ size = 256 } = {}) {
 }
 
 export function ForestSky() {
+  const { camera } = useThree();
+  const skyRef = useRef();
   const tex = useMemo(() => makeForestSkyTexture(), []);
-  if (!tex) return null;
-
+  
+  // Make sky follow camera to prevent it from ever being outside the sphere
+  useFrame(() => {
+    if (skyRef.current && camera) {
+      skyRef.current.position.copy(camera.position);
+    }
+  });
+  
   return (
-    <mesh scale={1}>
-      <sphereGeometry args={[240, 48, 32]} />
-      <meshBasicMaterial map={tex} side={THREE.BackSide} toneMapped={false} />
+    <mesh ref={skyRef} scale={[-1, 1, 1]}>
+      <sphereGeometry args={[800, 32, 32]} />
+      <meshBasicMaterial map={tex} side={THREE.BackSide} fog={false} />
     </mesh>
   );
 }

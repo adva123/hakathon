@@ -1,7 +1,7 @@
 .room {
   width: min(980px, 95vw);
   position: relative;
-  background: linear-gradient(135deg, #1a0033 0%, #2d1b4e 50%, #1a0033 100%);
+  background: linear-gradient(135deg, #8200ff 0%, #2d1b4e 50, #1a0033 100%);
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 0 40px rgba(138, 43, 226, 0.3),
@@ -107,18 +107,30 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1400px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .card {
-  padding: 18px;
-  border-radius: 14px;
+  padding: 14px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -128,41 +140,41 @@
 }
 
 .cardIcon {
-  width: 80px;
-  height: 80px;
-  border-radius: 12px;
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
   background: radial-gradient(circle at 30% 30%, rgba(0, 242, 255, 0.15), transparent 70%),
     rgba(255, 255, 255, 0.05);
   border: 1px solid var(--neo-border);
   display: grid;
   place-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .iconPlaceholder {
-  font-size: 40px;
+  font-size: 32px;
   filter: drop-shadow(0 0 8px rgba(0, 242, 255, 0.4));
 }
 
 .cardTitle {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--neo-text);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .cardDesc {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--neo-text-dim);
-  line-height: 1.4;
+  line-height: 1.3;
   flex: 1;
 }
 
 .cardPrice {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--neo-cyan);
-  padding: 6px 12px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: rgba(0, 242, 255, 0.1);
   border: 1px solid rgba(0, 242, 255, 0.3);
@@ -204,7 +216,7 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 
   .stats {

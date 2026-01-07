@@ -163,6 +163,7 @@ export default function GameShell() {
         onAutoWalkArrived={onRobotArrived}
         controlsEnabled={controlsEnabled}
         sceneId={currentScene}
+        activeOverlayRoom={activeOverlayRoom}
         neonMode={neonMode}
         lobbyReturnEvent={lobbyReturnEvent}
         gateCollisionCooldownUntil={gateCollisionCooldownUntil}

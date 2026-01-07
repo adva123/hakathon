@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import styles from '../game.module.css';
 import room from './ClothingRoom.module.css';
@@ -37,6 +37,30 @@ const clothingItems = [
     category: 'accessory',
     image: '/shop/visor.svg',
     description: 'Augmented reality visor for enhanced vision.',
+  },
+  {
+    id: 'hoodie',
+    name: 'Stealth Hoodie',
+    price: 90,
+    category: 'clothing',
+    image: '/shop/hoodie.svg',
+    description: 'Stay incognito with this sleek hoodie.',
+  },
+  {
+    id: 'pants',
+    name: 'Cargo Pants',
+    price: 70,
+    category: 'clothing',
+    image: '/shop/pants.svg',
+    description: 'Tactical pants with extra pockets.',
+  },
+  {
+    id: 'helmet',
+    name: 'Smart Helmet',
+    price: 150,
+    category: 'accessory',
+    image: '/shop/helmet.svg',
+    description: 'Advanced helmet with HUD display.',
   },
   // Accessories
   {
@@ -100,11 +124,35 @@ const energyItems = [
   },
 ];
 
-export default function ClothingRoom() {
+export default function ClothingRoom({ gestureRef }) {
   const { score, coins, energy, handleBack, buyItem, addEnergy } = useContext(GameContext);
   const [message, setMessage] = useState('');
   const [messageKind, setMessageKind] = useState(''); // 'ok' | 'warn' | ''
   const [activeTab, setActiveTab] = useState('clothing'); // 'clothing' | 'energy'
+  const gestureSeenRef = useRef({ lastAcceptedAt: 0 });
+
+  // זיהוי מחוות ידיים - iLoveYou כדי לחזור
+  useEffect(() => {
+    if (!gestureRef?.current) return;
+    
+    const id = setInterval(() => {
+      const g = gestureRef.current;
+      if (!g || !g.hasHand) return;
+
+      const gesture = String(g.gesture || 'none');
+      const now = Date.now();
+
+      // Cooldown למניעת הפעלה כפולה
+      if (now - gestureSeenRef.current.lastAcceptedAt < 800) return;
+
+      if (gesture === 'iLoveYou') {
+        handleBack();
+        gestureSeenRef.current.lastAcceptedAt = now;
+      }
+    }, 100);
+
+    return () => clearInterval(id);
+  }, [gestureRef, handleBack]);
 
   const buyClothing = (item) => {
     setMessage('');
@@ -165,6 +213,8 @@ export default function ClothingRoom() {
           <h2 className={room.title}>👗 Clothing & Accessories Shop</h2>
           <div className={`${styles.small} ${room.subtitle}`}>
             Your score has been converted to coins (1 point = 5 coins). Upgrade your style and restore energy!
+            <br />
+            <span style={{ opacity: 0.7, fontSize: '12px' }}>💡 Tip: Use 🤟 "I Love You" gesture to return to lobby</span>
           </div>
         </div>
         <div className={room.stats}>
@@ -266,4 +316,5 @@ export default function ClothingRoom() {
 
 ClothingRoom.propTypes = {
   addScore: PropTypes.func,
+  gestureRef: PropTypes.shape({ current: PropTypes.any }),
 };

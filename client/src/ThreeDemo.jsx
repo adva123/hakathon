@@ -12,6 +12,7 @@ import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from './game/mapTargets.js';
 import { useKeyboard } from './useKeyboard';
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 import { forestTerrainHeight, FOREST_PATH_SURFACE_LIFT, ForestSky, ForestWorld } from './ForestWorld.jsx';
+import MainGameContainer from './game/MainGameContainer.jsx';
 
 function smoothstep01(x) {
   const t = Math.max(0, Math.min(1, x));
@@ -22,43 +23,7 @@ function dampAngle(current, target, alpha) {
   return current + d * alpha;
 }
 
-function ScreenTintOverlay({ color = '#6B5B95', opacity = 0.15 }) {
-  const meshRef = useRef(null);
-  const { camera } = useThree();
-  const tmpPos = useMemo(() => new THREE.Vector3(), []);
-  const tmpQuat = useMemo(() => new THREE.Quaternion(), []);
-  const tmpDir = useMemo(() => new THREE.Vector3(), []);
-
-  useFrame(() => {
-    const m = meshRef.current;
-    if (!m || !camera) return;
-    camera.getWorldPosition(tmpPos);
-    camera.getWorldQuaternion(tmpQuat);
-    tmpDir.set(0, 0, -1).applyQuaternion(tmpQuat);
-    // Place just in front of the camera.
-    m.position.copy(tmpPos).addScaledVector(tmpDir, 0.22);
-    m.quaternion.copy(tmpQuat);
-  });
-
-  return (
-    <mesh ref={meshRef} renderOrder={999}>
-      <planeGeometry args={[2, 2]} />
-      <meshBasicMaterial
-        color={color}
-        transparent
-        opacity={opacity}
-        depthWrite={false}
-        depthTest={false}
-        toneMapped={false}
-      />
-    </mesh>
-  );
-}
-
-ScreenTintOverlay.propTypes = {
-  color: PropTypes.string,
-  opacity: PropTypes.number,
-};
+// ScreenTintOverlay removed - was causing black screen overlay issues
 
 const CANDY = Object.freeze({
   // Requested palette
@@ -565,6 +530,7 @@ function RobotController({
   equippedItem,
   laptopCanvas,
   mode,
+  isShop = false,
 }) {
   const keys = useKeyboard();
   const scratch2 = useRef(new THREE.Vector3());
@@ -579,12 +545,30 @@ function RobotController({
 
     const robot = robotRef.current;
     robot.userData = robot.userData || {};
+    
+    // Mark robot as being in shop mode for positioning
+    robot.userData._isShopMode = isShop;
 
     // Cave mode: keep the robot inside the cave (no path walking), subtle breathing only.
     if (mode === 'cave') {
       const time = clock.getElapsedTime();
       robot.userData.setAction?.('Idle');
-      robot.position.set(0, floorY + 0.02, 0);
+      
+      // Position robot based on scene: cave and shop far away from forest to prevent black sphere visibility
+      const shopX = 1000;
+      const shopZ = 1000;
+      const caveX = -1000;
+      const caveZ = -1000;
+      const isShopMode = robot.userData._isShopMode;
+      const isCaveMode = !isShopMode; // If not shop, it's cave
+      
+      if (isShopMode) {
+        robot.position.set(shopX, floorY + 0.02, shopZ);
+      } else if (isCaveMode) {
+        robot.position.set(caveX, floorY + 0.02, caveZ);
+      } else {
+        robot.position.set(0, floorY + 0.02, 0);
+      }
 
       if (camera) {
         const toCamX = camera.position.x - robot.position.x;
@@ -864,29 +848,33 @@ function RobotController({
     const yawA = 1 - Math.exp(-(delta || 0.016) * 14);
     robot.userData._yawSmoothed = dampAngle(robot.userData._yawSmoothed, yawTarget, yawA);
 
-    // Add a tiny procedural sway that depends on walking + turning.
-    const yawTurnLean = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.035;
-    const yawMicro = Math.sin(time * 1.35) * 0.012;
+    // Add procedural sway that depends on walking + turning - enhanced for more visible motion
+    const yawTurnLean = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.055; // Increased from 0.035
+    const yawMicro = Math.sin(time * 1.35) * 0.018; // Increased from 0.012
     const yaw = robot.userData._yawSmoothed + (yawTurnLean + yawMicro) * walkBlend;
     robot.rotation.y = yaw;
 
-    // Roll into turns (lean). Keep very subtle.
+    // Roll into turns (lean) with Sway - enhanced for natural organic motion
     robot.userData._rollSmoothed = Number.isFinite(robot.userData._rollSmoothed) ? robot.userData._rollSmoothed : 0;
-    const rollTurn = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.18;
-    const rollMicro = Math.sin(time * 2.8) * 0.035;
-    const rollTarget = (rollTurn + rollMicro) * walkBlend;
+    const rollTurn = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.25; // Increased from 0.18
+    const rollMicro = Math.sin(time * 2.8) * 0.045; // Increased from 0.035
+    // Add sway on Z-axis when turning - this prevents "robot on rails" look
+    const swaySide = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.05; // Lean sideways in turns
+    const rollTarget = (rollTurn + rollMicro + swaySide) * walkBlend;
     const rollA = 1 - Math.exp(-(delta || 0.016) * 10);
     robot.userData._rollSmoothed = THREE.MathUtils.lerp(robot.userData._rollSmoothed, rollTarget, rollA);
     robot.rotation.z = robot.userData._rollSmoothed;
 
     // Place the robot on the route (Google-Maps-ish). Keep Y stable for a smoother adventure feel.
     const terrainY = floorY + forestTerrainHeight(p.x, p.z) + FOREST_PATH_SURFACE_LIFT;
-    // Bobbing synced to walk cadence.
+    // Bobbing synced to walk cadence - enhanced for more natural movement.
     const speedScale = robot.userData._speedScaleSmoothed ?? 1;
     const bobFreq = 6.8 + Math.min(2.2, speedScale) * 1.4;
-    const bobAmp = 0.028 + Math.min(0.02, (speedScale - 1) * 0.008);
+    const bobAmp = 0.035 + Math.min(0.025, (speedScale - 1) * 0.012);
+    // Add secondary bobbing motion for more organic feel
     const bob = Math.sin(time * bobFreq) * bobAmp * walkBlend;
-    robot.position.set(p.x, terrainY + bob, p.z);
+    const bobSecondary = Math.sin(time * bobFreq * 2.1) * bobAmp * 0.3 * walkBlend;
+    robot.position.set(p.x, terrainY + bob + bobSecondary, p.z);
 
     // Eye contact + greeting trigger.
     if (camera) {
@@ -1019,6 +1007,7 @@ RobotController.propTypes = {
   equippedItem: PropTypes.string,
   laptopCanvas: PropTypes.any,
   mode: PropTypes.string,
+  isShop: PropTypes.bool,
 };
 
 function SceneAtmosphere({ mode }) {
@@ -2067,9 +2056,8 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
   const rayDirRef = useRef(new THREE.Vector3());
   const occlusionAmtRef = useRef(0);
 
-  // Stability-first: disable raycast-based occlusion camera pushes.
-  // Those tiny hit/no-hit toggles (foliage/props) can read as constant screen shaking.
-  const occlusionEnabled = false;
+  // Enable camera collision detection to prevent black screens when camera enters objects
+  const occlusionEnabled = true;
 
   const rebuildOccluders = () => {
     const root = occluderRootRef?.current || scene;
@@ -2148,8 +2136,8 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
       .addScaledVector(tan, (boardMode ? 0.45 : 0.8) + turnAmt * (boardMode ? 0.10 : 0.18))
       .addScaledVector(turnRight, -turnSide * turnAmt * (boardMode ? 1.05 : 1.65));
 
+    // Smart Camera: Raycaster prevents camera from entering objects (trees, rocks)
     if (occlusionEnabled) {
-      // Robot visibility: if something blocks line-of-sight, lift the camera a bit.
       const rayOrigin = rayOriginRef.current;
       rayOrigin.set(p.x, p.y + (boardMode ? 1.05 : 1.25), p.z);
 
@@ -2163,7 +2151,7 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
         rayDir.multiplyScalar(1 / dist);
         const rc = raycasterRef.current;
         rc.near = 0.05;
-        rc.far = Math.max(0.1, dist - 0.15);
+        rc.far = dist; // Check full distance to desired camera position
         rc.set(rayOrigin, rayDir);
 
         const hits = rc.intersectObjects(occludersRef.current, true);
@@ -2189,35 +2177,49 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
         }
       }
 
-      // Smoothly adjust an occlusion amount to avoid camera popping.
-      const targetOcc = occluded ? 1 : 0;
-      const occA = 1 - Math.exp(-(delta || 0.016) * 6.5);
-      occlusionAmtRef.current += (targetOcc - occlusionAmtRef.current) * occA;
-
-      // Lift when occluded.
-      scratch3.y += occlusionAmtRef.current * (boardMode ? 3.0 : 4.2);
-
-      // If still occluded, also pull the camera closer to the robot.
       if (occluded && hitDist !== Infinity) {
-        const safe = Math.max(1.8, hitDist - 0.8);
-        scratch3.copy(rayOrigin).addScaledVector(rayDir, safe);
-        scratch3.y += 0.35 + occlusionAmtRef.current * 0.35;
+        // CRITICAL: Pull camera to collision point (with small offset to stay outside object)
+        const safeOffset = 0.5; // Stay 0.5 units in front of obstacle
+        const safeDist = Math.max(1.0, hitDist - safeOffset);
+        
+        // Move camera to the safe position along the ray
+        scratch3.copy(rayOrigin).addScaledVector(rayDir, safeDist);
+        
+        // Smoothly adjust occlusion amount for additional lift if needed
+        const targetOcc = 1;
+        const occA = 1 - Math.exp(-(delta || 0.016) * 8.0); // Faster response
+        occlusionAmtRef.current += (targetOcc - occlusionAmtRef.current) * occA;
+        
+        // Slight lift to ensure we're above the obstacle
+        scratch3.y += 0.3;
+      } else {
+        // No occlusion - smoothly return to normal
+        const targetOcc = 0;
+        const occA = 1 - Math.exp(-(delta || 0.016) * 4.0);
+        occlusionAmtRef.current += (targetOcc - occlusionAmtRef.current) * occA;
       }
     }
     scratch2.copy(scratch3);
 
+    // Prevent camera from going below terrain - critical for avoiding black screens
+    const minCameraHeight = MAP_Y + 1.5; // Minimum height above floor
+    if (scratch2.y < minCameraHeight) {
+      scratch2.y = minCameraHeight;
+    }
+
     // Smooth follow to avoid jitter (frame-rate independent).
-    // Slightly slower than "locked" to feel like a human camera rig.
-    const posSpeed = 5.2;
-    const posA = 1 - Math.exp(-(delta || 0.016) * posSpeed);
+    // Enhanced damping for cinematic smooth camera movement (0.03 gives more weight and eliminates jerks)
+    const damping = 0.03; // Lower value = smoother, more "heavy" camera with reduced jerks
+    const posSpeed = navActive ? 4.5 : 3.8; // Slower when not navigating
+    const posA = Math.min(damping, 1 - Math.exp(-(delta || 0.016) * posSpeed));
     camera.position.lerp(scratch2, posA);
 
     const lookAtDesired = lookAtDesiredRef.current;
     lookAtDesired.set(p.x, pY + (boardMode ? 1.05 : 1.25), p.z);
     const lookAtSmoothed = lookAtSmoothedRef.current;
     if (!Number.isFinite(lookAtSmoothed.x)) lookAtSmoothed.copy(lookAtDesired);
-    const lookSpeed = 8.5;
-    const lookA = 1 - Math.exp(-(delta || 0.016) * lookSpeed);
+    // Smooth look-at transition that follows delta for consistent frame-rate independent motion
+    const lookA = delta * 2;
     lookAtSmoothed.lerp(lookAtDesired, lookA);
 
     // Apply lookAt, then a tiny roll toward the turn direction.
@@ -2235,6 +2237,77 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
 
   return null;
 }
+
+// Prevent black screen by making objects transparent when too close to camera
+function CameraProximityFade({ worldRef, enabled = true }) {
+  const { camera } = useThree();
+  const objectsRef = useRef([]);
+  const refreshCounterRef = useRef(0);
+
+  useFrame(() => {
+    if (!enabled || !worldRef?.current || !camera) return;
+
+    // Refresh objects list every 120 frames (not every frame for performance)
+    refreshCounterRef.current += 1;
+    if (refreshCounterRef.current % 120 === 0 || objectsRef.current.length === 0) {
+      objectsRef.current = [];
+      worldRef.current.traverse((obj) => {
+        if (obj.isMesh && obj.material && obj.visible) {
+          // Store original opacity if not already stored
+          if (obj.userData.originalOpacity === undefined) {
+            obj.userData.originalOpacity = obj.material.opacity !== undefined ? obj.material.opacity : 1;
+            obj.userData.originalTransparent = obj.material.transparent;
+          }
+          objectsRef.current.push(obj);
+        }
+      });
+    }
+
+    // Check distance and fade objects close to camera
+    const cameraPos = camera.position;
+    const fadeDistance = 2.0; // Start fading at 2 units
+    const minDistance = 0.8; // Fully transparent at 0.8 units
+
+    objectsRef.current.forEach((obj) => {
+      if (!obj.visible || !obj.material) return;
+
+      const dist = obj.position.distanceTo(cameraPos);
+      
+      if (dist < fadeDistance) {
+        // Calculate opacity based on distance
+        const fade = THREE.MathUtils.clamp((dist - minDistance) / (fadeDistance - minDistance), 0, 1);
+        const targetOpacity = fade * (obj.userData.originalOpacity || 1);
+        
+        // Enable transparency if needed
+        if (!obj.material.transparent) {
+          obj.material.transparent = true;
+          obj.material.needsUpdate = true;
+        }
+        
+        // Smoothly fade opacity
+        if (obj.material.opacity !== targetOpacity) {
+          obj.material.opacity = THREE.MathUtils.lerp(obj.material.opacity, targetOpacity, 0.1);
+        }
+      } else {
+        // Restore original opacity
+        if (obj.material.opacity !== obj.userData.originalOpacity) {
+          obj.material.opacity = THREE.MathUtils.lerp(
+            obj.material.opacity, 
+            obj.userData.originalOpacity || 1, 
+            0.05
+          );
+        }
+      }
+    });
+  });
+
+  return null;
+}
+
+CameraProximityFade.propTypes = {
+  worldRef: PropTypes.shape({ current: PropTypes.any }),
+  enabled: PropTypes.bool,
+};
 
 function ForestEnvironmentFx({ robotRef, enabled }) {
   const { scene } = useThree();
@@ -2649,6 +2722,7 @@ export default function ThreeDemo({
   onAutoWalkArrived,
   controlsEnabled = true,
   sceneId,
+  activeOverlayRoom,
   gestureRef,
   avatarFaceUrl,
   onLobbyPoiNavigate,
@@ -2666,7 +2740,7 @@ export default function ThreeDemo({
   const floorY = MAP_Y;
   const isLobby = sceneId === SCENES.lobby;
   const isCave = sceneId === SCENES.strength;
-  const isShop = sceneId === SCENES.clothing;
+  const isShop = sceneId === SCENES.clothing || activeOverlayRoom === SCENES.clothing;
   const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
 
   const [laptopCanvas] = useState(null);
@@ -2694,18 +2768,26 @@ export default function ThreeDemo({
 
   const curveData = useMemo(() => buildCurveData(CANDY_PATH_POINTS), []);
 
-  // Preserve the forest path position when temporarily switching into the cave.
+  // Preserve the forest path position when temporarily switching into the cave or shop.
   const prevSceneRef = useRef(sceneId);
+  const prevOverlayRef = useRef(activeOverlayRoom);
   useEffect(() => {
     const robot = robotRef.current;
     const prevScene = prevSceneRef.current;
-    if (prevScene === sceneId) return;
+    const prevOverlay = prevOverlayRef.current;
+    const nowInShop = sceneId === SCENES.lobby && activeOverlayRoom === SCENES.clothing;
+    const wasInShop = prevScene === SCENES.lobby && prevOverlay === SCENES.clothing;
+    
+    prevSceneRef.current = sceneId;
+    prevOverlayRef.current = activeOverlayRoom;
 
-    if (robot && (sceneId === SCENES.strength || sceneId === SCENES.clothing)) {
+    // Entering cave (strength) or shop (clothing overlay)
+    if (robot && (sceneId === SCENES.strength || nowInShop)) {
       robot.userData._savedForestPathT = robot.userData.pathT;
     }
 
-    if (robot && (prevScene === SCENES.strength || prevScene === SCENES.clothing) && sceneId === SCENES.lobby) {
+    // Returning from cave or shop to lobby
+    if (robot && ((prevScene === SCENES.strength && sceneId === SCENES.lobby) || (wasInShop && !nowInShop))) {
       const tSaved = robot.userData._savedForestPathT;
       if (typeof tSaved === 'number' && curveData?.curve) {
         const p = curveData.curve.getPointAt(((tSaved % 1) + 1) % 1);
@@ -2715,9 +2797,7 @@ export default function ThreeDemo({
         robot.rotation.z = 0;
       }
     }
-
-    prevSceneRef.current = sceneId;
-  }, [sceneId, curveData, floorY]);
+  }, [sceneId, activeOverlayRoom, curveData, floorY]);
 
   function CaveCameraRig() {
     const { camera } = useThree();
@@ -2737,8 +2817,12 @@ export default function ThreeDemo({
   }
 
   function StrengthCaveWorld() {
+    // Move cave far away from forest path to prevent black sphere from appearing in forest
+    const caveX = -1000;
+    const caveZ = -1000;
+    
     return (
-      <group>
+      <group position={[caveX, 0, caveZ]}>
         <fog attach="fog" args={['#05060c', 6, 22]} />
 
         <ambientLight intensity={0.35} color={'#b6c6ff'} />
@@ -2771,8 +2855,12 @@ export default function ThreeDemo({
   }
 
   function ClothingShopWorld() {
+    // Move shop far away from forest path to prevent black sphere from appearing in forest
+    const shopX = 1000; // Far from forest (0,0)
+    const shopZ = 1000;
+    
     return (
-      <group>
+      <group position={[shopX, 0, shopZ]}>
         <fog attach="fog" args={['#1a0033', 8, 28]} />
 
         <ambientLight intensity={0.5} color={'#d4c0ff'} />
@@ -2940,6 +3028,7 @@ export default function ThreeDemo({
             <SunRig />
             <SceneAtmosphere mode={'forest'} />
             <ForestEnvironmentFx robotRef={robotRef} enabled />
+            <CameraProximityFade worldRef={worldRef} enabled />
 
             {/* Forest lighting */}
             <ambientLight intensity={1.25} color={'#f3fff6'} />
@@ -3011,6 +3100,7 @@ export default function ThreeDemo({
           equippedItem={shopState?.equippedItem || undefined}
           laptopCanvas={laptopCanvas}
           mode={isCave || isShop ? 'cave' : 'forest'}
+          isShop={isShop}
         />
 
         {!isCave ? (
@@ -3025,12 +3115,12 @@ export default function ThreeDemo({
         {/* Postprocessing */}
         <EffectComposer>
           <Bloom
-            intensity={isCave ? 0.9 : 1.05}
-            luminanceThreshold={isCave ? 0.25 : 0.42}
+            intensity={isCave || isShop ? 0.9 : 1.05}
+            luminanceThreshold={isCave || isShop ? 0.25 : 0.42}
             luminanceSmoothing={0.14}
             mipmapBlur
           />
-          {!isCave && sunRef.current ? (
+          {!isCave && !isShop && sunRef.current ? (
             <GodRays
               sun={sunRef}
               samples={70}
@@ -3047,6 +3137,15 @@ export default function ThreeDemo({
         {/* Follow camera controls the camera; disable OrbitControls to avoid it overriding lookAt each frame. */}
         <OrbitControls enabled={false} />
       </Canvas>
+
+      {/* Show game UI overlays when in cave or shop scenes */}
+      {(isCave || isShop) && (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+          <div style={{ pointerEvents: 'auto' }}>
+            <MainGameContainer gestureRef={gestureRef} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3057,6 +3156,7 @@ ThreeDemo.propTypes = {
   controlsEnabled: PropTypes.bool,
   neonMode: PropTypes.bool,
   sceneId: PropTypes.string,
+  activeOverlayRoom: PropTypes.string,
   gestureRef: PropTypes.shape({ current: PropTypes.any }),
   avatarFaceUrl: PropTypes.string,
   onLobbyPoiNavigate: PropTypes.func,

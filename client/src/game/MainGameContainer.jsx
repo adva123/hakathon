@@ -27,6 +27,8 @@ export default function MainGameContainer({ gestureRef } = {}) {
         return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.strength:
         return <StrengthRoom addScore={addScore} gestureRef={gestureRef} />;
+      case SCENES.clothing:
+        return <ClothingRoom addScore={addScore} gestureRef={gestureRef} />;
       default:
         return null;
     }
@@ -51,8 +53,6 @@ export default function MainGameContainer({ gestureRef } = {}) {
         return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.strength:
         return <StrengthRoom addScore={addScore} gestureRef={gestureRef} />;
-      case SCENES.clothing:
-        return <ClothingRoom addScore={addScore} />;
       case SCENES.tryAgain:
         return <TryAgain />;
       default:
