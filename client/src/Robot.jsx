@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unknown-property */
 /* eslint-disable react-hooks/immutability */
-import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef, useContext } from "react";
+import { useEffect, useMemo, forwardRef, useImperativeHandle, useRef, useContext } from "react";
 import { GameContext } from './context/gameState.js';
 import { ROBOT_CATALOG } from './robotCatalog.js';
 import PropTypes from 'prop-types';
@@ -11,37 +11,19 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const GOLD_COLOR = '#d4af37';
 
-
-const ROBOT_MODELS = {
-  default: { glb: "/models/RobotExpressive.glb", color: "#b0b0b0" },
-  green: { glb: "/models/RobotGreen.glb", color: "#00ff00" },
-  gold: { glb: "/models/RobotGold.glb", color: "#ffd700" },
-  // Add more robots here
-};
-
 const Robot = forwardRef((props, ref) => {
   const { faceTextureUrl, showFaceScreen = false, ...rest } = props;
-  // 1. סנכרון עם ה-Global State (Context)
+  
+  // סנכרון עם ה-Global State (Context)
   const { shopState } = useContext(GameContext);
-  // 2. חישוב הסקין הפעיל
+  
+  // חישוב הסקין הפעיל
   const selectedId = shopState?.selectedRobotId || ROBOT_CATALOG[0].id;
   const skin = useMemo(() => ROBOT_CATALOG.find(r => r.id === selectedId) || ROBOT_CATALOG[0], [selectedId]);
+  
   const glbPath = '/models/RobotExpressive.glb';
   const gltf = useGLTF(glbPath);
   const { scene, animations } = gltf;
-
-  // 3. עדכון חומרים (Materials) דינמי בזמן אמת
-  useEffect(() => {
-    scene.traverse((obj) => {
-      if (obj.isMesh && obj.material) {
-        obj.material.color = new THREE.Color(skin.color);
-        obj.material.metalness = skin.type === 'luxury' ? (skin.metalness ?? 0.9) : 0;
-        obj.material.roughness = skin.type === 'luxury' ? (skin.roughness ?? 0.1) : 0.5;
-        obj.material.wireframe = !!skin.wireframe;
-        obj.material.needsUpdate = true;
-      }
-    });
-  }, [scene, skin]);
 
   const groupRef = useRef(null);
   useImperativeHandle(ref, () => groupRef.current);
@@ -71,67 +53,8 @@ const Robot = forwardRef((props, ref) => {
     base: null,
   });
 
-  const innerScene = useMemo(() => {
-    const cloned = clone(scene);
-    
-    // � COMPREHENSIVE GLB SCAN - Find ALL objects and their sizes
-    console.log('🔍 ===== COMPREHENSIVE GLB SCAN - ALL OBJECTS =====');
-    let largestObject = null;
-    let largestSize = 0;
-    let objectCount = 0;
-    
-    cloned.traverse((obj) => {
-      objectCount++;
-      const type = obj.type;
-      const name = obj.name || '(unnamed)';
-      
-      // Calculate bounding box for any object with geometry
-      if (obj.geometry) {
-        if (!obj.geometry.boundingBox) {
-          obj.geometry.computeBoundingBox();
-        }
-        const bbox = obj.geometry.boundingBox;
-        if (bbox) {
-          const size = bbox.max.clone().sub(bbox.min);
-          const volume = size.x * size.y * size.z;
-          
-          console.log(`📦 ${type} "${name}": Size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}, Volume: ${volume.toFixed(2)}`);
-          
-          if (volume > largestSize) {
-            largestSize = volume;
-            largestObject = obj;
-          }
-          
-          // Log material
-          if (obj.material) {
-            const mat = obj.material;
-            const color = mat.color ? `RGB(${(mat.color.r*255).toFixed(0)},${(mat.color.g*255).toFixed(0)},${(mat.color.b*255).toFixed(0)})` : 'N/A';
-            console.log(`   ↳ Material: ${mat.type}, Color: ${color}, Visible: ${obj.visible}`);
-          }
-        }
-      } else {
-        console.log(`🔹 ${type} "${name}": No geometry (container/bone)`);
-      }
-    });
-    
-    console.log(`📊 Total objects scanned: ${objectCount}`);
-    
-    if (largestObject) {
-      console.log('🎯 ===== LARGEST OBJECT FOUND =====');
-      console.log('Name:', largestObject.name);
-      console.log('Type:', largestObject.type);
-      console.log('Volume:', largestSize.toFixed(2));
-      console.log('🚫 HIDING AND SCALING TO ZERO...');
-      largestObject.visible = false;
-      largestObject.scale.set(0, 0, 0);
-      if (largestObject.parent) {
-        console.log('🗑️ REMOVING FROM PARENT...');
-        largestObject.parent.remove(largestObject);
-      }
-    }
-    
-    return cloned;
-  }, [scene]);
+  // Clone the scene once
+  const innerScene = useMemo(() => clone(scene), [scene]);
 
   const { actions, names } = useAnimations(animations, innerScene);
 
@@ -151,6 +74,20 @@ const Robot = forwardRef((props, ref) => {
   );
   const faceTextureRef = useRef(null);
   const faceShaderRef = useRef(null);
+
+  // עדכון חומרים (Materials) דינמי בזמן אמת לפי סקין נבחר
+  useEffect(() => {
+    innerScene.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        // עדכון לפי הסקין הנבחר
+        obj.material.color = new THREE.Color(skin.color);
+        obj.material.metalness = skin.type === 'luxury' ? (skin.metalness ?? 0.9) : 0.1;
+        obj.material.roughness = skin.type === 'luxury' ? (skin.roughness ?? 0.1) : 0.6;
+        obj.material.wireframe = !!skin.wireframe;
+        obj.material.needsUpdate = true;
+      }
+    });
+  }, [innerScene, skin]);
 
   // Upgrade GLB materials to glossy physical
   useEffect(() => {
@@ -197,17 +134,6 @@ const Robot = forwardRef((props, ref) => {
 
     innerScene.traverse((obj) => {
       if (!obj?.isMesh) return;
-      
-      // 🔥 TEST: Change Head_4 to BRIGHT GREEN to confirm it's the black box
-      if (obj.name === 'Head_4') {
-        console.log('🟢 Changing Head_4 to BRIGHT GREEN');
-        obj.material = new THREE.MeshBasicMaterial({
-          color: '#000000ff',
-          emissive: '#000000ff',
-          emissiveIntensity: 1,
-        });
-        return;
-      }
       
       const mat = obj.material;
       if (!mat) return;
@@ -686,18 +612,16 @@ const Robot = forwardRef((props, ref) => {
     if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = clock.getElapsedTime();
   });
 
-
-  // Clothing/accessory rendering removed (shop now sells robots)
-
   return (
     <group ref={groupRef} {...rest}>
       <primitive object={innerScene} />
-      {/* No equipped clothing/accessory rendering (shop now sells robots) */}
+
       <group ref={headAttachmentRef} position={headAnchor ? [0, 0, 0] : [0, 1.82, 0.12]}>
         <mesh position={[0, 0.02, 0.02]} castShadow receiveShadow>
           <sphereGeometry args={[0.26, 20, 16]} />
           <meshPhysicalMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
         </mesh>
+
         <group position={[0, 0.20, 0.06]}>
           <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
             <sphereGeometry args={[1, 12, 10]} />
@@ -710,6 +634,7 @@ const Robot = forwardRef((props, ref) => {
             </instancedMesh>
           ) : null}
         </group>
+
         <group ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.245]}>
           <mesh>
             <sphereGeometry args={[0.048, 16, 14]} />
@@ -738,6 +663,7 @@ const Robot = forwardRef((props, ref) => {
             </mesh>
           </group>
         </group>
+
         <group ref={rightEyeGlowRef} position={[0.12, 0.10, 0.245]}>
           <mesh>
             <sphereGeometry args={[0.048, 16, 14]} />
@@ -766,6 +692,7 @@ const Robot = forwardRef((props, ref) => {
             </mesh>
           </group>
         </group>
+
         <mesh ref={leftBrowRef} position={[-0.12, 0.17, 0.19]} rotation={[0, 0, 0.20]}>
           <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
@@ -774,6 +701,7 @@ const Robot = forwardRef((props, ref) => {
           <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
         </mesh>
+
         {showFaceScreen && faceTextureUrl ? (
           <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
             <planeGeometry args={[0.52, 0.4]} />
