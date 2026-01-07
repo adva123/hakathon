@@ -9,7 +9,6 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const GOLD_COLOR = '#d4af37';
 
-// מוסיף forwardRef כדי ש-ThreeDemo יוכל לשלוט עליו
 const Robot = forwardRef((props, ref) => {
   const gltf = useGLTF("/models/RobotExpressive.glb");
   const { scene, animations } = gltf;
@@ -19,7 +18,6 @@ const Robot = forwardRef((props, ref) => {
   const groupRef = useRef(null);
   useImperativeHandle(ref, () => groupRef.current);
 
-  // Eye gaze + greeting refs.
   const leftEyeGlowRef = useRef(null);
   const rightEyeGlowRef = useRef(null);
   const leftPupilRef = useRef(null);
@@ -45,12 +43,70 @@ const Robot = forwardRef((props, ref) => {
     base: null,
   });
 
-  // Single clone: the playable walking robot
-  const innerScene = useMemo(() => clone(scene), [scene]);
+  const innerScene = useMemo(() => {
+    const cloned = clone(scene);
+    
+    // � COMPREHENSIVE GLB SCAN - Find ALL objects and their sizes
+    console.log('🔍 ===== COMPREHENSIVE GLB SCAN - ALL OBJECTS =====');
+    let largestObject = null;
+    let largestSize = 0;
+    let objectCount = 0;
+    
+    cloned.traverse((obj) => {
+      objectCount++;
+      const type = obj.type;
+      const name = obj.name || '(unnamed)';
+      
+      // Calculate bounding box for any object with geometry
+      if (obj.geometry) {
+        if (!obj.geometry.boundingBox) {
+          obj.geometry.computeBoundingBox();
+        }
+        const bbox = obj.geometry.boundingBox;
+        if (bbox) {
+          const size = bbox.max.clone().sub(bbox.min);
+          const volume = size.x * size.y * size.z;
+          
+          console.log(`📦 ${type} "${name}": Size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}, Volume: ${volume.toFixed(2)}`);
+          
+          if (volume > largestSize) {
+            largestSize = volume;
+            largestObject = obj;
+          }
+          
+          // Log material
+          if (obj.material) {
+            const mat = obj.material;
+            const color = mat.color ? `RGB(${(mat.color.r*255).toFixed(0)},${(mat.color.g*255).toFixed(0)},${(mat.color.b*255).toFixed(0)})` : 'N/A';
+            console.log(`   ↳ Material: ${mat.type}, Color: ${color}, Visible: ${obj.visible}`);
+          }
+        }
+      } else {
+        console.log(`🔹 ${type} "${name}": No geometry (container/bone)`);
+      }
+    });
+    
+    console.log(`📊 Total objects scanned: ${objectCount}`);
+    
+    if (largestObject) {
+      console.log('🎯 ===== LARGEST OBJECT FOUND =====');
+      console.log('Name:', largestObject.name);
+      console.log('Type:', largestObject.type);
+      console.log('Volume:', largestSize.toFixed(2));
+      console.log('🚫 HIDING AND SCALING TO ZERO...');
+      largestObject.visible = false;
+      largestObject.scale.set(0, 0, 0);
+      if (largestObject.parent) {
+        console.log('🗑️ REMOVING FROM PARENT...');
+        largestObject.parent.remove(largestObject);
+      }
+    }
+    
+    return cloned;
+  }, [scene]);
 
   const { actions, names } = useAnimations(animations, innerScene);
 
-  // === Face "screen" material (user avatar) ===
   const faceMaterial = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
@@ -68,7 +124,7 @@ const Robot = forwardRef((props, ref) => {
   const faceTextureRef = useRef(null);
   const faceShaderRef = useRef(null);
 
-  // Upgrade GLB materials to glossy physical, and tint joints to gold.
+  // Upgrade GLB materials to glossy physical
   useEffect(() => {
     const created = [];
     const cache = new Map();
@@ -91,10 +147,9 @@ const Robot = forwardRef((props, ref) => {
         emissive: src.emissive?.clone?.() ?? new THREE.Color('#000000'),
         emissiveMap: src.emissiveMap ?? null,
         emissiveIntensity: Number.isFinite(src.emissiveIntensity) ? src.emissiveIntensity : 0,
-        // Spec: glossy Pixar/Fortnite-ish body material.
-        roughness: 0.15,
+        roughness: 0.6,
         roughnessMap: src.roughnessMap ?? null,
-        metalness: 0.5,
+        metalness: 0.1,
         metalnessMap: src.metalnessMap ?? null,
         normalMap: src.normalMap ?? null,
         aoMap: src.aoMap ?? null,
@@ -103,8 +158,8 @@ const Robot = forwardRef((props, ref) => {
         opacity: Number.isFinite(src.opacity) ? src.opacity : 1,
         side: src.side,
         toneMapped: src.toneMapped,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.08,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.3,
       });
 
       cache.set(key, mat);
@@ -114,6 +169,18 @@ const Robot = forwardRef((props, ref) => {
 
     innerScene.traverse((obj) => {
       if (!obj?.isMesh) return;
+      
+      // 🔥 TEST: Change Head_4 to BRIGHT GREEN to confirm it's the black box
+      if (obj.name === 'Head_4') {
+        console.log('🟢 Changing Head_4 to BRIGHT GREEN');
+        obj.material = new THREE.MeshBasicMaterial({
+          color: '#00ff00',
+          emissive: '#00ff00',
+          emissiveIntensity: 1,
+        });
+        return;
+      }
+      
       const mat = obj.material;
       if (!mat) return;
 
@@ -123,8 +190,8 @@ const Robot = forwardRef((props, ref) => {
       const applyOne = (m) => {
         if (!m) return m;
         if (isJoint) return goldMat;
-        // Leave unlit materials alone.
         if (m.isMeshBasicMaterial) return m;
+        
         const key = `${m.uuid}|phys`;
         return toPhysical(m, key) || m;
       };
@@ -153,7 +220,6 @@ const Robot = forwardRef((props, ref) => {
   }, [innerScene]);
 
   const hairInstances = useMemo(() => {
-    // Deterministic pseudo-random so curls don't "shuffle" between renders.
     const rand01 = (seed) => {
       const s = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
       return s - Math.floor(s);
@@ -164,7 +230,6 @@ const Robot = forwardRef((props, ref) => {
     const sphere = [];
     const torus = [];
 
-    // Head overlay sphere radius is ~0.26; place curls slightly outside so they read clearly.
     const baseR = 0.325;
     const centerY = 0.19;
 
@@ -192,11 +257,9 @@ const Robot = forwardRef((props, ref) => {
       const u = rand01(i * 17.3 + 6.1);
       const v = rand01(i * 29.9 + 2.7);
       const theta = u * Math.PI * 2;
-      // Rings: a bit tighter than spheres so they read as curls.
       const ringR = baseR * (0.72 + 0.18 * rand01(i * 10.1));
       const x = Math.cos(theta) * ringR;
       const z = Math.sin(theta) * ringR * 0.78;
-      // Slightly lower than crown so some curls hang on the sides.
       const y = 0.14 + 0.12 * v;
       torus.push({
         x,
@@ -240,10 +303,7 @@ const Robot = forwardRef((props, ref) => {
     }
   }, [hairInstances]);
 
-  // Laptop prop intentionally disabled.
-
   useEffect(() => {
-    // Candy toon-ish filter: posterize + soft vignette (keeps photo readable).
     faceMaterial.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = { value: 0 };
       shader.uniforms.uPosterize = { value: 5.0 };
@@ -257,7 +317,7 @@ const Robot = forwardRef((props, ref) => {
         )
         .replace(
           '#include <map_fragment>',
-          `#include <map_fragment>\n\n// Posterize for a toon-like screen look.\nfloat steps = max(2.0, uPosterize);\ndiffuseColor.rgb = floor(diffuseColor.rgb * steps) / steps;\n\n// Soft vignette for readability (works even if no map is set).\nvec2 uv = vec2(0.5);\n#ifdef USE_MAP\n  uv = vMapUv;\n#endif\nfloat v = smoothstep(0.9, 0.1, distance(uv, vec2(0.5)));\ndiffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uVignette), diffuseColor.rgb, v);`
+          `#include <map_fragment>\n\nfloat steps = max(2.0, uPosterize);\ndiffuseColor.rgb = floor(diffuseColor.rgb * steps) / steps;\n\nvec2 uv = vec2(0.5);\n#ifdef USE_MAP\n  uv = vMapUv;\n#endif\nfloat v = smoothstep(0.9, 0.1, distance(uv, vec2(0.5)));\ndiffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - uVignette), diffuseColor.rgb, v);`
         );
     };
     faceMaterial.toneMapped = false;
@@ -269,8 +329,6 @@ const Robot = forwardRef((props, ref) => {
   }, [faceMaterial]);
 
   const headAnchor = useMemo(() => {
-    // Prefer a real head/neck/face bone (or node) from the cloned rig.
-    // If not found, fall back to the highest bone in the skeleton.
     const tmp = new THREE.Vector3();
     innerScene.updateMatrixWorld(true);
 
@@ -327,7 +385,6 @@ const Robot = forwardRef((props, ref) => {
   }, [headAnchor]);
 
   useEffect(() => {
-    // Clear previous
     if (!faceTextureUrl) {
       if (faceMaterial.map) {
         faceMaterial.map = null;
@@ -348,7 +405,6 @@ const Robot = forwardRef((props, ref) => {
     loader.load(
       faceTextureUrl,
       (tex) => {
-        // Dispose old texture (if any)
         if (faceTextureRef.current && faceTextureRef.current !== tex) {
           try {
             faceTextureRef.current.dispose();
@@ -363,23 +419,20 @@ const Robot = forwardRef((props, ref) => {
         tex.wrapT = THREE.ClampToEdgeWrapping;
         tex.anisotropy = 8;
 
-        // Center + crop to fit a "screen" aspect (cover).
         const img = tex.image;
         const iw = img?.videoWidth || img?.width;
         const ih = img?.videoHeight || img?.height;
         const imgAspect = iw && ih ? iw / ih : 1;
 
-        const screenAspect = 1.3; // width / height
+        const screenAspect = 1.3;
         let rx = 1;
         let ry = 1;
         let ox = 0;
         let oy = 0;
         if (imgAspect > screenAspect) {
-          // too wide: crop left/right
           rx = screenAspect / imgAspect;
           ox = (1 - rx) * 0.5;
         } else if (imgAspect < screenAspect) {
-          // too tall: crop top/bottom
           ry = imgAspect / screenAspect;
           oy = (1 - ry) * 0.5;
         }
@@ -397,7 +450,6 @@ const Robot = forwardRef((props, ref) => {
     );
   }, [faceTextureUrl, faceMaterial]);
 
-  // Cache bones for a simple wave gesture (right arm/forearm/hand).
   useEffect(() => {
     const pickRightBones = (root) => {
       const out = { arm: null, forearm: null, hand: null };
@@ -433,7 +485,6 @@ const Robot = forwardRef((props, ref) => {
     }
   }, [innerScene]);
 
-  // === שליטה באנימציות (Idle / Walking) ===
   useEffect(() => {
     if (actions && names.length > 0) {
       let currentAction = null;
@@ -458,7 +509,6 @@ const Robot = forwardRef((props, ref) => {
         });
       };
 
-      // פונקציה לשינוי מצב האנימציה
       const setAction = (name) => {
         const next =
           actions[name] ||
@@ -472,37 +522,30 @@ const Robot = forwardRef((props, ref) => {
           currentAction = next;
           currentActionName = String(name || '');
 
-          // Re-apply speed scale when switching back into walk/run.
           if (/(walk|run)/i.test(currentActionName)) {
             applySpeedScale(innerScene.userData?.speedScale ?? 1);
           }
         }
       };
 
-      // Expose speed scaling so the controller (ThreeDemo) can sync leg cadence to movement speed.
       innerScene.userData.speedScale = innerScene.userData.speedScale ?? 1;
       innerScene.userData.setSpeedScale = (s) => {
         innerScene.userData.speedScale = s;
-        // Only affect cadence for walk/run; keep idle calm.
         if (/(walk|run)/i.test(currentActionName || '')) applySpeedScale(s);
         else applySpeedScale(1);
       };
 
-      // שומר את הפונקציה ב־userData כדי ש-ThreeDemo תוכל להפעיל אותה
       innerScene.userData.setAction = setAction;
       if (groupRef.current) groupRef.current.userData.setAction = setAction;
 
-      // Forward the same API on the group root.
       if (groupRef.current) {
         groupRef.current.userData.setSpeedScale = innerScene.userData.setSpeedScale;
       }
 
-      // ברירת מחדל: Idle
       setAction("Idle");
     }
   }, [actions, names, innerScene]);
 
-  // חיוך + מצמוץ עדין (כמו קודם)
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
 
@@ -510,7 +553,6 @@ const Robot = forwardRef((props, ref) => {
     const greetActive = !!robot?.userData?.greetActive;
     const lookAt = robot?.userData?.lookAtVec;
 
-    // Schedule a wink while greeting.
     if (greetActive) {
       if (t - winkState.current.lastWinkAt > 2.8) {
         winkState.current.lastWinkAt = t;
@@ -521,7 +563,6 @@ const Robot = forwardRef((props, ref) => {
     }
     const isWinkingNow = t < winkState.current.activeUntil;
 
-    // Eye gaze: move pupils toward camera in face-local space.
     if (lookAt && headAnchor) {
       gazeTmp.current.copy(lookAt);
       headAnchor.worldToLocal(gazeTmp.current);
@@ -548,7 +589,6 @@ const Robot = forwardRef((props, ref) => {
       setPupil(rightPupilRef, 0.12);
     }
 
-    // Visual wink (works even if the GLB has no blink morph targets).
     if (rightEyeGlowRef.current) {
       const y = isWinkingNow ? 0.18 : 1;
       rightEyeGlowRef.current.scale.y = y;
@@ -557,7 +597,6 @@ const Robot = forwardRef((props, ref) => {
       leftEyeGlowRef.current.scale.y = 1;
     }
 
-    // Brows: tiny dynamic tilt/lift adds "soul".
     const curious = (lookAt ? 1 : 0) * 0.10 + 0.06 * Math.sin(t * 0.9 + 0.2);
     const smiley = (greetActive ? 1 : 0) * 0.10;
     const browTilt = curious - smiley;
@@ -572,7 +611,6 @@ const Robot = forwardRef((props, ref) => {
       rightBrowRef.current.position.y = 0.17 + browLift;
     }
 
-    // Wave gesture: raise right arm and wave forearm/hand.
     if (waveRig.current.ready && waveRig.current.base) {
       const wave = Math.sin(t * 6.0);
       const raise = greetActive ? 1 : 0;
@@ -615,26 +653,21 @@ const Robot = forwardRef((props, ref) => {
     });
   });
 
-  // Drive scanline animation.
   useFrame(({ clock }) => {
     const shader = faceShaderRef.current;
     if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = clock.getElapsedTime();
   });
 
-  // Render a group so movement/rotation applies to both layers.
   return (
     <group ref={groupRef} {...rest}>
       <primitive object={innerScene} />
 
-      {/* Head/face overlay that follows the animated head bone (no reparenting of the bone itself). */}
       <group ref={headAttachmentRef} position={headAnchor ? [0, 0, 0] : [0, 1.82, 0.12]}>
-        {/* Head (simple proxy, tinted to match the dark-brown body) */}
         <mesh position={[0, 0.02, 0.02]} castShadow receiveShadow>
           <sphereGeometry args={[0.26, 20, 16]} />
           <meshPhysicalMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
         </mesh>
 
-        {/* Curly hair (volumetric curls via instancing) */}
         <group position={[0, 0.20, 0.06]}>
           <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
             <sphereGeometry args={[1, 12, 10]} />
@@ -648,14 +681,11 @@ const Robot = forwardRef((props, ref) => {
           ) : null}
         </group>
 
-        {/* Eyes: layered (sclera + iris + pupil + catch-light) */}
         <group ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.245]}>
-          {/* Sclera */}
           <mesh>
             <sphereGeometry args={[0.048, 16, 14]} />
             <meshPhysicalMaterial color={'#f8fbff'} roughness={0.22} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.04} />
           </mesh>
-          {/* Iris + pupil (moves for gaze) */}
           <group ref={leftPupilRef} position={[0, 0, 0.040]} renderOrder={21}>
             <mesh position={[0, 0, 0.002]}>
               <circleGeometry args={[0.022, 20]} />
@@ -709,7 +739,6 @@ const Robot = forwardRef((props, ref) => {
           </group>
         </group>
 
-        {/* Brows (dynamic tilt handled in useFrame) */}
         <mesh ref={leftBrowRef} position={[-0.12, 0.17, 0.19]} rotation={[0, 0, 0.20]}>
           <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
@@ -719,7 +748,6 @@ const Robot = forwardRef((props, ref) => {
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
         </mesh>
 
-        {/* Face screen (optional). Disabled by default to avoid a visible blue rectangle behind the eyes. */}
         {showFaceScreen && faceTextureUrl ? (
           <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
             <planeGeometry args={[0.52, 0.4]} />
@@ -736,6 +764,7 @@ Robot.displayName = 'Robot';
 
 Robot.propTypes = {
   faceTextureUrl: PropTypes.string,
+  showFaceScreen: PropTypes.bool,
 };
 
 useGLTF.preload("/models/RobotExpressive.glb");
