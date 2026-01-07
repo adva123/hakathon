@@ -27,26 +27,6 @@ NeonSvg.propTypes = {
   viewBox: PropTypes.string,
 };
 
-function IconThumbUp() {
-  return (
-    <NeonSvg>
-      <path d="M20 30v18" />
-      <path d="M20 30c3-8 7-12 11-16 2-2 5 0 5 3v7h12c3 0 5 3 4 6l-4 14c-1 3-3 4-6 4H26c-3 0-6-3-6-6V30z" />
-      <path d="M18 30h-4v22h4" />
-    </NeonSvg>
-  );
-}
-
-function IconThumbDown() {
-  return (
-    <NeonSvg>
-      <path d="M20 34V16" />
-      <path d="M20 34c3 8 7 12 11 16 2 2 5 0 5-3v-7h12c3 0 5-3 4-6l-4-14c-1-3-3-4-6-4H26c-3 0-6 3-6 6v16z" />
-      <path d="M18 12h-4v22h4" />
-    </NeonSvg>
-  );
-}
-
 function IconPalm() {
   return (
     <NeonSvg>
@@ -65,6 +45,17 @@ function IconFist() {
       <path d="M26 30v-9c0-2 2-4 4-4s4 2 4 4v9" />
       <path d="M34 30v-9c0-2 2-4 4-4s4 2 4 4v9" />
       <path d="M42 30v-7c0-2 2-4 4-4s4 2 4 4v12c0 7-5 13-12 13H30c-7 0-12-6-12-13v-5h24" />
+    </NeonSvg>
+  );
+}
+
+function IconPeace() {
+  return (
+    <NeonSvg>
+      <path d="M26 46V18c0-3 2-6 6-6s6 3 6 6v18" />
+      <path d="M38 36V16c0-3 2-6 6-6s6 3 6 6v22" />
+      <path d="M22 36c-4 0-8 3-8 7s4 9 10 9h18c6 0 12-4 12-10" />
+      <path d="M30 44l-4 4" />
     </NeonSvg>
   );
 }
@@ -89,11 +80,10 @@ export default function SideNavigation({
   const { playerName, score, energy, audioMuted, setAudioMuted, switchRoomWithRobot } = useContext(GameContext);
 
   const items = [
-    { key: 'thumbUp', name: 'Thumb Up', action: 'Right', icon: <IconThumbUp /> },
-    { key: 'thumbDown', name: 'Thumb Down', action: 'Left', icon: <IconThumbDown /> },
-    { key: 'openPalm', name: 'Open Palm', action: 'Forward', icon: <IconPalm /> },
-    { key: 'iLoveYou', name: 'I Love You', action: 'Back', icon: <IconILoveYou /> },
-    { key: 'fist', name: 'Fist', action: 'Stop + Block Rooms', icon: <IconFist /> },
+    { key: 'openPalm', name: 'Open Palm', action: 'Start Robot', icon: <IconPalm /> },
+    { key: 'iLoveYou', name: 'I Love You', action: 'Move Back', icon: <IconILoveYou /> },
+    { key: 'peace', name: 'Peace', action: 'Speed x2', icon: <IconPeace /> },
+    { key: 'fist', name: 'Fist', action: 'Stop Robot', icon: <IconFist /> },
   ];
 
   return (

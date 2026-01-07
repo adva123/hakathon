@@ -313,7 +313,7 @@ export default function GestureManager({
                   <div className={styles.bar} style={{ width: `${Math.round(calibProgress * 100)}%` }} />
                 </div>
                 <div className={styles.hint}>
-                  Gestures: Fist = Stop + block room entry, Thumb Up = Right, Thumb Down = Left, I Love You = Back, Palm = Forward.
+                  Gestures: Open Palm = Start, I Love You = Back, Peace = Speed x2, Fist = Stop.
                 </div>
               </div>
             </div>
@@ -329,24 +329,20 @@ export default function GestureManager({
               <div className={styles.legend}>
                 <div className={styles.legendTitle}>Gestures</div>
                 <div className={styles.legendRow}>
-                  <div className={styles.legendKey}>Fist</div>
-                  <div className={styles.legendVal}>Stop + block rooms</div>
-                </div>
-                <div className={styles.legendRow}>
-                  <div className={styles.legendKey}>Thumb Up</div>
-                  <div className={styles.legendVal}>Right</div>
-                </div>
-                <div className={styles.legendRow}>
-                  <div className={styles.legendKey}>Thumb Down</div>
-                  <div className={styles.legendVal}>Left</div>
+                  <div className={styles.legendKey}>Open Palm</div>
+                  <div className={styles.legendVal}>Start</div>
                 </div>
                 <div className={styles.legendRow}>
                   <div className={styles.legendKey}>I Love You</div>
                   <div className={styles.legendVal}>Back</div>
                 </div>
                 <div className={styles.legendRow}>
-                  <div className={styles.legendKey}>Open Palm</div>
-                  <div className={styles.legendVal}>Forward</div>
+                  <div className={styles.legendKey}>Peace</div>
+                  <div className={styles.legendVal}>Speed x2</div>
+                </div>
+                <div className={styles.legendRow}>
+                  <div className={styles.legendKey}>Fist</div>
+                  <div className={styles.legendVal}>Stop</div>
                 </div>
               </div>
             )}

@@ -681,20 +681,88 @@ function RobotController({
     const time = clock.getElapsedTime();
     const length = curveData.length || 1;
     const baseSpeed = 2.2; // relaxed walking pace
-    const dt = (baseSpeed / length) * delta;
 
-    // Continuous forward motion (game-like progress). Keep keyboard/gesture reads to avoid dead code,
-    // but the default experience is always moving.
+    // Hand-controlled movement (requested): robot starts stopped and moves only after an "activate" hand gesture.
+    // Commands (gestures):
+    // - openPalm: activate/start robot
+    // - iLoveYou: move backward (hold)
+    // - peace: toggle speed x2
+    // - fist: stop robot
+    const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const g = gestureRef?.current;
+    const gesture = String(g?.gesture || 'none');
+    const hasHand = Boolean(g?.hasHand);
+
+    robot.userData.handControl = robot.userData.handControl || {
+      enabled: false,
+      speedMult: 1,
+      lastCmdAt: 0,
+      lastGesture: 'none',
+    };
+
+    // Ensure we start stopped each fresh session.
+    if (!robot.userData.handControl._initialized) {
+      robot.userData.handControl.enabled = false;
+      robot.userData.handControl.speedMult = 1;
+      robot.userData.handControl.lastCmdAt = 0;
+      robot.userData.handControl.lastGesture = 'none';
+      robot.userData.handControl._initialized = true;
+    }
+
+    const cmdCooldownMs = 650;
+    const isNewGesture = gesture !== robot.userData.handControl.lastGesture;
+    if (hasHand && isNewGesture) {
+      robot.userData.handControl.lastGesture = gesture;
+
+      const canCmd = (nowMs - robot.userData.handControl.lastCmdAt) >= cmdCooldownMs;
+      if (canCmd) {
+        if (gesture === 'openPalm') {
+          robot.userData.handControl.enabled = true;
+          robot.userData.handControl.lastCmdAt = nowMs;
+        } else if (gesture === 'fist') {
+          robot.userData.handControl.enabled = false;
+          robot.userData.handControl.lastCmdAt = nowMs;
+        } else if (gesture === 'peace') {
+          // Toggle x2 speed.
+          robot.userData.handControl.speedMult = robot.userData.handControl.speedMult === 2 ? 1 : 2;
+          robot.userData.handControl.lastCmdAt = nowMs;
+        }
+      }
+    }
+
+    // Keep keyboard reads referenced (avoid dead code) but do not use them in forest mode.
     void keys;
-    void gestureRef;
     void controlsEnabled;
     void autoWalkTarget;
     void onAutoWalkArrived;
     void idlePatrolEnabled;
 
-    robot.userData.setAction?.('Walking');
-    robot.userData.pathT = robot.userData.pathT + dt;
-    if (robot.userData.pathT > 1) robot.userData.pathT -= 1;
+    const enabled = Boolean(robot.userData.handControl.enabled);
+    const speedMult = robot.userData.handControl.speedMult || 1;
+
+    // Smooth transition between Idle/Walking so the start/stop isn't snappy.
+    robot.userData._walkBlend = Number.isFinite(robot.userData._walkBlend) ? robot.userData._walkBlend : 0;
+    const walkBlendA = 1 - Math.exp(-(delta || 0.016) * 10);
+    robot.userData._walkBlend = THREE.MathUtils.lerp(robot.userData._walkBlend, enabled ? 1 : 0, walkBlendA);
+    const walkBlend = robot.userData._walkBlend;
+
+    const direction = enabled && gesture === 'iLoveYou' ? -1 : 1;
+    const dt = enabled ? direction * speedMult * (baseSpeed / length) * delta : 0;
+
+    if (enabled) {
+      robot.userData.setAction?.('Walking');
+      robot.userData.pathT = robot.userData.pathT + dt;
+      // Wrap 0..1
+      robot.userData.pathT = ((robot.userData.pathT % 1) + 1) % 1;
+    } else {
+      robot.userData.setAction?.('Idle');
+      hasPrev.current = false;
+      // Smooth animation speed back toward 1.
+      robot.userData._speedScaleSmoothed = robot.userData._speedScaleSmoothed ?? 1;
+      const aS = 1 - Math.exp(-(delta || 0.016) * 10);
+      robot.userData._speedScaleSmoothed += (1 - robot.userData._speedScaleSmoothed) * aS;
+      robot.userData.setSpeedScale?.(robot.userData._speedScaleSmoothed);
+    }
 
     // Keep robot centered; use path tangent for facing direction.
     const t = robot.userData.pathT;
@@ -706,15 +774,47 @@ function RobotController({
 
     scratch2.current.copy(tan);
     const yawTarget = Math.atan2(scratch2.current.x, scratch2.current.z);
+
+    // Compute turn direction + intensity (for body lean + camera tilt).
+    robot.userData._yawTargetPrev = Number.isFinite(robot.userData._yawTargetPrev) ? robot.userData._yawTargetPrev : yawTarget;
+    const dyawTargetRaw = yawTarget - robot.userData._yawTargetPrev;
+    const dyawTarget = Math.atan2(Math.sin(dyawTargetRaw), Math.cos(dyawTargetRaw));
+    robot.userData._yawTargetPrev = yawTarget;
+
+    const turnSide = Math.sign(dyawTarget) || 0;
+    const turnRate = (delta > 1e-6) ? (Math.abs(dyawTarget) / delta) : 0; // rad/sec
+    const turnAmtTarget = Math.max(0, Math.min(1, turnRate / 2.6));
+    robot.userData.turnFxCurve = robot.userData.turnFxCurve || { side: 0, amount: 0 };
+    const turnFxA = 1 - Math.exp(-(delta || 0.016) * 8);
+    robot.userData.turnFxCurve.side = turnSide;
+    robot.userData.turnFxCurve.amount += (turnAmtTarget - robot.userData.turnFxCurve.amount) * turnFxA;
     robot.userData._yawSmoothed = typeof robot.userData._yawSmoothed === 'number' ? robot.userData._yawSmoothed : yawTarget;
     const yawA = 1 - Math.exp(-(delta || 0.016) * 14);
     robot.userData._yawSmoothed = dampAngle(robot.userData._yawSmoothed, yawTarget, yawA);
-    const yaw = robot.userData._yawSmoothed;
+
+    // Add a tiny procedural sway that depends on walking + turning.
+    const yawTurnLean = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.035;
+    const yawMicro = Math.sin(time * 1.35) * 0.012;
+    const yaw = robot.userData._yawSmoothed + (yawTurnLean + yawMicro) * walkBlend;
     robot.rotation.y = yaw;
+
+    // Roll into turns (lean). Keep very subtle.
+    robot.userData._rollSmoothed = Number.isFinite(robot.userData._rollSmoothed) ? robot.userData._rollSmoothed : 0;
+    const rollTurn = turnSide * (robot.userData.turnFxCurve.amount || 0) * 0.18;
+    const rollMicro = Math.sin(time * 2.8) * 0.035;
+    const rollTarget = (rollTurn + rollMicro) * walkBlend;
+    const rollA = 1 - Math.exp(-(delta || 0.016) * 10);
+    robot.userData._rollSmoothed = THREE.MathUtils.lerp(robot.userData._rollSmoothed, rollTarget, rollA);
+    robot.rotation.z = robot.userData._rollSmoothed;
 
     // Place the robot on the route (Google-Maps-ish). Keep Y stable for a smoother adventure feel.
     const terrainY = floorY + forestTerrainHeight(p.x, p.z) + FOREST_PATH_SURFACE_LIFT;
-    robot.position.set(p.x, terrainY, p.z);
+    // Bobbing synced to walk cadence.
+    const speedScale = robot.userData._speedScaleSmoothed ?? 1;
+    const bobFreq = 6.8 + Math.min(2.2, speedScale) * 1.4;
+    const bobAmp = 0.028 + Math.min(0.02, (speedScale - 1) * 0.008);
+    const bob = Math.sin(time * bobFreq) * bobAmp * walkBlend;
+    robot.position.set(p.x, terrainY + bob, p.z);
 
     // Eye contact + greeting trigger.
     if (camera) {
@@ -738,7 +838,7 @@ function RobotController({
     }
 
     // Drive leg cadence from actual movement speed (and slightly from turning) to avoid foot sliding.
-    if (delta > 1e-6) {
+    if (enabled && delta > 1e-6) {
       if (!hasPrev.current) {
         prevP.current.copy(p);
         prevYaw.current = yaw;
@@ -1954,9 +2054,10 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     if (tan.lengthSq() < 1e-6) tan.set(0, 0, 1);
     tan.normalize();
 
-    // Keep the view stable: no camera roll/shake/shoulder sway.
-    const turnAmt = 0;
-    const turnSide = 0;
+    // Cinematic feel: slight lead/lag + tiny roll into turns.
+    const fx = target.userData?.turnFxCurve || target.userData?.turnFx;
+    const turnAmt = Math.max(0, Math.min(1, Number(fx?.amount ?? 0)));
+    const turnSide = Math.sign(Number(fx?.side ?? 0)) || 0;
     const turnRight = turnRightRef.current;
     turnRight.set(tan.z, 0, -tan.x);
     if (turnRight.lengthSq() > 1e-9) turnRight.normalize();
@@ -1966,7 +2067,7 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     const scratch3 = scratch3Ref.current;
 
     const aheadBase = boardMode ? (navActive ? 2.2 : 1.6) : (navActive ? 2.6 : 1.9);
-    const ahead = aheadBase + turnAmt * (boardMode ? 0.45 : 0.8);
+    const ahead = aheadBase + turnAmt * (boardMode ? 0.55 : 0.95);
     scratch.set(p.x, pY, p.z)
       .addScaledVector(tan, ahead)
       .addScaledVector(turnRight, -turnSide * turnAmt * (boardMode ? 0.35 : 0.55));
@@ -2036,7 +2137,8 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     scratch2.copy(scratch3);
 
     // Smooth follow to avoid jitter (frame-rate independent).
-    const posSpeed = 7.5;
+    // Slightly slower than "locked" to feel like a human camera rig.
+    const posSpeed = 5.2;
     const posA = 1 - Math.exp(-(delta || 0.016) * posSpeed);
     camera.position.lerp(scratch2, posA);
 
@@ -2044,10 +2146,21 @@ function CandyFollowCamera({ targetRef, curveData, navActive, boardMode = false,
     lookAtDesired.set(p.x, pY + (boardMode ? 1.05 : 1.25), p.z);
     const lookAtSmoothed = lookAtSmoothedRef.current;
     if (!Number.isFinite(lookAtSmoothed.x)) lookAtSmoothed.copy(lookAtDesired);
-    const lookSpeed = 11.0;
+    const lookSpeed = 8.5;
     const lookA = 1 - Math.exp(-(delta || 0.016) * lookSpeed);
     lookAtSmoothed.lerp(lookAtDesired, lookA);
+
+    // Apply lookAt, then a tiny roll toward the turn direction.
     camera.lookAt(lookAtSmoothed);
+
+    const desiredRoll = (boardMode ? 0.03 : 0.055) * turnSide * turnAmt;
+    camera.userData._rollSmoothed = Number.isFinite(camera.userData._rollSmoothed) ? camera.userData._rollSmoothed : 0;
+    const rollA = 1 - Math.exp(-(delta || 0.016) * 8);
+    camera.userData._rollSmoothed = THREE.MathUtils.lerp(camera.userData._rollSmoothed, desiredRoll, rollA);
+    const fwd = scratch3Ref.current;
+    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+    const qRoll = new THREE.Quaternion().setFromAxisAngle(fwd, camera.userData._rollSmoothed);
+    camera.quaternion.multiply(qRoll);
   });
 
   return null;
