@@ -3923,7 +3923,7 @@ function RobotController({
       robot.userData._yawSmoothed = dampAngle(robot.userData._yawSmoothed, yawTarget, yawA);
 
       robot.rotation.y = robot.userData._yawSmoothed;
-      const terrainY = getTerrainY(p.x, p.z);
+      const terrainY = forestTerrainHeight(p.x, p.z);
       const speedScale = navSpeedUnits / baseSpeed;
       const walkBlend = robot.userData.nav?.arrived ? 0 : 1;
       const bobFreq = 6.8 + Math.min(2.2, speedScale) * 1.4;

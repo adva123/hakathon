@@ -17,12 +17,12 @@ function evaluatePassword(pw) {
     numberOk,
     specialOk,
     met,
-    isStrong: met >= 3, // סיסמה חזקה = לפחות 3 קריטריונים
+    isStrong: met >= 3, // Strong password = at least 3 criteria
   };
 }
 
-// מאגר סיסמאות לבדיקה
-const PASSWORD_SAMPLES = [
+// Password samples for the game (each session: 10 random questions from the list)
+const ALL_PASSWORD_SAMPLES = [
   { password: 'password', isStrong: false },
   { password: '12345678', isStrong: false },
   { password: 'Abc123', isStrong: false },
@@ -37,6 +37,18 @@ const PASSWORD_SAMPLES = [
   { password: 'P@ssword123', isStrong: true },
 ];
 
+function getRandomSamples(arr, n) {
+  // Fisher-Yates shuffle
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
+
+const PASSWORD_SAMPLES = getRandomSamples(ALL_PASSWORD_SAMPLES, 10);
+
 export default function PasswordRoom({ addScore: addScoreProp, awardBadge: awardBadgeProp, gestureRef } = {}) {
   const { playerName, addScore, registerMistake, awardBadge, handleBack, badges } = useContext(GameContext);
   const addScoreFn = addScoreProp || addScore;
@@ -45,12 +57,13 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   // Game state
   const [currentPasswordIndex, setCurrentPasswordIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [coins, setCoins] = useState(0); // New: coins state
   const [lives, setLives] = useState(3);
   const [message, setMessage] = useState('');
   const [gameOver, setGameOver] = useState(false);
   const [victory, setVictory] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackType, setFeedbackType] = useState(''); // 'correct' או 'wrong'
+  const [feedbackType, setFeedbackType] = useState(''); // 'correct' or 'wrong'
   
   const gestureTimeoutRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
@@ -64,7 +77,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
     [currentPassword]
   );
 
-  // ניקוי טיימרים
+  // Cleanup timers
   useEffect(() => {
     return () => {
       if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
@@ -74,9 +87,13 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   }, []);
 
   const handleGesture = useCallback((gesture) => {
+    // Allow 'iloveyou' gesture to return to forest when game is over
+    if (gameOver && gesture === 'iloveyou') {
+      handleBack();
+      return;
+    }
     if (gameOver || victory || !currentPassword) return;
-    
-    // מניעת מחוות כפולות מהירות
+    // Prevent rapid duplicate gestures
     if (gestureTimeoutRef.current) return;
 
     let isCorrect = false;
@@ -86,31 +103,31 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
     } else if (gesture === 'thumbDown' && !currentPassword.isStrong) {
       isCorrect = true;
     } else if (gesture === 'thumbUp' || gesture === 'thumbDown') {
-      // תגובה שגויה
+      // Wrong response
       isCorrect = false;
     } else {
-      // מחווה לא רלוונטית
+      // Irrelevant gesture
       return;
     }
 
-    // הצגת פידבק ויזואלי
+    // Show visual feedback
     setShowFeedback(true);
     setFeedbackType(isCorrect ? 'correct' : 'wrong');
 
     if (isCorrect) {
-      // תשובה נכונה
+      // Correct answer
       const points = 20;
       setScore(s => s + points);
       addScoreFn(points);
-      setMessage('✅ נכון! סיסמה זוהתה נכון');
-      
-      // מעבר לסיסמה הבאה
+      setCoins(c => c + 10); // Award 10 coins
+      setMessage('✅ Correct! Password identified correctly (+10 coins)');
+      // Move to next password
       gestureTimeoutRef.current = setTimeout(() => {
         const nextIndex = currentPasswordIndex + 1;
         if (nextIndex >= PASSWORD_SAMPLES.length) {
-          // ניצחון!
+          // Victory!
           setVictory(true);
-          setMessage('🎉 ניצחת! זיהית את כל הסיסמאות נכון!');
+          setMessage('🎉 You won! You identified all passwords correctly!');
           awardBadgeFn('goldenKey');
           addScoreFn(100);
         } else {
@@ -121,18 +138,16 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
         gestureTimeoutRef.current = null;
       }, 1500);
     } else {
-      // תשובה שגויה
+      // Wrong answer
       registerMistake();
       const newLives = lives - 1;
       setLives(newLives);
-      
       if (newLives <= 0) {
         setGameOver(true);
-        setMessage('❌ המשחק נגמר! נסה שוב');
+        setMessage('❌ Game over! Try again');
       } else {
-        setMessage(`❌ שגוי! נותרו ${newLives} חיים`);
+        setMessage(`❌ Wrong! ${newLives} lives left`);
       }
-
       gestureTimeoutRef.current = setTimeout(() => {
         if (newLives > 0) {
           setMessage('');
@@ -141,19 +156,18 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
         gestureTimeoutRef.current = null;
       }, 1500);
     }
-
-    // הסתרת פידבק ויזואלי אחרי זמן קצר
+    // Hide visual feedback after short delay
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
     feedbackTimeoutRef.current = setTimeout(() => {
       setShowFeedback(false);
     }, 1000);
-  }, [gameOver, victory, currentPassword, lives, currentPasswordIndex, addScoreFn, awardBadgeFn, registerMistake]);
+  }, [gameOver, victory, currentPassword, lives, currentPasswordIndex, addScoreFn, awardBadgeFn, registerMistake, handleBack]);
 
-  // ניטור מחוות יד מ-gestureRef
+  // Monitor hand gestures from gestureRef
   useEffect(() => {
     if (!gestureRef) return;
 
-    // בדיקה קבועה של מחוות חדשות
+    // Poll for new gestures
     gestureCheckIntervalRef.current = setInterval(() => {
       const currentGesture = gestureRef.current?.gesture;
       if (currentGesture && currentGesture !== lastGestureRef.current && currentGesture !== 'none') {
@@ -172,6 +186,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   const restart = () => {
     setCurrentPasswordIndex(0);
     setScore(0);
+    setCoins(0);
     setLives(3);
     setMessage('');
     setGameOver(false);
@@ -198,6 +213,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
 
           <div style={{ color: 'rgba(255,255,255,0.72)', fontWeight: 700 }}>
             Score: <span className={styles.neonTag}>{score}</span> | 
+            Coins: <span className={styles.neonTag}>🪙 {coins}</span> | 
             Lives: <span className={styles.neonTag}>{'❤️'.repeat(lives)}</span>
           </div>
         </div>
@@ -233,6 +249,9 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
                 <h3>❌ Game Over</h3>
                 <p>Final Score: {score}</p>
                 <p>Passwords Detected: {currentPasswordIndex} / {PASSWORD_SAMPLES.length}</p>
+                <p style={{marginTop: 12, color: '#87CEEB', fontWeight: 600}}>
+                  To return to the forest, make the <b>"I Love You"</b> hand gesture 🤟
+                </p>
                 <div className={styles.row}>
                   <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={restart}>
                     Try Again
