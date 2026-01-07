@@ -696,6 +696,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       if (scene === 'strength') return 'key';
       if (scene === 'privacy') return 'privacy';
       if (scene === 'shop') return 'shop';
+      if (scene === 'clothing') return 'shop';
       if (scene === 'lobby' || scene === 'entry' || scene === 'tryAgain') return 'hub';
       return 'hub';
     };
@@ -728,6 +729,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       if (scene === 'password') return 'key';
       if (scene === 'strength') return 'key';
       if (scene === 'privacy') return 'privacy';
+      if (scene === 'clothing') return 'shop';
       if (scene === 'lobby' || scene === 'entry' || scene === 'tryAgain') return 'hub';
       return 'shop';
     };

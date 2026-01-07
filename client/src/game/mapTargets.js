@@ -76,6 +76,7 @@ export const MAP_NODES = Object.freeze({
   [SCENES.privacy]: CANDY_PATH_POINTS[32],
   [SCENES.shop]: CANDY_PATH_POINTS[48],
   [SCENES.strength]: CANDY_PATH_POINTS[64],
+  [SCENES.clothing]: CANDY_PATH_POINTS[80],
 });
 
 // Legacy exports kept for compatibility with earlier cyber-map code.

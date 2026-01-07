@@ -7,6 +7,7 @@ export const SCENES = Object.freeze({
   privacy: 'privacy',
   shop: 'shop',
   strength: 'strength',
+  clothing: 'clothing',
   tryAgain: 'tryAgain',
 });
 

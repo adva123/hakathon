@@ -10,6 +10,7 @@ import PasswordShield from './scenes/PasswordRoom.jsx';
 import PrivacyScanner from './scenes/PrivacyRoom.jsx';
 import UpgradePod from './scenes/ShopRoom.jsx';
 import StrengthRoom from './scenes/StrengthRoom.jsx';
+import ClothingRoom from './scenes/ClothingRoom.jsx';
 
 import TryAgain from './scenes/TryAgain.jsx';
 
@@ -50,6 +51,8 @@ export default function MainGameContainer({ gestureRef } = {}) {
         return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.strength:
         return <StrengthRoom addScore={addScore} gestureRef={gestureRef} />;
+      case SCENES.clothing:
+        return <ClothingRoom addScore={addScore} />;
       case SCENES.tryAgain:
         return <TryAgain />;
       default:

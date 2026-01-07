@@ -77,7 +77,7 @@ export default function SideNavigation({
   showCalibration,
   activeGesture,
 }) {
-  const { playerName, score, energy, audioMuted, setAudioMuted, switchRoomWithRobot } = useContext(GameContext);
+  const { playerName, score, coins, energy, audioMuted, setAudioMuted, switchRoomWithRobot } = useContext(GameContext);
 
   const items = [
     { key: 'openPalm', name: 'Open Palm', action: 'Start Robot', icon: <IconPalm /> },
@@ -100,7 +100,10 @@ export default function SideNavigation({
               <div className={styles.title} style={{ marginBottom: 10 }}>Energy</div>
               <EnergyBar energy={energy} />
             </div>
-            <div className={styles.kpi}>Score: {score}</div>
+            <div>
+              <div className={styles.kpi}>Score: {score}</div>
+              <div className={styles.kpi} style={{ marginTop: 8 }}>Coins: 🪙 {coins}</div>
+            </div>
           </div>
           <div className={styles.kpis}>
             <button
@@ -144,6 +147,13 @@ export default function SideNavigation({
               onClick={() => switchRoomWithRobot(SCENES.strength, MAP_NODES[SCENES.strength])}
             >
               👍 Password Meter
+            </button>
+            <button
+              type="button"
+              className={`${styles.kpi} ${styles.mapPin}`}
+              onClick={() => switchRoomWithRobot(SCENES.clothing, MAP_NODES[SCENES.clothing])}
+            >
+              👗 Clothing
             </button>
           </div>
           <div className={styles.small}>Robot auto-navigates on the map.</div>

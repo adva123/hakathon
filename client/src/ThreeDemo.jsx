@@ -2666,6 +2666,7 @@ export default function ThreeDemo({
   const floorY = MAP_Y;
   const isLobby = sceneId === SCENES.lobby;
   const isCave = sceneId === SCENES.strength;
+  const isShop = sceneId === SCENES.clothing;
   const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
 
   const [laptopCanvas] = useState(null);
@@ -2700,11 +2701,11 @@ export default function ThreeDemo({
     const prevScene = prevSceneRef.current;
     if (prevScene === sceneId) return;
 
-    if (robot && sceneId === SCENES.strength) {
+    if (robot && (sceneId === SCENES.strength || sceneId === SCENES.clothing)) {
       robot.userData._savedForestPathT = robot.userData.pathT;
     }
 
-    if (robot && prevScene === SCENES.strength && sceneId === SCENES.lobby) {
+    if (robot && (prevScene === SCENES.strength || prevScene === SCENES.clothing) && sceneId === SCENES.lobby) {
       const tSaved = robot.userData._savedForestPathT;
       if (typeof tSaved === 'number' && curveData?.curve) {
         const p = curveData.curve.getPointAt(((tSaved % 1) + 1) % 1);
@@ -2769,11 +2770,73 @@ export default function ThreeDemo({
     );
   }
 
+  function ClothingShopWorld() {
+    return (
+      <group>
+        <fog attach="fog" args={['#1a0033', 8, 28]} />
+
+        <ambientLight intensity={0.5} color={'#d4c0ff'} />
+        <pointLight position={[0, floorY + 4, 0]} intensity={35} distance={20} color={'#ff00ff'} />
+        <pointLight position={[3, floorY + 2.5, -3]} intensity={22} distance={18} color={'#00ffff'} />
+        <pointLight position={[-3, floorY + 2.5, 3]} intensity={22} distance={18} color={'#ffb347'} />
+
+        {/* Shop interior shell */}
+        <mesh position={[0, floorY + 3, 0]}>
+          <sphereGeometry args={[20, 48, 32]} />
+          <meshStandardMaterial color={'#2d1b4e'} roughness={0.8} metalness={0.1} side={THREE.BackSide} />
+        </mesh>
+
+        {/* Floor with pattern */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
+          <circleGeometry args={[12, 64]} />
+          <meshStandardMaterial color={'#1a0033'} roughness={0.9} metalness={0.05} />
+        </mesh>
+
+        {/* Decorative shop display stands */}
+        {[0, 120, 240].map((angle, i) => {
+          const rad = (angle * Math.PI) / 180;
+          const x = Math.cos(rad) * 5;
+          const z = Math.sin(rad) * 5;
+          return (
+            <group key={i} position={[x, floorY, z]}>
+              {/* Stand base */}
+              <mesh position={[0, 0.6, 0]}>
+                <cylinderGeometry args={[0.4, 0.5, 1.2, 16]} />
+                <meshStandardMaterial color={'#8a2be2'} emissive={'#8a2be2'} emissiveIntensity={0.3} roughness={0.3} metalness={0.6} />
+              </mesh>
+              {/* Display top */}
+              <mesh position={[0, 1.3, 0]}>
+                <boxGeometry args={[0.8, 0.1, 0.8]} />
+                <meshStandardMaterial color={'#ff00ff'} emissive={'#ff00ff'} emissiveIntensity={0.4} roughness={0.2} metalness={0.7} />
+              </mesh>
+              {/* Floating item icon */}
+              <mesh position={[0, 2, 0]} rotation={[0, Date.now() * 0.0001 + i, 0]}>
+                <torusGeometry args={[0.3, 0.08, 12, 24]} />
+                <meshStandardMaterial color={'#00ffff'} emissive={'#00ffff'} emissiveIntensity={0.6} roughness={0.1} metalness={0.8} />
+              </mesh>
+            </group>
+          );
+        })}
+
+        {/* Entrance portal ring */}
+        <mesh rotation={[0, 0, 0]} position={[0, floorY + 1.8, -5]}>
+          <torusGeometry args={[2.2, 0.15, 16, 64]} />
+          <meshStandardMaterial color={'#ff00ff'} emissive={'#ff00ff'} emissiveIntensity={0.8} roughness={0.2} metalness={0.3} />
+        </mesh>
+        <mesh rotation={[0, 0, 0]} position={[0, floorY + 1.8, -5]}>
+          <torusGeometry args={[2.6, 0.06, 10, 64]} />
+          <meshStandardMaterial color={'#00ffff'} emissive={'#00ffff'} emissiveIntensity={0.5} roughness={0.2} metalness={0.3} />
+        </mesh>
+      </group>
+    );
+  }
+
   const roomPortals = useMemo(() => {
     const defs = [
       { scene: SCENES.privacy, label: 'Privacy', accent: '#a78bff' },
       { scene: SCENES.shop, label: 'Shop', accent: '#ff6ec7' },
       { scene: SCENES.strength, label: 'Password Meter', accent: '#4cffd7' },
+      { scene: SCENES.clothing, label: 'Clothing', accent: '#ffb347' },
     ];
 
     const base = defs
@@ -2867,6 +2930,11 @@ export default function ThreeDemo({
             <StrengthCaveWorld />
             <CaveCameraRig />
           </>
+        ) : isShop ? (
+          <>
+            <ClothingShopWorld />
+            <CaveCameraRig />
+          </>
         ) : (
           <>
             <SunRig />
@@ -2942,7 +3010,7 @@ export default function ThreeDemo({
           idlePatrolEnabled={false}
           equippedItem={shopState?.equippedItem || undefined}
           laptopCanvas={laptopCanvas}
-          mode={isCave ? 'cave' : 'forest'}
+          mode={isCave || isShop ? 'cave' : 'forest'}
         />
 
         {!isCave ? (

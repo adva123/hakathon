@@ -118,6 +118,7 @@ export function GameProvider({ children }) {
     persisted && typeof persisted.playerName === 'string' ? persisted.playerName : ''
   );
   const [score, setScore] = useState(0);
+  const [coins, setCoins] = useState(0);
   const [energy, setEnergy] = useState(100);
   const [badges, setBadges] = useState(() => {
     if (persisted?.badges && typeof persisted.badges === 'object') {
@@ -216,7 +217,8 @@ export function GameProvider({ children }) {
         (currentScene === SCENES.password ||
           currentScene === SCENES.privacy ||
           currentScene === SCENES.shop ||
-          currentScene === SCENES.strength)
+          currentScene === SCENES.strength ||
+          currentScene === SCENES.clothing)
       ) {
         prepareLobbyReturn(currentScene);
       }
@@ -237,7 +239,8 @@ export function GameProvider({ children }) {
       currentScene === SCENES.password ||
       currentScene === SCENES.privacy ||
       currentScene === SCENES.shop ||
-      currentScene === SCENES.strength
+      currentScene === SCENES.strength ||
+      currentScene === SCENES.clothing
     ) {
       prepareLobbyReturn(currentScene);
     }
@@ -258,10 +261,14 @@ export function GameProvider({ children }) {
       setRobotAutoWalkTarget(null);
       return;
     }
-    // Strength is a real 3D cave scene (not a forest overlay).
-    if (pendingScene === SCENES.strength) {
+    // Strength and Clothing are real scenes (not forest overlays).
+    if (pendingScene === SCENES.strength || pendingScene === SCENES.clothing) {
       setActiveOverlayRoom(null);
-      setCurrentScene(SCENES.strength);
+      setCurrentScene(pendingScene);
+      // Convert score to coins when entering clothing store (1 score = 5 coins)
+      if (pendingScene === SCENES.clothing) {
+        setCoins((c) => c + score * 5);
+      }
     } else {
       setActiveOverlayRoom(pendingScene);
     }
@@ -285,22 +292,38 @@ export function GameProvider({ children }) {
     });
   }, []);
 
+  const addEnergy = useCallback((amount) => {
+    setEnergy((e) => Math.min(100, e + amount));
+  }, []);
+
   const awardBadge = useCallback((badgeId) => {
     setBadges((b) => ({ ...b, [badgeId]: true }));
   }, []);
 
   const buyItem = useCallback(
-    ({ itemId, price }) => {
+    ({ itemId, price, useCoins = false }) => {
       if (!itemId || typeof price !== 'number') return { ok: false, reason: 'invalid' };
       let allowed = false;
-      setScore((s) => {
-        if (s >= price) {
-          allowed = true;
-          return s - price;
-        }
-        allowed = false;
-        return s;
-      });
+      
+      if (useCoins) {
+        setCoins((c) => {
+          if (c >= price) {
+            allowed = true;
+            return c - price;
+          }
+          allowed = false;
+          return c;
+        });
+      } else {
+        setScore((s) => {
+          if (s >= price) {
+            allowed = true;
+            return s - price;
+          }
+          allowed = false;
+          return s;
+        });
+      }
 
       if (!allowed) return { ok: false, reason: 'insufficient' };
 
@@ -343,6 +366,7 @@ export function GameProvider({ children }) {
       switchRoomWithRobot,
       onRobotArrived,
       addScore,
+      addEnergy,
       registerMistake,
       awardBadge,
       setAudioMuted,
@@ -372,6 +396,7 @@ export function GameProvider({ children }) {
       switchRoomWithRobot,
       onRobotArrived,
       addScore,
+      addEnergy,
       registerMistake,
       awardBadge,
       buyItem,
