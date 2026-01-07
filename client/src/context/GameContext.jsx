@@ -184,7 +184,13 @@ export function GameProvider({ children }) {
   const selectRobot = useCallback((robotId) => {
     setShopState((prev) => {
       if (!prev.ownedRobots.includes(robotId)) return prev;
-      return { ...prev, selectedRobotId: robotId };
+      const newState = { ...prev, selectedRobotId: robotId };
+      // Persist robot selection in localStorage (id only)
+      try {
+        window.localStorage.setItem('selected_robot_skin', robotId);
+        window.localStorage.setItem('robot_shop_save', JSON.stringify(newState)); // for backward compatibility
+      } catch {}
+      return newState;
     });
   }, []);
 

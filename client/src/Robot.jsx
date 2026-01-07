@@ -21,14 +21,16 @@ const ROBOT_MODELS = {
 
 const Robot = forwardRef((props, ref) => {
   const { faceTextureUrl, showFaceScreen = false, ...rest } = props;
+  // 1. סנכרון עם ה-Global State (Context)
   const { shopState } = useContext(GameContext);
+  // 2. חישוב הסקין הפעיל
   const selectedId = shopState?.selectedRobotId || ROBOT_CATALOG[0].id;
-  const skin = ROBOT_CATALOG.find(r => r.id === selectedId) || ROBOT_CATALOG[0];
+  const skin = useMemo(() => ROBOT_CATALOG.find(r => r.id === selectedId) || ROBOT_CATALOG[0], [selectedId]);
   const glbPath = '/models/RobotExpressive.glb';
   const gltf = useGLTF(glbPath);
   const { scene, animations } = gltf;
 
-  // Apply skin properties to robot material
+  // 3. עדכון חומרים (Materials) דינמי בזמן אמת
   useEffect(() => {
     scene.traverse((obj) => {
       if (obj.isMesh && obj.material) {
