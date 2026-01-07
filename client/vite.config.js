@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    strictPort: false,
+    strictPort: true,
     proxy: {
       '/ducks': 'http://localhost:5000',
       '/images': 'http://localhost:5000',

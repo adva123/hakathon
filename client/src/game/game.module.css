@@ -104,6 +104,40 @@
   pointer-events: none;
 }
 
+.tunnelOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0.00) 32%),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(135, 206, 235, 0.00) 0 12px,
+      rgba(135, 206, 235, 0.14) 12px 14px,
+      rgba(255, 183, 213, 0.00) 14px 26px,
+      rgba(255, 183, 213, 0.12) 26px 28px
+    );
+  mix-blend-mode: screen;
+  filter: blur(0.4px);
+  animation: tunnelZoom 650ms ease-out forwards;
+}
+
+@keyframes tunnelZoom {
+  0% {
+    opacity: 0.0;
+    transform: scale(0.85);
+  }
+  18% {
+    opacity: 1.0;
+    transform: scale(1.0);
+  }
+  100% {
+    opacity: 0.0;
+    transform: scale(1.45);
+  }
+}
+
 .card {
   pointer-events: auto;
   max-width: 680px;

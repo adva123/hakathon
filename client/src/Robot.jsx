@@ -14,7 +14,7 @@ const Robot = forwardRef((props, ref) => {
   const gltf = useGLTF("/models/RobotExpressive.glb");
   const { scene, animations } = gltf;
 
-  const { faceTextureUrl, ...rest } = props;
+  const { faceTextureUrl, showFaceScreen = false, ...rest } = props;
 
   const groupRef = useRef(null);
   useImperativeHandle(ref, () => groupRef.current);
@@ -159,14 +159,14 @@ const Robot = forwardRef((props, ref) => {
       return s - Math.floor(s);
     };
 
-    const sphereCount = 40;
-    const torusCount = 0;
+    const sphereCount = 34;
+    const torusCount = 26;
     const sphere = [];
     const torus = [];
 
-    // Head overlay sphere radius is ~0.26; place curls on crown.
-    const baseR = 0.245;
-    const centerY = 0.16;
+    // Head overlay sphere radius is ~0.26; place curls slightly outside so they read clearly.
+    const baseR = 0.325;
+    const centerY = 0.19;
 
     for (let i = 0; i < sphereCount; i += 1) {
       const u = rand01(i * 19.7 + 2.3);
@@ -181,9 +181,9 @@ const Robot = forwardRef((props, ref) => {
 
       sphere.push({
         x,
-        y: Math.min(0.30, y),
-        z: THREE.MathUtils.clamp(z, -0.18, 0.12),
-        s: 0.020 + 0.018 * rand01(i * 41.7 + 4.2),
+        y: Math.min(0.36, y),
+        z: THREE.MathUtils.clamp(z, -0.22, 0.24),
+        s: 0.060 + 0.034 * rand01(i * 41.7 + 4.2),
         ry: (rand01(i * 5.7 + 8.8) - 0.5) * 1.0,
       });
     }
@@ -192,17 +192,19 @@ const Robot = forwardRef((props, ref) => {
       const u = rand01(i * 17.3 + 6.1);
       const v = rand01(i * 29.9 + 2.7);
       const theta = u * Math.PI * 2;
-      const ringR = baseR * (0.80 + 0.18 * rand01(i * 10.1));
+      // Rings: a bit tighter than spheres so they read as curls.
+      const ringR = baseR * (0.72 + 0.18 * rand01(i * 10.1));
       const x = Math.cos(theta) * ringR;
-      const z = Math.sin(theta) * ringR * 0.82;
-      const y = 0.20 + 0.08 * v;
+      const z = Math.sin(theta) * ringR * 0.78;
+      // Slightly lower than crown so some curls hang on the sides.
+      const y = 0.14 + 0.12 * v;
       torus.push({
         x,
         y: Math.min(0.32, y),
-        z: THREE.MathUtils.clamp(z, -0.18, 0.10),
-        s: 0.55 + 0.55 * rand01(i * 7.7 + 1.2),
-        rx: (rand01(i * 13.3 + 0.8) - 0.5) * 1.1,
-        rz: (rand01(i * 9.1 + 4.4) - 0.5) * 1.1,
+        z: THREE.MathUtils.clamp(z, -0.22, 0.22),
+        s: 1.05 + 0.65 * rand01(i * 7.7 + 1.2),
+        rx: (rand01(i * 13.3 + 0.8) - 0.5) * 1.3,
+        rz: (rand01(i * 9.1 + 4.4) - 0.5) * 1.3,
       });
     }
 
@@ -632,8 +634,8 @@ const Robot = forwardRef((props, ref) => {
           <meshPhysicalMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
         </mesh>
 
-        {/* Curly hair (volumetric curls via for-loop/instancing) */}
-        <group position={[0, 0.12, 0.00]}>
+        {/* Curly hair (volumetric curls via instancing) */}
+        <group position={[0, 0.20, 0.06]}>
           <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
             <sphereGeometry args={[1, 12, 10]} />
             <meshPhysicalMaterial color={'#d6b15c'} roughness={0.92} metalness={0} clearcoat={1.0} clearcoatRoughness={0.12} />
@@ -647,45 +649,61 @@ const Robot = forwardRef((props, ref) => {
         </group>
 
         {/* Eyes: layered (sclera + iris + pupil + catch-light) */}
-        <group ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.22]}>
+        <group ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.245]}>
           {/* Sclera */}
           <mesh>
-            <sphereGeometry args={[0.040, 16, 14]} />
+            <sphereGeometry args={[0.048, 16, 14]} />
             <meshPhysicalMaterial color={'#f8fbff'} roughness={0.22} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.04} />
           </mesh>
           {/* Iris + pupil (moves for gaze) */}
-          <group ref={leftPupilRef} position={[0, 0, 0.035]} renderOrder={21}>
+          <group ref={leftPupilRef} position={[0, 0, 0.040]} renderOrder={21}>
             <mesh position={[0, 0, 0.002]}>
-              <circleGeometry args={[0.018, 20]} />
-              <meshPhysicalMaterial color={'#2b5ea8'} roughness={0.35} metalness={0.02} clearcoat={1.0} clearcoatRoughness={0.06} />
+              <circleGeometry args={[0.022, 20]} />
+              <meshPhysicalMaterial
+                color={'#2b5ea8'}
+                emissive={'#2b5ea8'}
+                emissiveIntensity={0.25}
+                roughness={0.35}
+                metalness={0.02}
+                clearcoat={1.0}
+                clearcoatRoughness={0.06}
+              />
             </mesh>
             <mesh position={[0, 0, 0.004]}>
-              <circleGeometry args={[0.0088, 18]} />
+              <circleGeometry args={[0.0105, 18]} />
               <meshPhysicalMaterial color={'#0b0f18'} roughness={0.5} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
             </mesh>
             <mesh position={[-0.006, 0.006, 0.008]}>
-              <sphereGeometry args={[0.0042, 10, 8]} />
+              <sphereGeometry args={[0.0055, 10, 8]} />
               <meshPhysicalMaterial color={'#ffffff'} roughness={0.12} metalness={0} clearcoat={1.0} clearcoatRoughness={0.04} />
             </mesh>
           </group>
         </group>
 
-        <group ref={rightEyeGlowRef} position={[0.12, 0.10, 0.22]}>
+        <group ref={rightEyeGlowRef} position={[0.12, 0.10, 0.245]}>
           <mesh>
-            <sphereGeometry args={[0.040, 16, 14]} />
+            <sphereGeometry args={[0.048, 16, 14]} />
             <meshPhysicalMaterial color={'#f8fbff'} roughness={0.22} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.04} />
           </mesh>
-          <group ref={rightPupilRef} position={[0, 0, 0.035]} renderOrder={21}>
+          <group ref={rightPupilRef} position={[0, 0, 0.040]} renderOrder={21}>
             <mesh position={[0, 0, 0.002]}>
-              <circleGeometry args={[0.018, 20]} />
-              <meshPhysicalMaterial color={'#2b5ea8'} roughness={0.35} metalness={0.02} clearcoat={1.0} clearcoatRoughness={0.06} />
+              <circleGeometry args={[0.022, 20]} />
+              <meshPhysicalMaterial
+                color={'#2b5ea8'}
+                emissive={'#2b5ea8'}
+                emissiveIntensity={0.25}
+                roughness={0.35}
+                metalness={0.02}
+                clearcoat={1.0}
+                clearcoatRoughness={0.06}
+              />
             </mesh>
             <mesh position={[0, 0, 0.004]}>
-              <circleGeometry args={[0.0088, 18]} />
+              <circleGeometry args={[0.0105, 18]} />
               <meshPhysicalMaterial color={'#0b0f18'} roughness={0.5} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
             </mesh>
             <mesh position={[0.006, 0.006, 0.008]}>
-              <sphereGeometry args={[0.0042, 10, 8]} />
+              <sphereGeometry args={[0.0055, 10, 8]} />
               <meshPhysicalMaterial color={'#ffffff'} roughness={0.12} metalness={0} clearcoat={1.0} clearcoatRoughness={0.04} />
             </mesh>
           </group>
@@ -701,11 +719,13 @@ const Robot = forwardRef((props, ref) => {
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
         </mesh>
 
-        {/* Face screen (no point lights / no additive plane to prevent weird blue shimmer) */}
-        <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
-          <planeGeometry args={[0.52, 0.4]} />
-          <primitive object={faceMaterial} attach="material" />
-        </mesh>
+        {/* Face screen (optional). Disabled by default to avoid a visible blue rectangle behind the eyes. */}
+        {showFaceScreen && faceTextureUrl ? (
+          <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
+            <planeGeometry args={[0.52, 0.4]} />
+            <primitive object={faceMaterial} attach="material" />
+          </mesh>
+        ) : null}
       </group>
 
     </group>

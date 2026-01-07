@@ -560,14 +560,15 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
       const isPrivacy = scene === 'privacy';
       const isPassword = scene === 'password';
       const isShop = scene === 'shop';
+      const isStrength = scene === 'strength';
 
       // Each room gets a distinct "discovery path" shape + width.
-      const spurWidth = isShop ? 3.35 : (isPassword ? 1.55 : 2.35);
+      const spurWidth = isShop ? 3.35 : ((isPassword || isStrength) ? 1.75 : 2.35);
 
       // Start slightly off the main ribbon edge.
       const p0 = p.clone()
-        .addScaledVector(left, (isPassword ? 1.25 : 1.65) * side)
-        .addScaledVector(tan, isPassword ? -0.85 : 0);
+        .addScaledVector(left, ((isPassword || isStrength) ? 1.25 : 1.65) * side)
+        .addScaledVector(tan, (isPassword || isStrength) ? -0.85 : 0);
 
       // Control points:
       // - Privacy: soft S curve that feels like "hidden" and only reveals at the end.
@@ -614,8 +615,8 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
         if (tTan.lengthSq() < 1e-9) tTan.set(0, 0, 1);
         tTan.normalize();
         const n = new THREE.Vector3(0, 1, 0).cross(tTan).normalize();
-        const baseR = (isShop ? 1.7 : (isPassword ? 1.85 : 1.6)) * (0.95 + 0.15 * prand(idx * 77 + hi * 19));
-        const hScale = (isPassword ? 1.55 : (isPrivacy ? 1.75 : 1.65));
+        const baseR = (isShop ? 1.7 : ((isPassword || isStrength) ? 1.85 : 1.6)) * (0.95 + 0.15 * prand(idx * 77 + hi * 19));
+        const hScale = ((isPassword || isStrength) ? 1.55 : (isPrivacy ? 1.75 : 1.65));
         const offset = (spurWidth * 0.70 + baseR * 0.55);
 
         // Two hills flanking the spur; bias one side slightly bigger to form a visual "curtain".
@@ -651,7 +652,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
       // Breadcrumb candies (more for privacy S-curve, subtle for passwords).
       const crumbs = [];
-      const crumbCount = isPrivacy ? 10 : (isPassword ? 6 : 7);
+      const crumbCount = isPrivacy ? 10 : ((isPassword || isStrength) ? 6 : 7);
       for (let i = 1; i <= crumbCount; i += 1) {
         const tt = 0.10 + (i / (crumbCount + 1)) * 0.82;
         const cp = spurCurve.getPointAt(tt);
@@ -659,7 +660,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
           x: cp.x,
           y: floorY + forestTerrainHeight(cp.x, cp.z) + pathSurfaceLift + 0.06,
           z: cp.z,
-          s: (isPassword ? 0.12 : 0.14) * (0.9 + 0.25 * prand(idx * 100 + i * 17)),
+          s: ((isPassword || isStrength) ? 0.12 : 0.14) * (0.9 + 0.25 * prand(idx * 100 + i * 17)),
           a: r.accent || '#7afcff',
         });
       }
@@ -692,6 +693,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
   const signTextures = useMemo(() => {
     const typeForScene = (scene) => {
       if (scene === 'password') return 'key';
+      if (scene === 'strength') return 'key';
       if (scene === 'privacy') return 'privacy';
       if (scene === 'shop') return 'shop';
       if (scene === 'lobby' || scene === 'entry' || scene === 'tryAgain') return 'hub';
@@ -724,6 +726,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
 
     const resolveType = (scene) => {
       if (scene === 'password') return 'key';
+      if (scene === 'strength') return 'key';
       if (scene === 'privacy') return 'privacy';
       if (scene === 'lobby' || scene === 'entry' || scene === 'tryAgain') return 'hub';
       return 'shop';

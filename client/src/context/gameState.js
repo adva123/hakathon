@@ -6,6 +6,7 @@ export const SCENES = Object.freeze({
   password: 'password',
   privacy: 'privacy',
   shop: 'shop',
+  strength: 'strength',
   tryAgain: 'tryAgain',
 });
 

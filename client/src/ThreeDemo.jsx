@@ -562,7 +562,6 @@ function RobotController({
   autoWalkTarget,
   onAutoWalkArrived,
   idlePatrolEnabled,
-  faceTextureUrl,
   equippedItem,
   laptopCanvas,
   mode,
@@ -580,6 +579,28 @@ function RobotController({
 
     const robot = robotRef.current;
     robot.userData = robot.userData || {};
+
+    // Cave mode: keep the robot inside the cave (no path walking), subtle breathing only.
+    if (mode === 'cave') {
+      const time = clock.getElapsedTime();
+      robot.userData.setAction?.('Idle');
+      robot.position.set(0, floorY + 0.02, 0);
+
+      if (camera) {
+        const toCamX = camera.position.x - robot.position.x;
+        const toCamZ = camera.position.z - robot.position.z;
+        robot.rotation.y = Math.atan2(toCamX, toCamZ);
+        robot.rotation.z = 0;
+      }
+
+      const targetSX = 1.0 + 0.01 * Math.sin(time * 1.1);
+      const targetSY = 1.0 - 0.008 * Math.sin(time * 1.1);
+      const lerp = 1 - Math.exp(-delta * 10);
+      robot.scale.x = robot.scale.x + (targetSX - robot.scale.x) * lerp;
+      robot.scale.y = robot.scale.y + (targetSY - robot.scale.y) * lerp;
+      robot.scale.z = robot.scale.z + (targetSX - robot.scale.z) * lerp;
+      return;
+    }
 
     // Cyberpunk (now sunset skyline) mode: robot is user-controlled only; no auto-walk.
     if (mode === 'cyberpunk') {
@@ -682,6 +703,21 @@ function RobotController({
     const length = curveData.length || 1;
     const baseSpeed = 2.2; // relaxed walking pace
 
+    // Waze-style auto navigation (used by Destinations + portals).
+    // If an auto-walk target is provided, the robot should move even when hand-control is disabled.
+    const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
+    if (navActive) {
+      robot.userData.nav = robot.userData.nav || { targetKey: '', targetT: 0, arrived: false };
+      const key = `${Number(autoWalkTarget[0]).toFixed(3)}|${Number(autoWalkTarget[1]).toFixed(3)}|${Number(autoWalkTarget[2]).toFixed(3)}`;
+      if (robot.userData.nav.targetKey !== key) {
+        robot.userData.nav.targetKey = key;
+        robot.userData.nav.arrived = false;
+        const targetVec = scratch3.current;
+        targetVec.set(Number(autoWalkTarget[0]), Number(autoWalkTarget[1]), Number(autoWalkTarget[2]));
+        robot.userData.nav.targetT = closestTOnSamples(targetVec, curveData.sampleTs, curveData.samplePts);
+      }
+    }
+
     // Hand-controlled movement (requested): robot starts stopped and moves only after an "activate" hand gesture.
     // Commands (gestures):
     // - openPalm: activate/start robot
@@ -733,23 +769,59 @@ function RobotController({
     // Keep keyboard reads referenced (avoid dead code) but do not use them in forest mode.
     void keys;
     void controlsEnabled;
-    void autoWalkTarget;
-    void onAutoWalkArrived;
     void idlePatrolEnabled;
 
     const enabled = Boolean(robot.userData.handControl.enabled);
     const speedMult = robot.userData.handControl.speedMult || 1;
 
+    const moving = navActive ? !robot.userData.nav?.arrived : enabled;
+
     // Smooth transition between Idle/Walking so the start/stop isn't snappy.
     robot.userData._walkBlend = Number.isFinite(robot.userData._walkBlend) ? robot.userData._walkBlend : 0;
     const walkBlendA = 1 - Math.exp(-(delta || 0.016) * 10);
-    robot.userData._walkBlend = THREE.MathUtils.lerp(robot.userData._walkBlend, enabled ? 1 : 0, walkBlendA);
+    robot.userData._walkBlend = THREE.MathUtils.lerp(robot.userData._walkBlend, moving ? 1 : 0, walkBlendA);
     const walkBlend = robot.userData._walkBlend;
 
-    const direction = enabled && gesture === 'iLoveYou' ? -1 : 1;
-    const dt = enabled ? direction * speedMult * (baseSpeed / length) * delta : 0;
+    if (navActive) {
+      // Move along the loop toward the target T (shortest direction around the ring).
+      const targetT = Number(robot.userData.nav?.targetT ?? 0);
+      const tNow = Number(robot.userData.pathT ?? 0);
+      const forwardDist = ((targetT - tNow) % 1 + 1) % 1;
+      const backwardDist = ((tNow - targetT) % 1 + 1) % 1;
+      const navDir = forwardDist <= backwardDist ? 1 : -1;
 
-    if (enabled) {
+      // Slow down gently near arrival, but cruise fast while far away.
+      // NOTE: curve length is large, so we use a higher "navigation" speed than normal walking.
+      const distT = Math.min(forwardDist, backwardDist);
+      const near01 = 1 - THREE.MathUtils.smoothstep(distT, 0, 0.085); // 1 near target, 0 far
+      const navSpeedMax = 16.0;
+      const navSpeedMin = 6.5;
+      const navSpeedUnits = THREE.MathUtils.lerp(navSpeedMax, navSpeedMin, near01);
+      const dt = navDir * (navSpeedUnits / length) * delta;
+
+      if (!robot.userData.nav?.arrived) {
+        robot.userData.setAction?.('Walking');
+        robot.userData.pathT = tNow + dt;
+        robot.userData.pathT = ((robot.userData.pathT % 1) + 1) % 1;
+      }
+
+      // Arrival check: close on path + close in world space.
+      const tAfter = Number(robot.userData.pathT ?? 0);
+      const forwardAfter = ((targetT - tAfter) % 1 + 1) % 1;
+      const backwardAfter = ((tAfter - targetT) % 1 + 1) % 1;
+      const distAfter = Math.min(forwardAfter, backwardAfter);
+      const pNow = curveData.curve.getPointAt(tAfter);
+      const targetP = curveData.curve.getPointAt(targetT);
+      const arrived = distAfter < 0.01 && pNow.distanceTo(targetP) < 1.1;
+      if (arrived && !robot.userData.nav?.arrived) {
+        robot.userData.nav.arrived = true;
+        hasPrev.current = false;
+        robot.userData.setAction?.('Idle');
+        if (typeof onAutoWalkArrived === 'function') onAutoWalkArrived();
+      }
+    } else if (enabled) {
+      const direction = gesture === 'iLoveYou' ? -1 : 1;
+      const dt = direction * speedMult * (baseSpeed / length) * delta;
       robot.userData.setAction?.('Walking');
       robot.userData.pathT = robot.userData.pathT + dt;
       // Wrap 0..1
@@ -838,7 +910,7 @@ function RobotController({
     }
 
     // Drive leg cadence from actual movement speed (and slightly from turning) to avoid foot sliding.
-    if (enabled && delta > 1e-6) {
+    if (moving && delta > 1e-6) {
       if (!hasPrev.current) {
         prevP.current.copy(p);
         prevYaw.current = yaw;
@@ -923,7 +995,6 @@ function RobotController({
       ref={robotRef}
       scale={1.05}
       position={[0, floorY, 0]}
-      faceTextureUrl={faceTextureUrl || undefined}
       laptopCanvas={laptopCanvas || undefined}
       equippedItem={equippedItem || undefined}
     />
@@ -945,7 +1016,6 @@ RobotController.propTypes = {
   autoWalkTarget: PropTypes.arrayOf(PropTypes.number),
   onAutoWalkArrived: PropTypes.func,
   idlePatrolEnabled: PropTypes.bool,
-  faceTextureUrl: PropTypes.string,
   equippedItem: PropTypes.string,
   laptopCanvas: PropTypes.any,
   mode: PropTypes.string,
@@ -2595,6 +2665,7 @@ export default function ThreeDemo({
   const dirLightTargetRef = useRef(null);
   const floorY = MAP_Y;
   const isLobby = sceneId === SCENES.lobby;
+  const isCave = sceneId === SCENES.strength;
   const navActive = Array.isArray(autoWalkTarget) && autoWalkTarget.length >= 3;
 
   const [laptopCanvas] = useState(null);
@@ -2622,11 +2693,87 @@ export default function ThreeDemo({
 
   const curveData = useMemo(() => buildCurveData(CANDY_PATH_POINTS), []);
 
+  // Preserve the forest path position when temporarily switching into the cave.
+  const prevSceneRef = useRef(sceneId);
+  useEffect(() => {
+    const robot = robotRef.current;
+    const prevScene = prevSceneRef.current;
+    if (prevScene === sceneId) return;
+
+    if (robot && sceneId === SCENES.strength) {
+      robot.userData._savedForestPathT = robot.userData.pathT;
+    }
+
+    if (robot && prevScene === SCENES.strength && sceneId === SCENES.lobby) {
+      const tSaved = robot.userData._savedForestPathT;
+      if (typeof tSaved === 'number' && curveData?.curve) {
+        const p = curveData.curve.getPointAt(((tSaved % 1) + 1) % 1);
+        const terrainY = floorY + forestTerrainHeight(p.x, p.z) + FOREST_PATH_SURFACE_LIFT;
+        robot.position.set(p.x, terrainY, p.z);
+        robot.userData.pathT = tSaved;
+        robot.rotation.z = 0;
+      }
+    }
+
+    prevSceneRef.current = sceneId;
+  }, [sceneId, curveData, floorY]);
+
+  function CaveCameraRig() {
+    const { camera } = useThree();
+    const tmp = useRef({
+      pos: new THREE.Vector3(),
+      look: new THREE.Vector3(),
+    });
+
+    useFrame((_, delta) => {
+      const targetPos = tmp.current.pos.set(0, floorY + 2.2, 6.2);
+      const targetLook = tmp.current.look.set(0, floorY + 1.35, 0);
+      const a = 1 - Math.exp(-(delta || 0.016) * 6);
+      camera.position.lerp(targetPos, a);
+      camera.lookAt(targetLook);
+    });
+    return null;
+  }
+
+  function StrengthCaveWorld() {
+    return (
+      <group>
+        <fog attach="fog" args={['#05060c', 6, 22]} />
+
+        <ambientLight intensity={0.35} color={'#b6c6ff'} />
+        <pointLight position={[0, floorY + 3.2, 2.0]} intensity={28} distance={18} color={'#00f2ff'} />
+        <pointLight position={[2.8, floorY + 2.0, -2.6]} intensity={18} distance={16} color={'#7000ff'} />
+
+        {/* Cave shell */}
+        <mesh position={[0, floorY + 2.4, 0]}>
+          <sphereGeometry args={[18, 48, 32]} />
+          <meshStandardMaterial color={'#0a0b1e'} roughness={1} metalness={0} side={THREE.BackSide} />
+        </mesh>
+
+        {/* Floor */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]} receiveShadow>
+          <circleGeometry args={[10, 48]} />
+          <meshStandardMaterial color={'#05060c'} roughness={1} metalness={0} />
+        </mesh>
+
+        {/* Tunnel ring (visual "entrance") */}
+        <mesh rotation={[0, 0, 0]} position={[0, floorY + 1.5, -4.2]}>
+          <torusGeometry args={[1.9, 0.12, 16, 64]} />
+          <meshStandardMaterial color={'#00f2ff'} emissive={'#00f2ff'} emissiveIntensity={0.7} roughness={0.2} metalness={0.2} />
+        </mesh>
+        <mesh rotation={[0, 0, 0]} position={[0, floorY + 1.5, -4.2]}>
+          <torusGeometry args={[2.3, 0.04, 10, 64]} />
+          <meshStandardMaterial color={'#7000ff'} emissive={'#7000ff'} emissiveIntensity={0.45} roughness={0.2} metalness={0.2} />
+        </mesh>
+      </group>
+    );
+  }
+
   const roomPortals = useMemo(() => {
     const defs = [
-      { scene: SCENES.password, label: 'Passwords', accent: '#7afcff' },
       { scene: SCENES.privacy, label: 'Privacy', accent: '#a78bff' },
       { scene: SCENES.shop, label: 'Shop', accent: '#ff6ec7' },
+      { scene: SCENES.strength, label: 'Password Meter', accent: '#4cffd7' },
     ];
 
     const base = defs
@@ -2677,101 +2824,111 @@ export default function ThreeDemo({
       tmp: new THREE.Vector3(),
     });
 
-    // Keep the sun visible in-frame and shining toward the robot/trees.
+    // Keep the sun + directional light roughly aligned with camera view.
     useFrame(({ camera }, delta) => {
       const g = sunGroupRef.current;
       const light = dirLightRef.current;
       const target = dirLightTargetRef.current;
-      const robot = robotRef.current;
-      if (!g || !light) return;
+      if (!g || !light || !camera) return;
 
       const { fwd, right, tmp } = sunFollow.current;
       camera.getWorldDirection(fwd);
       fwd.normalize();
-
-      // Right vector in camera space.
       right.crossVectors(fwd, camera.up).normalize();
 
-      // Place sun slightly top-right in view so rays streak toward scene center.
-      tmp.copy(camera.position)
-        .addScaledVector(fwd, 160)
-        .addScaledVector(camera.up, 95)
-        .addScaledVector(right, 105);
+      // Position the sun in front-right of the camera, high up.
+      const robot = robotRef.current;
+      const base = robot ? robot.position : tmp.set(0, floorY, 0);
+      g.position.copy(base)
+        .addScaledVector(fwd, 55)
+        .addScaledVector(right, 26);
+      g.position.y = floorY + 56;
 
-      const a = 1 - Math.exp(-delta * 2.8);
-      g.position.lerp(tmp, a);
+      if (target && robot) target.position.copy(robot.position);
+      if (target) light.target = target;
 
-      // Match main shadow light direction to the sun.
-      light.position.copy(g.position);
-
-      if (target) {
-        if (robot) target.position.copy(robot.position);
-        else target.position.set(0, 0, 0);
-        light.target = target;
-      }
+      // Gentle smoothing so it doesn't jitter.
+      light.position.lerp(g.position, 1 - Math.exp(-(delta || 0.016) * 2.5));
     });
 
     return null;
   }
 
   return (
-    <div style={{ height: '100vh', width: '100%', position: 'relative' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <Canvas
-        camera={{ position: [10, 10, 10], fov: 50, near: 0.05, far: 420 }}
         shadows
+        dpr={[1, 2]}
+        camera={{ position: [0, 3.2, 9], fov: 50, near: 0.1, far: 200 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
-        <SunRig />
-        <SceneAtmosphere mode={'forest'} />
-        <ForestEnvironmentFx robotRef={robotRef} enabled />
+        {isCave ? (
+          <>
+            <StrengthCaveWorld />
+            <CaveCameraRig />
+          </>
+        ) : (
+          <>
+            <SunRig />
+            <SceneAtmosphere mode={'forest'} />
+            <ForestEnvironmentFx robotRef={robotRef} enabled />
 
-        {/* Forest lighting */}
-        <ambientLight intensity={1.25} color={'#f3fff6'} />
-        <hemisphereLight intensity={1.05} skyColor={'#effff7'} groundColor={'#2a6b2f'} />
-        <directionalLight
-          ref={dirLightRef}
-          position={[-14, 18, 8]}
-          intensity={1.85}
-          color={'#fff3b0'}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-        />
-        <object3D ref={dirLightTargetRef} position={[0, 0, 0]} />
-
-        {/* Sun (visual) */}
-        <group ref={sunGroupRef} position={[42, 56, -36]}>
-          <mesh ref={sunRef}>
-            <sphereGeometry args={[2.6, 24, 16]} />
-            <meshBasicMaterial color={'#ffe36a'} toneMapped={false} />
-          </mesh>
-          {/* soft glow */}
-          <mesh>
-            <sphereGeometry args={[6.2, 24, 16]} />
-            <meshBasicMaterial
-              color={'#ffd54a'}
-              transparent
-              opacity={0.36}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
+            {/* Forest lighting */}
+            <ambientLight intensity={1.25} color={'#f3fff6'} />
+            <hemisphereLight intensity={1.05} skyColor={'#effff7'} groundColor={'#2a6b2f'} />
+            <directionalLight
+              ref={dirLightRef}
+              position={[-14, 18, 8]}
+              intensity={1.85}
+              color={'#fff3b0'}
+              castShadow
+              shadow-mapSize-width={2048}
+              shadow-mapSize-height={2048}
             />
-          </mesh>
-        </group>
+            <object3D ref={dirLightTargetRef} position={[0, 0, 0]} />
 
-        <ForestSky />
+            {/* Sun (visual) */}
+            <group ref={sunGroupRef} position={[42, 56, -36]}>
+              <mesh ref={sunRef}>
+                <sphereGeometry args={[2.6, 24, 16]} />
+                <meshBasicMaterial color={'#ffe36a'} toneMapped={false} />
+              </mesh>
+              {/* soft glow */}
+              <mesh>
+                <sphereGeometry args={[6.2, 24, 16]} />
+                <meshBasicMaterial
+                  color={'#ffd54a'}
+                  transparent
+                  opacity={0.36}
+                  blending={THREE.AdditiveBlending}
+                  depthWrite={false}
+                  toneMapped={false}
+                />
+              </mesh>
+            </group>
 
-        <group ref={worldRef}>
-          <ForestWorld
-            floorY={floorY}
-            curveData={curveData}
-            robotRef={robotRef}
-            gestureRef={gestureRef}
-            roomPortals={roomPortals}
-            completion={completion}
-            onPortalEnter={onLobbyPortalEnter}
-          />
-        </group>
+            <ForestSky />
+
+            <group ref={worldRef}>
+              <ForestWorld
+                floorY={floorY}
+                curveData={curveData}
+                robotRef={robotRef}
+                gestureRef={gestureRef}
+                roomPortals={roomPortals}
+                completion={completion}
+                onPortalEnter={onLobbyPortalEnter}
+              />
+            </group>
+          </>
+        )}
+
+        <RobotModel
+          robotRef={robotRef}
+          avatarFaceUrl={avatarFaceUrl}
+          avatarDominantColor={null}
+          equippedItem={shopState?.equippedItem || undefined}
+        />
 
         <RobotController
           robotRef={robotRef}
@@ -2783,18 +2940,29 @@ export default function ThreeDemo({
           autoWalkTarget={autoWalkTarget}
           onAutoWalkArrived={handleAutoWalkArrived}
           idlePatrolEnabled={false}
-          faceTextureUrl={avatarFaceUrl || undefined}
           equippedItem={shopState?.equippedItem || undefined}
           laptopCanvas={laptopCanvas}
-          mode={'forest'}
+          mode={isCave ? 'cave' : 'forest'}
         />
 
-        <CandyFollowCamera targetRef={robotRef} curveData={curveData} navActive={navActive} occluderRootRef={worldRef} />
+        {!isCave ? (
+          <CandyFollowCamera
+            targetRef={robotRef}
+            curveData={curveData}
+            navActive={navActive}
+            occluderRootRef={worldRef}
+          />
+        ) : null}
 
-        {/* Postprocessing candy bloom */}
+        {/* Postprocessing */}
         <EffectComposer>
-          <Bloom intensity={1.05} luminanceThreshold={0.42} luminanceSmoothing={0.14} mipmapBlur />
-          {sunRef.current ? (
+          <Bloom
+            intensity={isCave ? 0.9 : 1.05}
+            luminanceThreshold={isCave ? 0.25 : 0.42}
+            luminanceSmoothing={0.14}
+            mipmapBlur
+          />
+          {!isCave && sunRef.current ? (
             <GodRays
               sun={sunRef}
               samples={70}
@@ -2807,7 +2975,6 @@ export default function ThreeDemo({
             />
           ) : null}
         </EffectComposer>
-
 
         {/* Follow camera controls the camera; disable OrbitControls to avoid it overriding lookAt each frame. */}
         <OrbitControls enabled={false} />

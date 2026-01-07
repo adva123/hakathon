@@ -137,6 +137,14 @@ export default function SideNavigation({
             >
               🛍️ Shop
             </button>
+
+            <button
+              type="button"
+              className={`${styles.kpi} ${styles.mapPin}`}
+              onClick={() => switchRoomWithRobot(SCENES.strength, MAP_NODES[SCENES.strength])}
+            >
+              👍 Password Meter
+            </button>
           </div>
           <div className={styles.small}>Robot auto-navigates on the map.</div>
         </div>

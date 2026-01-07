@@ -74,6 +74,35 @@ export default function GameShell() {
   // Start directly in the game (skip the level-map landing).
   const [showLevelMap, setShowLevelMap] = useState(false);
 
+  // Quick “tunnel” transition when entering password rooms.
+  const [tunnelActive, setTunnelActive] = useState(false);
+  const prevOverlayRef = useRef(null);
+  const tunnelTimerRef = useRef(null);
+
+  useEffect(() => {
+    const prev = prevOverlayRef.current;
+    prevOverlayRef.current = activeOverlayRoom;
+
+    const enteringOverlay = !prev && activeOverlayRoom === SCENES.password;
+    const enteringCave = currentScene === SCENES.strength;
+    const entering = enteringOverlay || enteringCave;
+    if (!entering) return;
+
+    setTunnelActive(true);
+    if (tunnelTimerRef.current) clearTimeout(tunnelTimerRef.current);
+    tunnelTimerRef.current = setTimeout(() => {
+      setTunnelActive(false);
+      tunnelTimerRef.current = null;
+    }, 650);
+
+    return () => {
+      if (tunnelTimerRef.current) {
+        clearTimeout(tunnelTimerRef.current);
+        tunnelTimerRef.current = null;
+      }
+    };
+  }, [activeOverlayRoom, currentScene]);
+
   // Avoid blocking the UI behind a "show your hand" calibration step.
   const [gestureCalibrated, setGestureCalibrated] = useState(true);
   const [activeGesture, setActiveGesture] = useState('none');
@@ -84,6 +113,8 @@ export default function GameShell() {
     updatedAt: 0,
   });
   const lastGestureForUiRef = useRef('none');
+
+  const handTrackingEnabled = currentScene === SCENES.lobby || currentScene === SCENES.strength;
 
   const controlsEnabled = currentScene === SCENES.lobby && !activeOverlayRoom && !robotAutoWalkTarget;
   // Maintain consistent 3D lighting across all scenes.
@@ -156,13 +187,13 @@ export default function GameShell() {
       />
 
       <SideNavigation
-        gestureEnabled={currentScene === SCENES.lobby}
+        gestureEnabled={handTrackingEnabled}
         showCalibration={currentScene === SCENES.lobby && !gestureCalibrated}
         activeGesture={activeGesture}
       />
 
       <GestureManager
-        enabled={currentScene === SCENES.lobby}
+        enabled={handTrackingEnabled}
         showCalibration={currentScene === SCENES.lobby && !gestureCalibrated}
         onCalibrated={() => setGestureCalibrated(true)}
         onGesture={(g) => {
@@ -183,7 +214,8 @@ export default function GameShell() {
       />
 
       <div className={styles.overlay}>
-        <MainGameContainer />
+        {tunnelActive ? <div className={styles.tunnelOverlay} aria-hidden="true" /> : null}
+        <MainGameContainer gestureRef={gestureRef} />
       </div>
     </div>
   );

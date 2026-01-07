@@ -215,7 +215,8 @@ export function GameProvider({ children }) {
         targetScene === SCENES.lobby &&
         (currentScene === SCENES.password ||
           currentScene === SCENES.privacy ||
-          currentScene === SCENES.shop)
+          currentScene === SCENES.shop ||
+          currentScene === SCENES.strength)
       ) {
         prepareLobbyReturn(currentScene);
       }
@@ -235,7 +236,8 @@ export function GameProvider({ children }) {
     if (
       currentScene === SCENES.password ||
       currentScene === SCENES.privacy ||
-      currentScene === SCENES.shop
+      currentScene === SCENES.shop ||
+      currentScene === SCENES.strength
     ) {
       prepareLobbyReturn(currentScene);
     }
@@ -256,7 +258,13 @@ export function GameProvider({ children }) {
       setRobotAutoWalkTarget(null);
       return;
     }
-    setActiveOverlayRoom(pendingScene);
+    // Strength is a real 3D cave scene (not a forest overlay).
+    if (pendingScene === SCENES.strength) {
+      setActiveOverlayRoom(null);
+      setCurrentScene(SCENES.strength);
+    } else {
+      setActiveOverlayRoom(pendingScene);
+    }
     setPendingScene(null);
     setRobotAutoWalkTarget(null);
   }, [pendingScene]);

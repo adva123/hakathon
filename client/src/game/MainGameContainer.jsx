@@ -1,4 +1,5 @@
 import { useContext, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { GameContext, SCENES } from '../context/gameState.js';
 
 import EntryPoint from './scenes/EntryPoint.jsx';
@@ -8,10 +9,11 @@ import Lobby from './scenes/Lobby.jsx';
 import PasswordShield from './scenes/PasswordRoom.jsx';
 import PrivacyScanner from './scenes/PrivacyRoom.jsx';
 import UpgradePod from './scenes/ShopRoom.jsx';
+import StrengthRoom from './scenes/StrengthRoom.jsx';
 
 import TryAgain from './scenes/TryAgain.jsx';
 
-export default function MainGameContainer() {
+export default function MainGameContainer({ gestureRef } = {}) {
   const { currentScene, activeOverlayRoom, addScore, awardBadge } = useContext(GameContext);
 
   const overlay = useMemo(() => {
@@ -22,10 +24,12 @@ export default function MainGameContainer() {
         return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.shop:
         return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
+      case SCENES.strength:
+        return <StrengthRoom addScore={addScore} gestureRef={gestureRef} />;
       default:
         return null;
     }
-  }, [activeOverlayRoom, addScore, awardBadge]);
+  }, [activeOverlayRoom, addScore, awardBadge, gestureRef]);
 
   const view = useMemo(() => {
     switch (currentScene) {
@@ -38,12 +42,24 @@ export default function MainGameContainer() {
             {overlay}
           </>
         );
+      case SCENES.password:
+        return <PasswordShield addScore={addScore} awardBadge={awardBadge} />;
+      case SCENES.privacy:
+        return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} />;
+      case SCENES.shop:
+        return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
+      case SCENES.strength:
+        return <StrengthRoom addScore={addScore} gestureRef={gestureRef} />;
       case SCENES.tryAgain:
         return <TryAgain />;
       default:
         return <EntryPoint />;
     }
-  }, [currentScene, overlay]);
+  }, [currentScene, overlay, addScore, awardBadge, gestureRef]);
 
   return view;
 }
+
+MainGameContainer.propTypes = {
+  gestureRef: PropTypes.shape({ current: PropTypes.any }),
+};
