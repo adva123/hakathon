@@ -1,6 +1,8 @@
 /* eslint-disable react/no-unknown-property */
 /* eslint-disable react-hooks/immutability */
-import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from "react";
+import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef, useContext } from "react";
+import { GameContext } from './context/gameState.js';
+import { ROBOT_CATALOG } from './robotCatalog.js';
 import PropTypes from 'prop-types';
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
@@ -9,11 +11,35 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const GOLD_COLOR = '#d4af37';
 
+
+const ROBOT_MODELS = {
+  default: { glb: "/models/RobotExpressive.glb", color: "#b0b0b0" },
+  green: { glb: "/models/RobotGreen.glb", color: "#00ff00" },
+  gold: { glb: "/models/RobotGold.glb", color: "#ffd700" },
+  // Add more robots here
+};
+
 const Robot = forwardRef((props, ref) => {
-  const gltf = useGLTF("/models/RobotExpressive.glb");
+  const { faceTextureUrl, showFaceScreen = false, ...rest } = props;
+  const { shopState } = useContext(GameContext);
+  const selectedId = shopState?.selectedRobotId || ROBOT_CATALOG[0].id;
+  const skin = ROBOT_CATALOG.find(r => r.id === selectedId) || ROBOT_CATALOG[0];
+  const glbPath = '/models/RobotExpressive.glb';
+  const gltf = useGLTF(glbPath);
   const { scene, animations } = gltf;
 
-  const { faceTextureUrl, showFaceScreen = false, ...rest } = props;
+  // Apply skin properties to robot material
+  useEffect(() => {
+    scene.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        obj.material.color = new THREE.Color(skin.color);
+        obj.material.metalness = skin.type === 'luxury' ? (skin.metalness ?? 0.9) : 0;
+        obj.material.roughness = skin.type === 'luxury' ? (skin.roughness ?? 0.1) : 0.5;
+        obj.material.wireframe = !!skin.wireframe;
+        obj.material.needsUpdate = true;
+      }
+    });
+  }, [scene, skin]);
 
   const groupRef = useRef(null);
   useImperativeHandle(ref, () => groupRef.current);
@@ -658,16 +684,18 @@ const Robot = forwardRef((props, ref) => {
     if (shader?.uniforms?.uTime) shader.uniforms.uTime.value = clock.getElapsedTime();
   });
 
+
+  // Clothing/accessory rendering removed (shop now sells robots)
+
   return (
     <group ref={groupRef} {...rest}>
       <primitive object={innerScene} />
-
+      {/* No equipped clothing/accessory rendering (shop now sells robots) */}
       <group ref={headAttachmentRef} position={headAnchor ? [0, 0, 0] : [0, 1.82, 0.12]}>
         <mesh position={[0, 0.02, 0.02]} castShadow receiveShadow>
           <sphereGeometry args={[0.26, 20, 16]} />
           <meshPhysicalMaterial color={'#3b2a1c'} roughness={0.7} metalness={0.05} clearcoat={1.0} clearcoatRoughness={0.08} />
         </mesh>
-
         <group position={[0, 0.20, 0.06]}>
           <instancedMesh ref={hairSphereInstRef} args={[null, null, hairInstances.sphere.length]} castShadow>
             <sphereGeometry args={[1, 12, 10]} />
@@ -680,7 +708,6 @@ const Robot = forwardRef((props, ref) => {
             </instancedMesh>
           ) : null}
         </group>
-
         <group ref={leftEyeGlowRef} position={[-0.12, 0.10, 0.245]}>
           <mesh>
             <sphereGeometry args={[0.048, 16, 14]} />
@@ -709,7 +736,6 @@ const Robot = forwardRef((props, ref) => {
             </mesh>
           </group>
         </group>
-
         <group ref={rightEyeGlowRef} position={[0.12, 0.10, 0.245]}>
           <mesh>
             <sphereGeometry args={[0.048, 16, 14]} />
@@ -738,7 +764,6 @@ const Robot = forwardRef((props, ref) => {
             </mesh>
           </group>
         </group>
-
         <mesh ref={leftBrowRef} position={[-0.12, 0.17, 0.19]} rotation={[0, 0, 0.20]}>
           <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
@@ -747,7 +772,6 @@ const Robot = forwardRef((props, ref) => {
           <torusGeometry args={[0.040, 0.006, 8, 16, Math.PI]} />
           <meshPhysicalMaterial color={'#7a3b1b'} roughness={0.9} metalness={0.0} clearcoat={1.0} clearcoatRoughness={0.12} />
         </mesh>
-
         {showFaceScreen && faceTextureUrl ? (
           <mesh position={[0, 0.04, 0.18]} renderOrder={20}>
             <planeGeometry args={[0.52, 0.4]} />
@@ -755,7 +779,6 @@ const Robot = forwardRef((props, ref) => {
           </mesh>
         ) : null}
       </group>
-
     </group>
   );
 });

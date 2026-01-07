@@ -9,7 +9,9 @@ const defaultBadges = Object.freeze({
 
 const defaultOwned = Object.freeze({
   ownedItems: [],
-  equippedItem: null,
+  equippedItems: [],
+  ownedRobots: [], // array of robot ids
+  selectedRobotId: null, // id of selected robot
 });
 
 const storageKey = 'hakathon.gameState.v1';
@@ -136,14 +138,55 @@ export function GameProvider({ children }) {
       const ownedItems = Array.isArray(persisted.shopState.ownedItems)
         ? uniqueArray(persisted.shopState.ownedItems)
         : [];
-      const equippedItem =
-        typeof persisted.shopState.equippedItem === 'string'
-          ? persisted.shopState.equippedItem
-          : null;
-      return { ownedItems, equippedItem };
+      const equippedItems = Array.isArray(persisted.shopState.equippedItems)
+        ? uniqueArray(persisted.shopState.equippedItems)
+        : [];
+      const ownedRobots = Array.isArray(persisted.shopState.ownedRobots)
+        ? uniqueArray(persisted.shopState.ownedRobots)
+        : [];
+      const selectedRobotId = persisted.shopState.selectedRobotId || null;
+      return { ownedItems, equippedItems, ownedRobots, selectedRobotId };
     }
     return { ...defaultOwned };
   });
+  // Buy a robot and select it
+  const buyRobot = useCallback(({ robotId, price, useCoins = false }) => {
+    if (!robotId || typeof price !== 'number') return { ok: false, reason: 'invalid' };
+    let allowed = false;
+    if (useCoins) {
+      setCoins((c) => {
+        if (c >= price) {
+          allowed = true;
+          return c - price;
+        }
+        allowed = false;
+        return c;
+      });
+    } else {
+      setScore((s) => {
+        if (s >= price) {
+          allowed = true;
+          return s - price;
+        }
+        allowed = false;
+        return s;
+      });
+    }
+    if (!allowed) return { ok: false, reason: 'insufficient' };
+    setShopState((prev) => {
+      const ownedRobots = uniqueArray([...prev.ownedRobots, robotId]);
+      return { ...prev, ownedRobots, selectedRobotId: robotId };
+    });
+    return { ok: true };
+  }, [setScore]);
+
+  // Select a robot (must be owned)
+  const selectRobot = useCallback((robotId) => {
+    setShopState((prev) => {
+      if (!prev.ownedRobots.includes(robotId)) return prev;
+      return { ...prev, selectedRobotId: robotId };
+    });
+  }, []);
 
   // Robot walk-to-switch handshake with ThreeDemo
   const [robotAutoWalkTarget, setRobotAutoWalkTarget] = useState(null); // [x,y,z]
@@ -260,16 +303,14 @@ export function GameProvider({ children }) {
       setRobotAutoWalkTarget(null);
       return;
     }
-    // Strength is a real scene (not forest overlay), Clothing is overlay like shop.
+    // Strength is a real scene (not forest overlay), Shop is overlay.
     if (pendingScene === SCENES.strength) {
       console.log('📍 Setting strength as scene');
       setActiveOverlayRoom(null);
       setCurrentScene(pendingScene);
-    } else if (pendingScene === SCENES.clothing) {
-      console.log('📍 Setting clothing as overlay');
-      // Convert score to coins when entering clothing store (1 score = 5 coins)
-      setCoins((c) => c + score * 5);
-      setActiveOverlayRoom(pendingScene);
+    } else if (pendingScene === SCENES.shop) {
+      console.log('📍 Setting shop as overlay');
+      setActiveOverlayRoom(SCENES.shop);
     } else {
       console.log('📍 Setting as overlay:', pendingScene);
       setActiveOverlayRoom(pendingScene);
@@ -306,7 +347,6 @@ export function GameProvider({ children }) {
     ({ itemId, price, useCoins = false }) => {
       if (!itemId || typeof price !== 'number') return { ok: false, reason: 'invalid' };
       let allowed = false;
-      
       if (useCoins) {
         setCoins((c) => {
           if (c >= price) {
@@ -326,14 +366,13 @@ export function GameProvider({ children }) {
           return s;
         });
       }
-
       if (!allowed) return { ok: false, reason: 'insufficient' };
-
       setShopState((prev) => {
         const ownedItems = uniqueArray([...prev.ownedItems, itemId]);
-        return { ownedItems, equippedItem: itemId };
+        // Auto-equip purchased item
+        const equippedItems = uniqueArray([...prev.equippedItems, itemId]);
+        return { ownedItems, equippedItems };
       });
-
       return { ok: true };
     },
     [setScore]
@@ -342,7 +381,8 @@ export function GameProvider({ children }) {
   const equipItem = useCallback((itemId) => {
     setShopState((prev) => {
       if (!prev.ownedItems.includes(itemId)) return prev;
-      return { ...prev, equippedItem: itemId };
+      const equippedItems = uniqueArray([...prev.equippedItems, itemId]);
+      return { ...prev, equippedItems };
     });
   }, []);
 
@@ -378,6 +418,8 @@ export function GameProvider({ children }) {
       setAvatarDominantColor,
       buyItem,
       equipItem,
+      buyRobot,
+      selectRobot,
     }),
     [
       currentScene,
@@ -407,6 +449,8 @@ export function GameProvider({ children }) {
       awardBadge,
       buyItem,
       equipItem,
+      buyRobot,
+      selectRobot,
     ]
   );
 

@@ -139,9 +139,9 @@ export default function SideNavigation({
             <button
               type="button"
               className={`${styles.kpi} ${styles.mapPin}`}
-              onClick={() => switchRoomWithRobot(SCENES.clothing, MAP_NODES[SCENES.clothing])}
+              onClick={() => switchRoomWithRobot(SCENES.shop, MAP_NODES[SCENES.shop])}
             >
-              👗 Clothing
+              🤖 Robot Shop
             </button>
           </div>
           <div className={styles.small}>Robot auto-navigates on the map.</div>

@@ -6041,7 +6041,7 @@ export default function ThreeDemo({
           onAutoWalkArrived={handleAutoWalkArrived}
           idlePatrolEnabled={false}
           faceTextureUrl={avatarFaceUrl || undefined}
-          equippedItem={shopState?.equippedItem || undefined}
+          equippedItems={shopState?.equippedItems || []}
           laptopCanvas={laptopCanvas}
           mode={'forest'}
         />

@@ -1,103 +1,110 @@
+
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense } from 'react';
 import styles from '../game.module.css';
 import room from './ShopRoom.module.css';
+import { Canvas } from '@react-three/fiber';
+import MiniRobotPreview from '../../components/common/MiniRobotPreview/MiniRobotPreview';
 import { GameContext } from '../../context/gameState.js';
-
-const items = [
-  {
-    id: 'hat',
-    name: 'Hat',
-    price: 50,
-    image: '/shop/hat.svg',
-    description: 'Cosmetic upgrade: friendly explorer vibes.',
-  },
-  {
-    id: 'gold',
-    name: 'Gold Paint',
-    price: 100,
-    image: '/shop/gold.svg',
-    description: 'Cosmetic upgrade: legendary finish.',
-  },
-];
-
-function robotPortraitForEquipped(equippedItem) {
-  if (equippedItem === 'hat') return '/robot/robot-hat.svg';
-  if (equippedItem === 'gold') return '/robot/robot-gold.svg';
-  return '/robot/robot.svg';
-}
+import { ROBOT_CATALOG } from '../../robotCatalog.js';
 
 export default function ShopRoom() {
-  const { score, shopState, buyItem, equipItem, handleBack } = useContext(GameContext);
-  const [message, setMessage] = useState('');
-  const [messageKind, setMessageKind] = useState(''); // 'ok' | 'warn' | ''
-  const [equipFx, setEquipFx] = useState(false);
-  const equipFxTimerRef = useRef(null);
+  const { score, shopState, buyRobot, selectRobot, handleBack } = useContext(GameContext);
+  
+  const ownedRobots = useMemo(() => new Set(shopState?.ownedRobots || []), [shopState?.ownedRobots]);
+  const selectedRobotId = shopState?.selectedRobotId || ROBOT_CATALOG[0].id;
+  
+  // State לתצוגה מקדימה (Preview)
+  const [previewId, setPreviewId] = useState(selectedRobotId);
+  const previewSkin = useMemo(() => ROBOT_CATALOG.find(r => r.id === previewId) || ROBOT_CATALOG[0], [previewId]);
 
-  const owned = useMemo(() => new Set(shopState?.ownedItems || []), [shopState?.ownedItems]);
-  const equippedItem = shopState?.equippedItem || null;
-  const portrait = useMemo(() => robotPortraitForEquipped(equippedItem), [equippedItem]);
+  // פונקציית פעולה לכל רובוט (כפתור מתאים)
+  const renderRobotAction = (robot) => {
+    const isOwned = ownedRobots.has(robot.id);
+    const isSelected = selectedRobotId === robot.id;
+    const canAfford = score >= robot.price;
+
+    if (isSelected) {
+      return <button className={room.btnSelected} disabled>ACTIVE</button>;
+    }
+    if (isOwned) {
+      return (
+        <button 
+          className={room.btnEquip} 
+          onClick={() => {
+            selectRobot(robot.id);
+            triggerEquipFx();
+          }}
+        >
+          SELECT
+        </button>
+      );
+    }
+    if (canAfford) {
+      return (
+        <button 
+          className={room.btnBuy} 
+          onClick={() => buy(robot)}
+        >
+          BUY ({robot.price})
+        </button>
+      );
+    }
+    return (
+      <div className={room.lockedStatus}>
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <path d="M12 17a2 2 0 100-4 2 2 0 000 4z" fill="currentColor" />
+          <path d="M18 8h-1V6a5 5 0 00-10 0v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zM9 6a3 3 0 016 0v2H9V6z" fill="currentColor" />
+        </svg>
+        LOCKED
+      </div>
+    );
+  };
+  const selectedSkin = useMemo(() => ROBOT_CATALOG.find(r => r.id === selectedRobotId), [selectedRobotId]);
+
+  const [message, setMessage] = useState('');
+  const [messageKind, setMessageKind] = useState('');
+  const [equipFx, setEquipFx] = useState(false);
+  const [pendingEquip, setPendingEquip] = useState(null);
+  const equipFxTimerRef = useRef(null);
 
   useEffect(() => {
     return () => {
-      if (equipFxTimerRef.current) {
-        window.clearTimeout(equipFxTimerRef.current);
-        equipFxTimerRef.current = null;
-      }
+      if (equipFxTimerRef.current) window.clearTimeout(equipFxTimerRef.current);
     };
   }, []);
 
   const triggerEquipFx = () => {
     setEquipFx(true);
-    if (equipFxTimerRef.current) {
-      window.clearTimeout(equipFxTimerRef.current);
-      equipFxTimerRef.current = null;
-    }
-    equipFxTimerRef.current = window.setTimeout(() => {
-      setEquipFx(false);
-      equipFxTimerRef.current = null;
-    }, 900);
+    if (equipFxTimerRef.current) window.clearTimeout(equipFxTimerRef.current);
+    equipFxTimerRef.current = window.setTimeout(() => setEquipFx(false), 900);
   };
 
-  const buy = (item) => {
-    setMessage('');
-    setMessageKind('');
-
-    if (score < item.price) {
+  const buy = (robot) => {
+    if (score >= robot.price) {
+      const res = buyRobot({ robotId: robot.id, price: robot.price });
+      if (res.ok) {
+        setMessageKind('ok');
+        setMessage(`Successfully unlocked ${robot.name}! -${robot.price} Score`);
+        triggerEquipFx();
+        window.dispatchEvent(new CustomEvent('hakathon.shop.buy', { 
+          detail: { robotId: robot.id, price: robot.price } 
+        }));
+      }
+    } else {
       setMessageKind('warn');
-      setMessage(`Not enough score. Need ${item.price - score} more.`);
-      return;
+      setMessage(`Insufficient score! You need ${robot.price - score} more.`);
     }
-
-    const res = buyItem({ itemId: item.id, price: item.price });
-    if (!res.ok) {
-      setMessageKind('warn');
-      setMessage(res.reason === 'insufficient' ? 'Not enough score yet.' : 'Cannot buy item.');
-      return;
-    }
-
-    // Bridge to 3D Upgrade Pod: fly the purchased accessory into place.
-    window.dispatchEvent(new CustomEvent('hakathon.shop.buy', { detail: { itemId: item.id } }));
-    triggerEquipFx();
-
-    setMessageKind('ok');
-    setMessage(`Purchased: ${item.name}. Equipped in the pod.`);
   };
 
-  const equip = (item) => {
-    setMessage('');
-    setMessageKind('');
-    equipItem(item.id);
-
-    // Sync 3D visuals (no guaranteed animation here; buy handles the fly-in).
-    window.dispatchEvent(new CustomEvent('hakathon.shop.equip', { detail: { itemId: item.id } }));
-
-    triggerEquipFx();
-
-    setMessageKind('ok');
-    setMessage(`Equipped: ${item.name}`);
+  const handleAction = (robot) => {
+    const isOwned = ownedRobots.has(robot.id);
+    if (isOwned) {
+      setPendingEquip(robot);
+    } else {
+      buy(robot);
+    }
   };
-
-  const back = () => handleBack();
 
   return (
     <div className={`${styles.panel} ${room.room}`}>
@@ -105,97 +112,91 @@ export default function ShopRoom() {
         <div>
           <h2 className={room.title}>🛍️ Robot Upgrade Pod</h2>
           <div className={`${styles.small} ${room.subtitle}`}>
-            Spend score to customize the robot. Equipped upgrades persist across rooms.
+            Spend score to customize your appearance.
           </div>
         </div>
-        <div className="neonGlow">POD ONLINE</div>
+        <div className={room.podStatus}>POD ONLINE</div>
       </div>
 
-      <div className={styles.hr} />
-
       <div className={room.layout}>
-        <div className={`${room.pod} glassNeon`}>
+        {/* צד שמאל: Charging Pod - תצוגה מקדימה ב-3D */}
+        <div className={`${room.pod} ${room.glassNeon}`}>
           <div className={room.podTop}>
-            <div className={room.podLabel}>Charging Pod</div>
-            <div className={room.kpi}>Score: {score}</div>
+            <div className={room.podLabel}>PREVIEW UNIT</div>
+            <div className={room.kpi}>Wallet: {score}</div>
           </div>
 
-          <div className={room.robotStage} aria-label="Robot charging pod preview">
-            <div className={`${room.glowRing} ${equipFx ? room.glowActive : ''}`} />
-            <div className={`${room.arm} ${room.armLeft} ${equipFx ? room.armActive : ''}`} />
-            <div className={`${room.arm} ${room.armRight} ${equipFx ? room.armActive : ''}`} />
-            <img className={room.robotImg} src={portrait} alt="Robot" />
-          </div>
+          <div className={room.robotStage}>
+            <div className={room.robotGlow} style={{ '--robot-glow-color': previewSkin.color }} />
+            <div className={room.robotScan} />
+            
+            <Suspense fallback={<div style={{color: 'white'}}>Loading Systems...</div>}>
+            <Canvas camera={{ position: [0, 0, 4.5] }} style={{ width: '100%', height: '100%', zIndex: 3 }}>
+              <ambientLight intensity={0.7} />
+              <pointLight position={[10, 10, 10]} color={previewSkin.color} intensity={1.5} />
+              <MiniRobotPreview color={previewSkin.color} type={previewSkin.type} />
+            </Canvas>
+            </Suspense>
 
-          <div className={room.podHint}>
-            Equipped: <strong>{equippedItem || 'None'}</strong> (stays equipped after leaving)
+            <Canvas 
+              camera={{ position: [0, 1.5, 6], fov: 45 }} 
+              style={{ width: '100%', height: '100%', zIndex: 3 }}
+            >
+              <ambientLight intensity={0.8} />
+              <pointLight position={[5, 5, 5]} intensity={1.5} />
+              <Suspense fallback={null}>
+                <MiniRobotPreview color={previewSkin.color} type={previewSkin.type} />
+              </Suspense>
+            </Canvas>
           </div>
         </div>
 
-        <div className={`${room.shop} glassNeon`}>
+        {/* צד ימין: Robot Shop - רשימת הרובוטים */}
+        <div className={room.shop}>
           <div className={room.podTop}>
-            <div className={room.podLabel}>Shop Items</div>
-            <div className={room.kpi}>Global Score Wallet</div>
+            <div className={room.podLabel}>AVAILABLE SKINS</div>
           </div>
 
           <div className={room.items}>
-            {items.map((item, idx) => {
-              const isOwned = owned.has(item.id);
-              const isEquipped = equippedItem === item.id;
-              const canAfford = score >= item.price;
-
-              return (
-                <div
-                  key={item.id}
-                  className={`${room.itemRow} ${idx === items.length - 1 ? room.itemRowLast : ''}`}
-                >
-                  <div className={room.itemIcon}>
-                    <img src={item.image} alt={item.name} width={26} height={26} />
-                  </div>
-
-                  <div>
-                    <div className={room.itemName}>
-                      {item.name}
-                      {isEquipped ? <span className={room.tagEquipped}>EQUIPPED</span> : null}
-                    </div>
-                    <div className={room.itemMeta}>
-                      Price: {item.price} • {item.description}
-                    </div>
-                  </div>
-
-                  {!isOwned ? (
-                    <button
-                      type="button"
-                      className={`${styles.button} ${styles.buttonPrimary}`}
-                      onClick={() => buy(item)}
-                      disabled={!canAfford}
-                      title={!canAfford ? 'Earn more score to buy this item' : undefined}
-                    >
-                      {canAfford ? 'Buy' : 'Locked'}
-                    </button>
-                  ) : (
-                    <button type="button" className={styles.button} onClick={() => equip(item)} disabled={isEquipped}>
-                      {isEquipped ? 'Equipped' : 'Equip'}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+             {ROBOT_CATALOG.map((robot) => (
+               <div
+                 key={robot.id}
+                 className={`${room.shopItem} ${selectedRobotId === robot.id ? room.shopItemActive : ''} ${robot.type === 'luxury' ? room.shopItemLuxury : ''} ${robot.type === 'special' ? room.shopItemSpecial : ''}`}
+                 onMouseEnter={() => setPreviewId(robot.id)}
+               >
+                 <div className={room.itemInfo}>
+                   <div className={room.itemName}>
+                     {robot.name}
+                     {selectedRobotId === robot.id && <span className={room.tagEquipped}>SELECTED</span>}
+                   </div>
+                   <div className={room.itemMeta}>
+                     Price: {robot.price} • {robot.type.toUpperCase()}
+                   </div>
+                 </div>
+                 <div className={room.itemAction}>
+                   {renderRobotAction(robot)}
+                 </div>
+               </div>
+             ))}
           </div>
-
-          <div className={styles.hr} />
-
-          <div className={`${styles.row} ${room.actions}`}>
-            <button type="button" className={styles.button} onClick={back}>
-              Back
-            </button>
-          </div>
-
-          {message ? (
-            <div className={`${room.notice} ${messageKind === 'ok' ? room.noticeOk : room.noticeWarn}`}>{message}</div>
-          ) : null}
         </div>
       </div>
+
+      {message && <div className={`${room.notice} ${messageKind === 'ok' ? room.noticeOk : room.noticeWarn}`}>{message}</div>}
+
+      {/* Confirmation Modal */}
+      {pendingEquip && (
+        <div className={room.modalOverlay}>
+          <div className={room.modal}>
+            <h3>Confirm Component Sync</h3>
+            <p>Sync robot interface with <span style={{color: pendingEquip.color}}>{pendingEquip.name}</span>?</p>
+            <div className={room.modalActions}>
+              <button className={room.btnEquip} onClick={() => { selectRobot(pendingEquip.id); setPendingEquip(null); triggerEquipFx(); }}>SYNC</button>
+              <button className={room.btnCancel} onClick={() => setPendingEquip(null)}>CANCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
