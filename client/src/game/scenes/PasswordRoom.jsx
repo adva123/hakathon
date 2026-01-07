@@ -50,14 +50,13 @@ function getRandomSamples(arr, n) {
 const PASSWORD_SAMPLES = getRandomSamples(ALL_PASSWORD_SAMPLES, 10);
 
 export default function PasswordRoom({ addScore: addScoreProp, awardBadge: awardBadgeProp, gestureRef } = {}) {
-  const { playerName, addScore, registerMistake, awardBadge, handleBack, badges } = useContext(GameContext);
+  const { playerName, addScore, registerMistake, awardBadge, handleBack, badges, coins, setCoins } = useContext(GameContext);
   const addScoreFn = addScoreProp || addScore;
   const awardBadgeFn = awardBadgeProp || awardBadge;
 
   // Game state
   const [currentPasswordIndex, setCurrentPasswordIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [coins, setCoins] = useState(0); // New: coins state
   const [lives, setLives] = useState(3);
   const [message, setMessage] = useState('');
   const [gameOver, setGameOver] = useState(false);
@@ -87,8 +86,8 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   }, []);
 
   const handleGesture = useCallback((gesture) => {
-    // Allow 'iloveyou' gesture to return to forest when game is over
-    if (gameOver && gesture === 'iloveyou') {
+    // Allow 'iloveyou' gesture to return to forest when game is over or won
+    if ((gameOver || victory) && gesture === 'iloveyou') {
       handleBack();
       return;
     }
@@ -119,7 +118,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
       const points = 20;
       setScore(s => s + points);
       addScoreFn(points);
-      setCoins(c => c + 10); // Award 10 coins
+      setCoins(c => c + 10); // Award 10 coins (shared context)
       setMessage('✅ Correct! Password identified correctly (+10 coins)');
       // Move to next password
       gestureTimeoutRef.current = setTimeout(() => {
@@ -186,7 +185,6 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   const restart = () => {
     setCurrentPasswordIndex(0);
     setScore(0);
-    setCoins(0);
     setLives(3);
     setMessage('');
     setGameOver(false);
@@ -269,6 +267,9 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
                 <p>You identified all passwords correctly!</p>
                 <p>Final Score: {score}</p>
                 {!alreadyEarned && <p className={styles.neonTag}>🔑 Golden Key earned!</p>}
+                <p style={{marginTop: 12, color: '#87CEEB', fontWeight: 600}}>
+                  To return to the forest, make the <b>"I Love You"</b> hand gesture 🤟
+                </p>
                 <div className={styles.row}>
                   <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={restart}>
                     Play Again
