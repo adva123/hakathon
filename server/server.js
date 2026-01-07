@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import rubberDuckRoutes from './routes/rubberDucks.js'; // Import the routes
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,8 +19,7 @@ app.use('/images', express.static(path.join(__dirname, 'images'))); // Serve sta
 // If you want to lock it down later, replace this with an allowlist.
 app.use(cors());
 
-// Use the routes file for all `/ducks` routes
-app.use('/ducks', rubberDuckRoutes);
+
 
 // Start server
 const PORT = Number(process.env.PORT) || 5000;

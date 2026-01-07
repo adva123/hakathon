@@ -6,3 +6,4 @@ const ducks = [
 ];
 
 export default ducks;
+// (intentionally left blank after duck code removal)

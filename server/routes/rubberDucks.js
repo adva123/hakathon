@@ -7,7 +7,7 @@ import {
     updateDuck,
     getRandomDuck,
 } from '../controllers/rubberDuckController.js';
-
+// (intentionally left blank after duck code removal)
 const router = express.Router();
 
 /**
