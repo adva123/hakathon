@@ -118,7 +118,7 @@ export function GameProvider({ children }) {
     persisted && typeof persisted.playerName === 'string' ? persisted.playerName : ''
   );
   const [score, setScore] = useState(0);
-  const [coins, setCoins] = useState(0);
+  const [coins, setCoins] = useState(50);
   const [energy, setEnergy] = useState(100);
   const [badges, setBadges] = useState(() => {
     if (persisted?.badges && typeof persisted.badges === 'object') {

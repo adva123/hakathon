@@ -119,13 +119,7 @@ export default function SideNavigation({
         <div className={`${styles.section} ${styles.destinationsSection}`}>
           <div className={styles.title} style={{ marginBottom: 10 }}>Destinations</div>
           <div className={`${styles.kpis} ${styles.destinationsMap}`}>
-            <button
-              type="button"
-              className={`${styles.kpi} ${styles.mapPin}`}
-              onClick={() => switchRoomWithRobot(SCENES.password, MAP_NODES[SCENES.password])}
-            >
-              🛡️ Passwords
-            </button>
+            {/* Removed Passwords button as requested */}
             <button
               type="button"
               className={`${styles.kpi} ${styles.mapPin}`}
@@ -133,13 +127,7 @@ export default function SideNavigation({
             >
               🔒 Privacy
             </button>
-            <button
-              type="button"
-              className={`${styles.kpi} ${styles.mapPin}`}
-              onClick={() => switchRoomWithRobot(SCENES.shop, MAP_NODES[SCENES.shop])}
-            >
-              🛍️ Shop
-            </button>
+            {/* Removed Shop button as requested */}
 
             <button
               type="button"
