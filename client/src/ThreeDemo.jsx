@@ -5,6 +5,8 @@ import * as THREE from "three";
 import Scene from "./Scene";
 import CorridorScene from "./CorridorScene";
 
+
+
 export default function ThreeDemo() {
   // --- ניהול מצבי החדרים ---
   const [room, setRoom] = useState("main"); // החדר הנוכחי שבו נמצא המשתמש

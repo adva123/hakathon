@@ -6,6 +6,11 @@ import * as THREE from "three";
 import Robot from "./components/Robot";
 import { useKeyboard } from "./useKeyboard";
 import PropTypes from "prop-types";
+import Mission1Room from "./Missions/Mission1";
+import Mission2Room from "./Missions/Mission2";
+import Mission3Room from "./Missions/Mission3";
+import Mission4Room from "./Missions/Mission4";
+
 
 
 // --- פונקציות עזר מתמטיות ---
@@ -163,7 +168,7 @@ export default function Scene({
   const pos = useRef(new THREE.Vector3(0, -1.15, 0));
   const yaw = useRef(0);
 
-  const SPEED = 7;
+  const SPEED = 10;
 
   // הגדרות מצלמה (גובה, מרחק והיסט צידי למראה קולנועי)
   const CAM_HEIGHT = 4.1;
@@ -335,32 +340,43 @@ export default function Scene({
       <directionalLight position={[-8, 6, -6]} intensity={0.35} color="#dde7ff" />
 
       {/* בניית ארבעת קירות החדר */}
-      {(() => {
-        const WALL_VIS_H = 220; // גובה ויזואלי של הקירות
-        const yCenter = -1.15 + WALL_VIS_H / 2;
-        const W = ROOM_W;
-        const D = ROOM_D;
-        return (
-          <>
-            <mesh position={[-W / 2, yCenter, 0]} rotation={[0, Math.PI / 2, 0]}>
-              <planeGeometry args={[D, WALL_VIS_H]} />
-              <primitive object={wallMat} attach="material" />
-            </mesh>
-            <mesh position={[W / 2, yCenter, 0]} rotation={[0, -Math.PI / 2, 0]}>
-              <planeGeometry args={[D, WALL_VIS_H]} />
-              <primitive object={wallMat} attach="material" />
-            </mesh>
-            <mesh position={[0, yCenter, -D / 2]} rotation={[0, 0, 0]}>
-              <planeGeometry args={[W, WALL_VIS_H]} />
-              <primitive object={wallMat} attach="material" />
-            </mesh>
-            <mesh position={[0, yCenter, D / 2]} rotation={[0, Math.PI, 0]}>
-              <planeGeometry args={[W, WALL_VIS_H]} />
-              <primitive object={wallMat} attach="material" />
-            </mesh>
-          </>
-        );
-      })()}
+      {roomId === "task1" ? (
+        <Mission1Room />
+      ) : roomId === "task2" ? (
+        <Mission2Room />
+      ) : roomId === "task3" ? (
+        <Mission3Room />
+      ) : roomId === "task4" ? (
+        <Mission4Room />
+      ) : (
+        (() => {
+          const WALL_VIS_H = 220;
+          const yCenter = -1.15 + WALL_VIS_H / 2;
+          const W = ROOM_W;
+          const D = ROOM_D;
+          return (
+            <>
+              <mesh position={[-W / 2, yCenter, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <planeGeometry args={[D, WALL_VIS_H]} />
+                <primitive object={wallMat} attach="material" />
+              </mesh>
+              <mesh position={[W / 2, yCenter, 0]} rotation={[0, -Math.PI / 2, 0]}>
+                <planeGeometry args={[D, WALL_VIS_H]} />
+                <primitive object={wallMat} attach="material" />
+              </mesh>
+              <mesh position={[0, yCenter, -D / 2]}>
+                <planeGeometry args={[W, WALL_VIS_H]} />
+                <primitive object={wallMat} attach="material" />
+              </mesh>
+              <mesh position={[0, yCenter, D / 2]} rotation={[0, Math.PI, 0]}>
+                <planeGeometry args={[W, WALL_VIS_H]} />
+                <primitive object={wallMat} attach="material" />
+              </mesh>
+            </>
+          );
+        })()
+      )}
+
 
       {/* הרצפה - מקבלת צללים מהרובוט */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.15, 0]} receiveShadow>
