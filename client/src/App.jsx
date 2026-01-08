@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import GameShell from './game/GameShell.jsx';
 import Login from './Login.jsx';
+import styles from './App.module.css';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -14,6 +15,13 @@ function App() {
 
   return (
     <>
+      {/* User profile top right */}
+      {user && (
+        <div className={styles.userProfile}>
+          <span className={styles.greeting}>Hi, {user.name}!</span>
+          <img src={user.picture} alt={user.name} className={styles.userAvatar} />
+        </div>
+      )}
       {showLogin || !user ? (
         <Login onClose={() => {}} onLoginSuccess={handleLoginSuccess} />
       ) : (

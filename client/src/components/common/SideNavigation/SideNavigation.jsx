@@ -90,7 +90,7 @@ export default function SideNavigation({
     <aside className={styles.root}>
       <div className={styles.header}>
         <div className={styles.title}>Control Panel</div>
-        <div className={styles.small}>{playerName ? `Hi ${playerName}!` : 'Hi!'}</div>
+        {/* <div className={styles.small}>{playerName ? `Hi ${playerName}!` : 'Hi!'}</div> */}
       </div>
 
       <div className={styles.content}>
