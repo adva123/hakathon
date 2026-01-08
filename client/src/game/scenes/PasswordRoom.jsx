@@ -86,8 +86,9 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   }, []);
 
   const handleGesture = useCallback((gesture) => {
-    // Allow 'iloveyou' gesture to return to forest when game is over or won
-    if ((gameOver || victory) && gesture === 'iloveyou') {
+    // Accept both `iLoveYou` (camelCase from ThreeDemo) and `iloveyou`.
+    // Immediately return to the lobby when that gesture is seen.
+    if (gesture === 'iLoveYou' || gesture === 'iloveyou') {
       handleBack();
       return;
     }
