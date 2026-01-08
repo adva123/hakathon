@@ -1,11 +1,12 @@
 
 
 import React, { useState, useContext, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { GameContext } from '../../context/gameState.js';
 import api from '../../services/api';
 import styles from './PrivacyRoom.module.css';
 
-const PrivacyRoom = () => {
+function PrivacyRoom({ gestureRef }) {
   const [dollDescription, setDollDescription] = useState('');
   const [privacySettings, setPrivacySettings] = useState({
     isNamePublic: false,
@@ -21,8 +22,23 @@ const PrivacyRoom = () => {
   const [generatedDoll, setGeneratedDoll] = useState(null);
   const [selectedDoll, setSelectedDoll] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  // Fullscreen image modal state
+  const [showFullImage, setShowFullImage] = useState(false);
   const [useDALLE, setUseDALLE] = useState(false); // אופציה ל-DALL-E
-  const { addDollToInventory, setCoins, addScore, registerMistake, shopState, setMovementLocked } = useContext(GameContext);
+  const { addDollToInventory, setCoins, addScore, registerMistake, shopState, setMovementLocked, handleBack } = useContext(GameContext);
+    // Gesture-based navigation: listen for "iloveyou" gesture to go back
+    useEffect(() => {
+      if (!gestureRef?.current) return;
+      const interval = setInterval(() => {
+        const g = gestureRef.current;
+        if (!g || !g.hasHand) return;
+        const gesture = String(g.gesture || 'none');
+        if (gesture === 'iLoveYou' || gesture === 'iloveyou') {
+          if (handleBack) handleBack();
+        }
+      }, 200);
+      return () => clearInterval(interval);
+    }, [gestureRef, handleBack]);
   // Track number of consecutive bad images
   const badImageCountRef = useRef(0);
 
@@ -188,10 +204,35 @@ const PrivacyRoom = () => {
       {/* Status bar */}
       <div className={styles.statusBar}>
         <span>🎭 Collection: {shopState?.generatedDolls?.length || 0} dolls</span>
-        <span>🎨 AI: {useDALLE ? 'DALL-E 3' : 'Pollinations (Free)'}</span>
+        {/* <span>🎨 AI: {useDALLE ? 'DALL-E 3' : 'Pollinations (Free)'}</span> */}
       </div>
 
       <div className={styles.mainLayout}>
+        {/* Back button for returning to forest/lobby */}
+        <button
+          className={styles.backButton}
+          onClick={handleBack}
+          style={{
+            position: 'absolute',
+            top: 18,
+            left: 18,
+            zIndex: 100,
+            background: 'rgba(0,0,0,0.5)',
+            border: 'none',
+            borderRadius: '12px',
+            color: '#00f2ff',
+            fontSize: '1.3rem',
+            padding: '8px 18px',
+            boxShadow: '0 0 12px #00f2ff55',
+            cursor: 'pointer',
+            transition: 'background 0.2s',
+          }}
+        >
+          ← Back
+        </button>
+
+
+
         {/* Display side */}
         <div className={styles.displaySide}>
           <div className={styles.previewZone}>
@@ -204,27 +245,51 @@ const PrivacyRoom = () => {
                       <p>AI is creating your image...</p>
                     </div>
                   )}
-                  
-                  <img 
-                    src={selectedDoll.imageUrl} 
-                    className={selectedDoll.blur ? styles.blurred : ''} 
-                    alt={selectedDoll.name}
-                    onLoad={() => handleImageLoad(selectedDoll.id)}
-                    onError={(e) => handleImageError(e, selectedDoll.id, selectedDoll.name)}
-                    style={{
-                      display: imageLoadStates[selectedDoll.id] === 'loading' ? 'none' : 'block'
-                    }}
-                  />
-                  
-                  {!selectedDoll.blur && imageLoadStates[selectedDoll.id] === 'loaded' && (
-                    <button 
-                      className={styles.downloadIcon} 
-                      onClick={() => downloadDoll(selectedDoll.imageUrl, selectedDoll.name)}
-                    >
-                      📥 Download
-                    </button>
-                  )}
+                  <div style={{position:'relative', display:'inline-block'}}>
+                    <img
+                      src={selectedDoll.imageUrl}
+                      className={selectedDoll.blur ? styles.blurred : ''}
+                      alt={selectedDoll.name}
+                      onLoad={() => handleImageLoad(selectedDoll.id)}
+                      onError={(e) => handleImageError(e, selectedDoll.id, selectedDoll.name)}
+                      style={{
+                        display: imageLoadStates[selectedDoll.id] === 'loading' ? 'none' : 'block',
+                        cursor: 'zoom-in',
+                        borderRadius: '12px',
+                        maxWidth: '100%',
+                        boxShadow: '0 0 18px #00f2ff33'
+                      }}
+                      onClick={() => setShowFullImage(true)}
+                    />
+                    {!selectedDoll.blur && imageLoadStates[selectedDoll.id] === 'loaded' && (
+                      <button
+                        className={styles.downloadIconSmall}
+                        title="Download image"
+                        onClick={e => {
+                          e.stopPropagation();
+                          downloadDoll(selectedDoll.imageUrl, selectedDoll.name);
+                        }}
+                      >
+                        📥
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Fullscreen modal for image */}
+
+                {showFullImage && (
+                  <div className={styles.fullImageOverlay} onClick={() => setShowFullImage(false)}>
+                    <div className={styles.fullImageContainer} onClick={e => e.stopPropagation()}>
+                      <img
+                        src={selectedDoll.imageUrl}
+                        alt={selectedDoll.name}
+                        className={styles.fullImage}
+                      />
+                      <button className={styles.closeFullImage} onClick={e => { e.stopPropagation(); setShowFullImage(false); }}>✖</button>
+                    </div>
+                  </div>
+                )}
                 
                 <h3>{selectedDoll.name}</h3>
                 <p className={styles.dollDescription}>{selectedDoll.description}</p>

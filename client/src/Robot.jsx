@@ -80,6 +80,7 @@ const Robot = forwardRef((props, ref) => {
     innerScene.traverse((obj) => {
       if (obj.isMesh && obj.material) {
         // עדכון לפי הסקין הנבחר
+        if(obj.material.name === "Main")
         obj.material.color = new THREE.Color(skin.color);
         obj.material.metalness = skin.type === 'luxury' ? (skin.metalness ?? 0.9) : 0.1;
         obj.material.roughness = skin.type === 'luxury' ? (skin.roughness ?? 0.1) : 0.6;
