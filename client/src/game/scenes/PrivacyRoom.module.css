@@ -2,7 +2,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 10;
+  z-index: 100;
   background: rgba(0,0,0,0.7);
   color: #00f2ff;
   border: none;
@@ -16,6 +16,7 @@
   justify-content: center;
   box-shadow: 0 0 8px #00f2ff55;
   transition: background 0.2s, color 0.2s;
+  pointer-events: auto;
 }
 .downloadIconSmall:hover {
   background: #00f2ff;
