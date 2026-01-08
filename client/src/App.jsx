@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import GameShell from './game/GameShell.jsx';
-import Login from './Login.jsx';
-import styles from './App.module.css';
+import Login from './pages/Login.jsx';
+import styles from '../src/styles/modules/App.module.css';
 
 function App() {
   const [user, setUser] = useState(null);

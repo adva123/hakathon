@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unknown-property */
 /* eslint-disable react-hooks/immutability */
 import { useEffect, useMemo, forwardRef, useImperativeHandle, useRef, useContext } from "react";
-import { GameContext } from './context/gameState.js';
+import { GameContext } from '../../context/gameState.js';
 import { ROBOT_CATALOG } from './robotCatalog.js';
 import PropTypes from 'prop-types';
 import * as THREE from "three";

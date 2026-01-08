@@ -3,8 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import PropTypes from 'prop-types';
 import { useEffect, useMemo, useRef, useContext } from 'react';
 import * as THREE from 'three';
-import { PasswordRoom3D } from './game/scenes/PasswordRoom3D.jsx';
-import { GameContext, SCENES } from './context/gameState';
+import { PasswordRoom3D } from '../../game/scenes/PasswordRoom3D.jsx';
+import { GameContext, SCENES } from '../../context/gameState.js';
 
 // Bump this to force tree re-generation under React Fast Refresh.
 const TREE_COLOR_REV = 2;
