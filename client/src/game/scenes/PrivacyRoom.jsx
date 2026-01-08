@@ -1,202 +1,193 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import PropTypes from 'prop-types';
-import styles from '../game.module.css';
-import room from './PrivacyRoom.module.css';
+
+import React, { useState, useContext, useEffect } from 'react';
 import { GameContext } from '../../context/gameState.js';
+import api from '../../services/api';
+import styles from './PrivacyRoom.module.css';
 
-const initial = Object.freeze({
-  firstName: true,
-  photo: true,
-  hobbies: true,
-  school: false,
-  address: false,
-  phone: false,
-});
-
-export default function PrivacyRoom({ addScore: addScoreProp, awardBadge: awardBadgeProp } = {}) {
-  const { playerName, addScore, registerMistake, awardBadge, handleBack, badges } = useContext(GameContext);
-  const addScoreFn = addScoreProp || addScore;
-  const awardBadgeFn = awardBadgeProp || awardBadge;
-
-  const [toggles, setToggles] = useState({ ...initial });
+const PrivacyRoom = () => {
+  const [dollDescription, setDollDescription] = useState('');
+  const [privacySettings, setPrivacySettings] = useState({
+    isNamePublic: false,
+    isAgePublic: false,
+    isSchoolPublic: false,
+    isPhonePublic: false,
+    isAddressPublic: false,
+    isPhotoPublic: false,
+    isLocationPublic: false,
+  });
   const [message, setMessage] = useState('');
-  const [messageKind, setMessageKind] = useState(''); // 'danger' | 'ok' | ''
-  const [scanning, setScanning] = useState(false);
-  const scanTimerRef = useRef(null);
+  const [messageKind, setMessageKind] = useState('');
+  const [generatedDoll, setGeneratedDoll] = useState(null);
+  const [selectedDoll, setSelectedDoll] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { addDollToInventory, setCoins, shopState, setMovementLocked } = useContext(GameContext);
 
-  const unsafeOn = useMemo(() => {
-    return Boolean(toggles.address || toggles.phone);
-  }, [toggles]);
-
-  const alreadyEarned = Boolean(badges?.privacyShield);
-
-  // Bridge state to 3D UI (floating glass panel in the canvas)
-  useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent('hakathon.privacy.profile', {
-        detail: {
-          toggles,
-          scanning,
-          unsafeOn,
-          message,
-          messageKind,
-          playerName: playerName || '',
-        },
-      }),
-    );
-  }, [toggles, scanning, unsafeOn, message, messageKind, playerName]);
-
-  const submit = () => {
-    if (scanTimerRef.current) {
-      window.clearTimeout(scanTimerRef.current);
-      scanTimerRef.current = null;
-    }
-
+  const handleToggle = (field) => {
+    setPrivacySettings(prev => ({ ...prev, [field]: !prev[field] }));
     setMessage('');
-    setMessageKind('');
-    setScanning(true);
-
-    scanTimerRef.current = window.setTimeout(() => {
-      setScanning(false);
-      scanTimerRef.current = null;
-
-      if (unsafeOn) {
-        registerMistake();
-        setMessageKind('danger');
-        setMessage('⚠️ Warning: Home Address / Phone should not be public. Turn them OFF.');
-        return;
-      }
-
-      setMessageKind('ok');
-      if (alreadyEarned) {
-        setMessage('✅ Privacy Shield already earned — great choices.');
-        return;
-      }
-
-      awardBadgeFn('privacyShield');
-      addScoreFn(50);
-      setMessage('✅ Scan complete — you earned the Privacy Shield badge.');
-    }, 900);
   };
 
-  const back = () => handleBack();
-
-  const toggle = (key) => {
-    setToggles((t) => ({ ...t, [key]: !t[key] }));
+  const calculateRisk = () => {
+    let risk = 0;
+    if (privacySettings.isPhonePublic) risk += 3;
+    if (privacySettings.isAddressPublic) risk += 4;
+    if (privacySettings.isLocationPublic) risk += 2;
+    if (privacySettings.isPhotoPublic) risk += 1;
+    return risk;
   };
 
-  return (
-    <div className={`${styles.panel} ${room.room}`}>
-      <div className={room.header}>
-        <div>
-          <h2 className={room.title}>🔒 Privacy Scanner — Social Profile</h2>
-          <div className={`${styles.small} ${room.subtitle}`}>
-            {playerName ? `${playerName}, keep sensitive info private.` : 'Keep sensitive info private.'}
+  const handleGenerateDoll = async () => {
+    if (!dollDescription.trim()) {
+      setMessageKind('warn');
+      setMessage('Please enter a description for your doll!');
+      return;
+    }
+    setIsLoading(true);
+    setMessage('');
+    setGeneratedDoll(null);
+    try {
+      const response = await api.post('/dolls/generate', {
+        dollDescription,
+        privacySettings
+      });
+      if (response.data.success) {
+        setMessageKind('ok');
+        setMessage(response.data.message);
+        setGeneratedDoll(response.data.doll);
+        setSelectedDoll(response.data.doll);
+        addDollToInventory && addDollToInventory(response.data.doll);
+        setCoins && setCoins(prevCoins => prevCoins + 10);
+      } else {
+        setMessageKind('warn');
+        setMessage(response.data.message);
+      }
+    } catch (error) {
+      setMessageKind('error');
+      setMessage(error.response?.data?.message || 'Server error. Could not create doll.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectFromAlbum = (doll) => {
+    setSelectedDoll(doll);
+    setGeneratedDoll(doll);
+  };
+
+  // Download button logic
+  const downloadDoll = async (url, name) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${name}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      alert('Download failed.');
+    }
+  };
+
+  // Load dolls from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('saved_dolls');
+    if (saved && shopState && shopState.generatedDolls.length === 0) {
+      try {
+        const dolls = JSON.parse(saved);
+        if (Array.isArray(dolls) && dolls.length > 0) {
+          setSelectedDoll(dolls[dolls.length - 1]);
+          // Optionally update shopState here if needed
+        }
+      } catch {}
+    }
+  }, []);
+
+  const currentRisk = calculateRisk();
+
+    return (
+      <div className={styles.privacyRoom} onClick={e => e.stopPropagation()}>
+        <h2 className={styles.neonTitle}>Doll Factory & Museum</h2>
+        <div className={styles.mainLayout}>
+          {/* Display side: preview and album */}
+          <div className={styles.displaySide}>
+            <div className={styles.previewZone}>
+              {selectedDoll ? (
+                <div className={styles.bigFocus}>
+                  <div className={styles.imageContainer}>
+                    <img src={selectedDoll.imageUrl} className={selectedDoll.blur ? styles.blurred : ''} alt={selectedDoll.name} />
+                    {!selectedDoll.blur && (
+                      <button className={styles.downloadIcon} onClick={() => downloadDoll(selectedDoll.imageUrl, selectedDoll.name)}>
+                        📥 Download
+                      </button>
+                    )}
+                  </div>
+                  <h3>{selectedDoll.name}</h3>
+                </div>
+              ) : (
+                <p>Select a doll from the album or create a new one</p>
+              )}
+            </div>
+            <div className={styles.albumContainer}>
+              <h4>My Collection</h4>
+              <div className={styles.dollGrid}>
+                {shopState.generatedDolls.map((doll) => (
+                  <div
+                    key={doll.id}
+                    className={styles.dollCard}
+                    onClick={() => setSelectedDoll(doll)}
+                  >
+                    <img src={doll.imageUrl} alt={doll.name} />
+                    <span>{doll.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Control side: privacy toggles and input */}
+          <div className={styles.controlSide}>
+            <div className={styles.privacyGrid}>
+              <PrivacyItem label="Full Name" value="[Your Name]" isPrivate={!privacySettings.isNamePublic} onToggle={() => handleToggle('isNamePublic')} />
+              <PrivacyItem label="Age" value="[Your Age]" isPrivate={!privacySettings.isAgePublic} onToggle={() => handleToggle('isAgePublic')} />
+              <PrivacyItem label="School" value="[Your School]" isPrivate={!privacySettings.isSchoolPublic} onToggle={() => handleToggle('isSchoolPublic')} />
+              <PrivacyItem label="Phone Number" value="[Hidden]" isPrivate={!privacySettings.isPhonePublic} onToggle={() => handleToggle('isPhonePublic')} />
+              <PrivacyItem label="Home Address" value="[Hidden]" isPrivate={!privacySettings.isAddressPublic} onToggle={() => handleToggle('isAddressPublic')} />
+              <PrivacyItem label="Profile Photo" value="[Image]" isPrivate={!privacySettings.isPhotoPublic} onToggle={() => handleToggle('isPhotoPublic')} />
+              <PrivacyItem label="Location (GPS)" value="[Hidden]" isPrivate={!privacySettings.isLocationPublic} onToggle={() => handleToggle('isLocationPublic')} />
+            </div>
+            <div className={styles.inputArea}>
+              <textarea
+                className={styles.dollInput}
+                value={dollDescription}
+                onChange={e => setDollDescription(e.target.value)}
+                onKeyDown={e => e.stopPropagation()}
+                placeholder="Describe your dream doll..."
+                rows="3"
+              />
+              <button
+                className={styles.generateBtn}
+                onClick={handleGenerateDoll}
+                disabled={isLoading}
+              >
+                {isLoading ? 'MANUFACTURING...' : 'GENERATE NEW ENTITY'}
+              </button>
+              {message && <div className={`${styles.message} ${styles[messageKind]}`}>{message}</div>}
+            </div>
           </div>
         </div>
-        <div className="neonGlow">SCAN MODE</div>
       </div>
-
-      <div className={styles.hr} />
-
-      <div className={`${room.controls} glassNeon`}>
-        <div className={room.cardTop}>
-          <div className={room.cardName}>3D Profile Panel</div>
-          <div className={room.badge}>{unsafeOn ? 'SENSITIVE DATA ON' : 'SAFE MODE'}</div>
-        </div>
-
-        <div className={room.controls}>
-          <div className={room.toggleRow}>
-            <div className={room.toggleText}>
-              <div>First name</div>
-              <div className={room.toggleHint}>Safe to share in many cases</div>
-            </div>
-            <button type="button" className={styles.button} onClick={() => toggle('firstName')}>
-              {toggles.firstName ? 'ON ✅' : 'OFF ❌'}
-            </button>
-          </div>
-
-          <div className={room.toggleRow}>
-            <div className={room.toggleText}>
-              <div>Photo</div>
-              <div className={room.toggleHint}>Only share with people you trust</div>
-            </div>
-            <button type="button" className={styles.button} onClick={() => toggle('photo')}>
-              {toggles.photo ? 'ON ✅' : 'OFF ❌'}
-            </button>
-          </div>
-
-          <div className={room.toggleRow}>
-            <div className={room.toggleText}>
-              <div>Hobbies</div>
-              <div className={room.toggleHint}>General info is usually OK</div>
-            </div>
-            <button type="button" className={styles.button} onClick={() => toggle('hobbies')}>
-              {toggles.hobbies ? 'ON ✅' : 'OFF ❌'}
-            </button>
-          </div>
-
-          <div className={room.toggleRow}>
-            <div className={room.toggleText}>
-              <div>School</div>
-              <div className={room.toggleHint}>Be careful with identifying details</div>
-            </div>
-            <button type="button" className={styles.button} onClick={() => toggle('school')}>
-              {toggles.school ? 'ON ✅' : 'OFF ❌'}
-            </button>
-          </div>
-
-          <div className={room.toggleRow}>
-            <div className={room.toggleText}>
-              <div>Home Address</div>
-              <div className={room.toggleHint}>Sensitive — keep private</div>
-            </div>
-            <button type="button" className={styles.button} onClick={() => toggle('address')}>
-              {toggles.address ? 'ON ✅' : 'OFF ❌'}
-            </button>
-          </div>
-
-          <div className={`${room.toggleRow} ${room.toggleRowLast}`}>
-            <div className={room.toggleText}>
-              <div>Phone</div>
-              <div className={room.toggleHint}>Sensitive — keep private</div>
-            </div>
-            <button type="button" className={styles.button} onClick={() => toggle('phone')}>
-              {toggles.phone ? 'ON ✅' : 'OFF ❌'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.hr} />
-
-      <div className={`${styles.row} ${room.actions}`}>
-        <button
-          type="button"
-          className={`${styles.button} ${styles.buttonPrimary}`}
-          onClick={submit}
-          disabled={scanning}
-        >
-          {scanning ? 'Scanning…' : 'Finish'}
-        </button>
-        <button type="button" className={styles.button} onClick={back}>
-          Back
-        </button>
-      </div>
-
-      {message ? (
-        <div
-          role={messageKind === 'danger' ? 'alert' : undefined}
-          className={`${room.alert} ${messageKind === 'danger' ? room.alertDanger : room.alertOk}`}
-        >
-          {message}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-PrivacyRoom.propTypes = {
-  addScore: PropTypes.func,
-  awardBadge: PropTypes.func,
+    );
 };
+
+const PrivacyItem = ({ label, value, isPrivate, onToggle }) => (
+  <div className={`${styles.privacyItem} ${isPrivate ? styles.private : styles.public}`}>
+    <span>{label}: <strong>{value}</strong></span>
+    <button onClick={onToggle}>
+      {isPrivate ? '🔒 Private' : '🌍 Public'}
+    </button>
+  </div>
+);
+
+export default PrivacyRoom;

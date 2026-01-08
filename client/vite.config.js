@@ -8,9 +8,19 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/ducks': 'http://localhost:5000',
-      '/images': 'http://localhost:5000',
+      // כל בקשה שמתחילה ב-api תופנה לשרת ה-Node.js
+      '/api': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+      // הפניית בקשות לתמונות (אם יש תיקייה כזו בשרת)
+      '/images': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
+      }
     },
-    open: true // Automatically open the browser
+    open: true
   }
 })

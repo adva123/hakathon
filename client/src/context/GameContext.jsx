@@ -7,11 +7,13 @@ const defaultBadges = Object.freeze({
   privacyShield: false,
 });
 
+
 const defaultOwned = Object.freeze({
   ownedItems: [],
   equippedItems: [],
   ownedRobots: [], // array of robot ids
   selectedRobotId: null, // id of selected robot
+  generatedDolls: [], // array of doll objects
 });
 
 const storageKey = 'hakathon.gameState.v1';
@@ -145,10 +147,23 @@ export function GameProvider({ children }) {
         ? uniqueArray(persisted.shopState.ownedRobots)
         : [];
       const selectedRobotId = persisted.shopState.selectedRobotId || null;
-      return { ownedItems, equippedItems, ownedRobots, selectedRobotId };
+      const generatedDolls = Array.isArray(persisted.shopState.generatedDolls)
+        ? persisted.shopState.generatedDolls
+        : [];
+      return { ownedItems, equippedItems, ownedRobots, selectedRobotId, generatedDolls };
     }
     return { ...defaultOwned };
   });
+    // Add a generated doll to inventory
+    const addDollToInventory = useCallback((doll) => {
+      if (!doll) return;
+      setShopState((prev) => {
+        const generatedDolls = Array.isArray(prev.generatedDolls)
+          ? [...prev.generatedDolls, doll]
+          : [doll];
+        return { ...prev, generatedDolls };
+      });
+    }, []);
   // Buy a robot and select it
   const buyRobot = useCallback(({ robotId, price, useCoins = false }) => {
     if (!robotId || typeof price !== 'number') return { ok: false, reason: 'invalid' };
@@ -426,6 +441,7 @@ export function GameProvider({ children }) {
       equipItem,
       buyRobot,
       selectRobot,
+      addDollToInventory,
     }),
     [
       currentScene,
@@ -457,6 +473,7 @@ export function GameProvider({ children }) {
       equipItem,
       buyRobot,
       selectRobot,
+      addDollToInventory,
     ]
   );
 
