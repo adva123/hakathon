@@ -171,42 +171,18 @@ app.post('/api/dolls/generate', async (req, res) => {
 
     console.log('📝 Received doll request:', dollDescription);
 
-    // 1. Safety check
-    const forbiddenWords = ['כתובת', 'רחוב', 'עיר', 'מילה_רעה1', 'טלפון', 'email', 'מספר', 'דוא"ל'];
-    const isUnsafe = forbiddenWords.some(word => dollDescription.includes(word)) ||
-                     privacySettings?.isPhonePublic ||
-                     privacySettings?.isAddressPublic;
+    // 1. Safety check (regex for phone/email, forbidden words)
+    const forbiddenPattern = /(05\d|02\d|03\d|04\d|08\d|09\d)-?\d{7}|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+    const forbiddenWords = ['רחוב', 'מספר בית', 'קומה', 'דירה', 'קקי', 'פיפי', 'קללה', 'גנב', 'שקרן', 'טמבל'];
+    const containsInfo = forbiddenPattern.test(dollDescription);
+    const containsBadWords = forbiddenWords.some(word => dollDescription.includes(word));
+    const isUnsafe = containsInfo || containsBadWords || privacySettings?.isPhonePublic || privacySettings?.isAddressPublic;
     if (isUnsafe) {
-        console.log('🚫 Unsafe content detected');
-        // Virus image with red X (SVG data URL)
-        const virusSvg = encodeURIComponent(`
-            <svg width='256' height='256' xmlns='http://www.w3.org/2000/svg'>
-              <rect width='256' height='256' fill='#fff'/>
-              <circle cx='128' cy='128' r='80' fill='#ff3333' stroke='#b20000' stroke-width='8'/>
-              <text x='50%' y='50%' text-anchor='middle' dy='.3em' font-size='80' font-family='Arial' fill='#fff'>🦠</text>
-              <line x1='60' y1='60' x2='196' y2='196' stroke='#fff' stroke-width='18' stroke-linecap='round'/>
-              <line x1='196' y1='60' x2='60' y2='196' stroke='#fff' stroke-width='18' stroke-linecap='round'/>
-            </svg>
-        `);
-        const unsafeDoll = {
-            id: `doll_${Date.now()}`,
-            name: "❌ Virus Detected",
-            description: "Blocked due to unsafe content.",
-            imageUrl: `data:image/svg+xml,${virusSvg}`,
-            blur: true,
-            privacyApproved: false,
-            createdAt: new Date()
-        };
-        // Do NOT add unsafe doll to userData.generatedDolls
-        // הורד אנרגיה למשתמש (נניח energy קיים, אם לא - הוסף)
-        if (typeof userData.energy !== 'number') userData.energy = 100;
-        userData.energy = Math.max(0, userData.energy - 10);
-        return res.json({ 
-            success: true, 
-            isUnsafe: true, 
-            doll: unsafeDoll, 
-            message: "❌ Unsafe content detected! Energy decreased.",
-            userData
+        return res.json({
+            success: true,
+            isUnsafe: true,
+            message: "Privacy violation: Please do not share personal info or bad words!",
+            doll: { name: "Blocked", description: "Unsafe content" }
         });
     }
 

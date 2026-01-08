@@ -78,38 +78,31 @@ function PrivacyRoom({ gestureRef }) {
       });
 
       if (response.data.success) {
-        const doll = response.data.doll;
         const isUnsafe = response.data.isUnsafe;
-
-        if (!isUnsafe) {
-          // ✅ Good image: rewards
-          setMessageKind('ok');
-          setMessage('🌟 Creative! +10 points, +5 coins!');
-          if (addScore) addScore(10);
-          if (setCoins) setCoins(prev => prev + 5);
-          setGeneratedDoll(doll);
-          setSelectedDoll(doll);
-          badImageCountRef.current = 0;
-          if (addDollToInventory) addDollToInventory(doll);
-        } else {
-          // ❌ Unsafe image: penalty
-          setMessageKind('error');
-          setMessage('⚠️ Inappropriate or unsafe content detected! Energy decreased.');
+        if (isUnsafe) {
+          // ❌ Unsafe content: show red X, penalty
           const redXDoll = {
-            ...doll,
-            imageUrl: 'https://img.icons8.com/emoji/256/cross-mark.png',
+            id: 'blocked_' + Date.now(),
             name: 'Blocked Content',
-            description: 'This image was blocked for safety reasons.',
-            isGood: false
+            imageUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png',
+            description: 'This creation was blocked for safety reasons.'
           };
           setGeneratedDoll(redXDoll);
           setSelectedDoll(redXDoll);
+          setMessageKind('error');
+          setMessage('⚠️ Safety Warning: Do not share personal info! -1 Energy.');
           if (registerMistake) registerMistake();
-          if (addScore) addScore(-10);
+        } else {
+          // ✅ Good image: rewards
+          const doll = response.data.doll;
+          setGeneratedDoll(doll);
+          setSelectedDoll(doll);
+          if (addScore) addScore(10);
+          if (setCoins) setCoins(prev => prev + 5);
+          setMessageKind('ok');
+          setMessage('🌟 Amazing! +10 points & +5 coins!');
+          if (addDollToInventory) addDollToInventory(doll);
         }
-      } else {
-        setMessageKind('warn');
-        setMessage(response.data.message);
       }
     } catch (error) {
       console.error('❌ Error generating doll:', error);
