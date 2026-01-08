@@ -75,21 +75,84 @@ const Robot = forwardRef((props, ref) => {
   const faceTextureRef = useRef(null);
   const faceShaderRef = useRef(null);
 
-  // עדכון חומרים (Materials) דינמי בזמן אמת לפי סקין נבחר
+  // Upgrade GLB materials and apply Skin colors
   useEffect(() => {
-    innerScene.traverse((obj) => {
-      if (obj.isMesh && obj.material) {
-        // צבע גוף בלבד
-        if (obj.material.name === "Main") {
-          obj.material.color = new THREE.Color(skin.color);
-          obj.material.metalness = skin.type === 'luxury' ? (skin.metalness ?? 0.9) : 0.1;
-          obj.material.roughness = skin.type === 'luxury' ? (skin.roughness ?? 0.1) : 0.6;
-          obj.material.wireframe = !!skin.wireframe;
-          obj.material.needsUpdate = true;
-        }
-      }
+    const created = [];
+    const cache = new Map();
+
+    const goldMat = new THREE.MeshPhysicalMaterial({
+      color: GOLD_COLOR,
+      metalness: 0.9,
+      roughness: 0.1,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.06,
     });
-  }, [innerScene, skin]);
+
+    const toPhysical = (src, key, forceColor = null) => {
+      if (!src) return null;
+      if (cache.has(key)) return cache.get(key);
+
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: forceColor ? new THREE.Color(forceColor) : (src.color?.clone?.() ?? new THREE.Color('#ffffff')),
+        map: src.map ?? null,
+        emissive: src.emissive?.clone?.() ?? new THREE.Color('#000000'),
+        emissiveMap: src.emissiveMap ?? null,
+        emissiveIntensity: Number.isFinite(src.emissiveIntensity) ? src.emissiveIntensity : 0,
+        roughness: forceColor ? 0.7 : 0.6, // מסגרת תהיה פחות מבריקה
+        metalness: forceColor ? 0.05 : 0.1,
+        transparent: Boolean(src.transparent),
+        opacity: Number.isFinite(src.opacity) ? src.opacity : 1,
+        side: src.side,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+      });
+
+      cache.set(key, mat);
+      created.push(mat);
+      return mat;
+    };
+
+    innerScene.traverse((obj) => {
+      if (!obj?.isMesh || !obj.material) return;
+      const mat = Array.isArray(obj.material) ? obj.material[0] : obj.material;
+      const matName = mat.name || "";
+      const objName = obj.name || "";
+
+      // בדיקה: האם זה חלק מהמסגרת או העיניים?
+      const isFrame = matName.includes("Frame") || objName.includes("Frame");
+      const isEye = matName.includes("Eye") || objName.includes("Eye");
+      const isJoint = /(joint|hinge|elbow|knee|ankle|wrist|shoulder|hip)/i.test(objName);
+
+      if (isJoint) {
+        obj.material = goldMat;
+      } else if (isFrame) {
+        // צבע מסגרת קבוע - חום כהה/שחור
+        obj.material = toPhysical(mat, 'frame_fixed', '#3b2a1c');
+      } else if (isEye) {
+        // צבע עיניים קבוע - לבן
+        obj.material = toPhysical(mat, 'eye_fixed', '#f8fbff');
+      } else if (matName.includes("Main") || objName.includes("Main") || objName.includes("Body")) {
+        // כאן משתנה הצבע לפי הסקין הנבחר!
+        const bodyMat = toPhysical(mat, `skin_${skin.id}_${skin.color}`);
+        bodyMat.color.set(skin.color);
+        bodyMat.metalness = skin.type === 'luxury' ? (skin.metalness ?? 0.9) : 0.1;
+        bodyMat.roughness = skin.type === 'luxury' ? (skin.roughness ?? 0.1) : 0.6;
+        bodyMat.wireframe = !!skin.wireframe;
+        obj.material = bodyMat;
+      } else {
+        // שאר החלקים הכלליים
+        obj.material = toPhysical(mat, mat.uuid);
+      }
+
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    });
+
+    return () => {
+      goldMat.dispose();
+      created.forEach((m) => m.dispose());
+    };
+  }, [innerScene, skin]); // פועל בכל פעם שהסקין משתנה
 
   // Upgrade GLB materials to glossy physical
   useEffect(() => {
