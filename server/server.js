@@ -1,12 +1,12 @@
-
 import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import OpenAI from 'openai';
-import { fileURLToPath } from 'url';
+import pool from '../db/db.js';
 
-dotenv.config();
+
 const app = express();
 app.use(cors({
     origin: 'http://localhost:5173',
@@ -15,6 +15,118 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// 1. נתיב לעדכון ניקוד (יפתור את ה-404 בתמונה baa3dc)
+app.post('/api/users/update-score', async (req, res) => {
+    const { userId, scoreToAdd } = req.body;
+    // בדיקה למניעת שגיאת "undefined" בפרמטרים
+    if (!userId || scoreToAdd === undefined) {
+        return res.status(400).json({ error: "Missing userId or scoreToAdd in request body" });
+    }
+    try {
+        await pool.execute(
+            'UPDATE users SET score = score + ? WHERE id = ?',
+            [scoreToAdd, userId]
+        );
+        const [rows] = await pool.execute('SELECT id, score, coins FROM users WHERE id = ?', [userId]);
+        res.json({ success: true, user: rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. נתיב למחיקת בובה (בדיקת DELETE בפוסטמן)
+app.delete('/api/dolls/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.execute('DELETE FROM dolls WHERE id = ?', [id]);
+        res.json({ success: true, message: "Doll deleted" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// שליפת 10 סיסמאות אקראיות מה-DB
+app.get('/api/passwords/random', async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            'SELECT password_text AS password, is_strong AS isStrong FROM passwords ORDER BY RAND() LIMIT 10'
+        );
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// שמירת בובה חדשה ב-DB
+app.post('/api/dolls/save', async (req, res) => {
+    // הוספת ערכי ברירת מחדל (0) למניעת undefined
+    const {
+        userId,
+        name,
+        description,
+        imageUrl,
+        isGood,
+        pointsDelta = 0,
+        energyDelta = 0
+    } = req.body;
+
+    try {
+        // 1. שמירת הבובה
+        await pool.execute(
+            'INSERT INTO dolls (user_id, name, description, image_url, is_good) VALUES (?, ?, ?, ?, ?)',
+            [userId, name, description, imageUrl, isGood]
+        );
+
+        // 2. בניית שאילתת עדכון המשתמש
+        let updateFields = [];
+        let updateValues = [];
+
+        if (isGood) {
+            updateFields.push('coins = coins + 10');
+        }
+
+        // שימוש ב-score כפי שמופיע ב-DB שלך
+        updateFields.push('score = score + ?');
+        updateValues.push(pointsDelta);
+
+        updateFields.push('energy = energy + ?');
+        updateValues.push(energyDelta);
+
+        // ביצוע העדכון
+        await pool.execute(
+            `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
+            [...updateValues, userId]
+        );
+
+        // שליפת הנתונים המעודכנים להצגה
+        const [userRows] = await pool.execute(
+            'SELECT id, coins, score, energy FROM users WHERE id = ?',
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            message: "Success! Everything saved to DB.",
+            user: userRows[0]
+        });
+
+    } catch (err) {
+        console.error("❌ DB Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// שליפת כל הבובות של משתמש
+app.get('/api/dolls/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const [rows] = await pool.execute('SELECT * FROM dolls WHERE user_id = ?', [userId]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -27,6 +139,29 @@ let userData = {
     selectedRobotId: 'default',
     generatedDolls: []
 };
+
+// נתיב להתחברות/יצירת משתמש (מה שחיפשת בפוסטמן)
+app.post('/api/auth/login', async (req, res) => {
+    const { email, username } = req.body; // בבדיקה ידנית נשלח אימייל
+    try {
+        // בודק אם המשתמש קיים ב-DB
+        const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [email]);
+        
+        if (rows.length > 0) {
+            return res.json({ success: true, user: rows[0] });
+        }
+
+        // אם לא קיים - יוצר משתמש חדש
+        const [result] = await pool.execute(
+            'INSERT INTO users (username, email, coins, points, energy) VALUES (?, ?, ?, ?, ?)',
+            [username || 'New Player', email, 100, 0, 100]
+        );
+        
+        res.json({ success: true, user: { id: result.insertId, email, username } });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 /**
  * 🎨 יצירת בובה עם DALL-E 3
