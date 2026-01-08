@@ -36,47 +36,110 @@ let userData = {
 app.post('/api/dolls/generate', async (req, res) => {
     const { dollDescription, privacySettings } = req.body;
 
-    // 1. בדיקת פרטיות
-    if (privacySettings.isPhonePublic || privacySettings.isAddressPublic) {
-        return res.status(400).json({ 
-            success: false, 
-            message: "Sharing phone or address is too risky. Doll creation failed!" 
+    console.log('📝 Received doll request:', dollDescription);
+
+    // 1. Safety check
+    const isUnsafe = dollDescription.toLowerCase().includes("קללה") || 
+                     privacySettings.isPhonePublic ||
+                     privacySettings.isAddressPublic;
+    
+    if (isUnsafe) {
+        console.log('🚫 Unsafe content detected');
+        const unsafeDoll = {
+            id: `doll_${Date.now()}`,
+            name: "⚠️ Blocked Content",
+            description: "Content blocked for safety reasons.",
+            imageUrl: "https://via.placeholder.com/500/ff0000/ffffff?text=BLOCKED",
+            blur: true,
+            privacyApproved: false,
+            createdAt: new Date()
+        };
+        userData.generatedDolls.push(unsafeDoll);
+        return res.json({ 
+            success: true, 
+            isUnsafe: true, 
+            doll: unsafeDoll, 
+            message: "⚠️ Content blocked due to safety concerns." 
         });
     }
 
     try {
-        // 2. קריאה ל-Gemini API
-        const prompt = `Create a whimsical and child-friendly name and a short, cute description (max 20 words) for a doll based on this request: "${dollDescription}". Format: {"name": "Doll Name", "description": "Doll Description"}`;
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        console.log('🤖 Step 1: Calling Gemini to generate doll details...');
+        
+        // 2. Gemini: יוצר שם ותיאור לבובה
+        const geminiPrompt = `Create a whimsical, child-friendly name and a short cute description (max 25 words) for a doll based on this request: "${dollDescription}". \n\nReturn ONLY valid JSON in this exact format:\n{"name": "Doll Name", "description": "Short cute description"}`;
 
-        // נסה לנתח את הטקסט ל-JSON (Gemini לא תמיד מחזירה JSON מושלם)
-        let dollDetails;
+        let dollDetails = { 
+            name: `${dollDescription.substring(0, 20)} Doll`, 
+            description: "A unique and special doll!" 
+        };
+
         try {
-            dollDetails = JSON.parse(text.replace(/```json|```/g, '').trim());
-        } catch (parseError) {
-            console.error("Failed to parse Gemini response:", text, parseError);
-            dollDetails = { name: `${dollDescription} Doll`, description: "A unique doll!" };
+            const result = await model.generateContent(geminiPrompt);
+            const response = await result.response;
+            const text = response.text();
+            console.log('✅ Gemini response:', text);
+
+            // Parse the JSON response
+            const cleanText = text.replace(/```json\n?|```\n?/g, '').trim();
+            dollDetails = JSON.parse(cleanText);
+            console.log('📦 Parsed doll details:', dollDetails);
+        } catch (geminiError) {
+            console.error('⚠️ Gemini error (using fallback):', geminiError.message);
         }
 
-        // 3. שמירת הבובה (imageUrl ריק או תמונת placeholder)
+        console.log('🎨 Step 2: Creating AI prompt for image...');
+
+        // 3. יצירת prompt מתאים ליצירת תמונה
+        // Gemini יעזור לנו ליצור prompt טוב לתמונה
+        const imagePromptRequest = `Based on this doll description: "${dollDescription}", create a detailed image generation prompt for a cute toy doll. \n\nThe prompt should be:\n- Child-friendly and whimsical\n- Describe physical appearance clearly\n- Mention "toy doll", "cute", "colorful"\n- Keep it under 60 words\n\nReturn ONLY the prompt text, nothing else.`;
+
+        let imagePrompt = `cute colorful toy doll, ${dollDescription}, friendly design, isolated on white background, high quality`;
+
+        try {
+            const result = await model.generateContent(imagePromptRequest);
+            const response = await result.response;
+            imagePrompt = response.text().trim();
+            console.log('🖼️ Generated image prompt:', imagePrompt);
+        } catch (err) {
+            console.warn('⚠️ Using fallback image prompt');
+        }
+
+        // 4. 🎨 יצירת URL לתמונה מ-Pollinations.ai (חינמי!)
+        // זה פשוט URL - אין צורך ב-API key!
+        const encodedPrompt = encodeURIComponent(imagePrompt);
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&seed=${Date.now()}&nologo=true`;
+        
+        console.log('✅ Image URL created:', imageUrl);
+
+        // 5. יצירת אובייקט הבובה
         const newDoll = {
             id: `doll_${Date.now()}`,
             name: dollDetails.name,
             description: dollDetails.description,
-            imageUrl: `/dolls/${Math.floor(Math.random() * 5) + 1}.png`,
+            imageUrl: imageUrl,
+            imagePrompt: imagePrompt, // שמירת ה-prompt לעיון
+            blur: false,
             privacyApproved: true,
             createdAt: new Date()
         };
-        userData.generatedDolls.push(newDoll);
 
-        // 4. החזרת תשובה חיובית
-        res.json({ success: true, doll: newDoll, message: "Doll created successfully!" });
+        userData.generatedDolls.push(newDoll);
+        console.log('✅ Doll created successfully!');
+
+        res.json({ 
+            success: true, 
+            isUnsafe: false, 
+            doll: newDoll, 
+            message: "✨ Doll created successfully! The AI is generating your image..." 
+        });
 
     } catch (error) {
-        console.error("Gemini API or server error:", error);
-        res.status(500).json({ success: false, message: "Failed to generate doll. Try again later." });
+        console.error("❌ Server error:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Failed to generate doll. Please try again." 
+        });
     }
 });
 
