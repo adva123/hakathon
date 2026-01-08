@@ -26,19 +26,19 @@ function PrivacyRoom({ gestureRef }) {
   const [showFullImage, setShowFullImage] = useState(false);
   const [useDALLE, setUseDALLE] = useState(false); // אופציה ל-DALL-E
   const { addDollToInventory, setCoins, addScore, registerMistake, shopState, setMovementLocked, handleBack } = useContext(GameContext);
-    // Gesture-based navigation: listen for "iloveyou" gesture to go back
-    useEffect(() => {
-      if (!gestureRef?.current) return;
-      const interval = setInterval(() => {
-        const g = gestureRef.current;
-        if (!g || !g.hasHand) return;
-        const gesture = String(g.gesture || 'none');
-        if (gesture === 'iLoveYou' || gesture === 'iloveyou') {
-          if (handleBack) handleBack();
-        }
-      }, 200);
-      return () => clearInterval(interval);
-    }, [gestureRef, handleBack]);
+  // Gesture-based navigation: listen for "iloveyou" gesture to go back
+  useEffect(() => {
+    if (!gestureRef?.current) return;
+    const interval = setInterval(() => {
+      const g = gestureRef.current;
+      if (!g || !g.hasHand) return;
+      const gesture = String(g.gesture || 'none');
+      if (gesture === 'iLoveYou' || gesture === 'iloveyou') {
+        if (handleBack) handleBack();
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [gestureRef, handleBack]);
   // Track number of consecutive bad images
   const badImageCountRef = useRef(0);
 
@@ -77,8 +77,7 @@ function PrivacyRoom({ gestureRef }) {
         useDALLE // שולח true אם רוצים DALL-E (בתשלום)
       });
 
-      console.log('📦 Server response:', response.data);
-
+console.log('📦 Server response:', JSON.stringify(response.data, null, 2));
       if (response.data.success) {
         setMessageKind('ok');
         setMessage(response.data.message);
@@ -190,7 +189,7 @@ function PrivacyRoom({ gestureRef }) {
   const handleImageError = (e, dollId, dollName) => {
     console.error('❌ Image failed:', dollId);
     setImageLoadStates(prev => ({ ...prev, [dollId]: 'error' }));
-    
+
     // Fallback placeholder
     e.target.src = `https://via.placeholder.com/500/cccccc/666666?text=${encodeURIComponent(dollName)}`;
   };
@@ -200,7 +199,7 @@ function PrivacyRoom({ gestureRef }) {
   return (
     <div className={styles.privacyRoom} onClick={e => e.stopPropagation()}>
       <h2 className={styles.neonTitle}>🎨 AI Doll Factory & Museum</h2>
-      
+
       {/* Status bar */}
       <div className={styles.statusBar}>
         <span>🎭 Collection: {shopState?.generatedDolls?.length || 0} dolls</span>
@@ -245,33 +244,52 @@ function PrivacyRoom({ gestureRef }) {
                       <p>AI is creating your image...</p>
                     </div>
                   )}
-                  <div style={{position:'relative', display:'inline-block'}}>
-                    <img
-                      src={selectedDoll.imageUrl}
-                      className={selectedDoll.blur ? styles.blurred : ''}
-                      alt={selectedDoll.name}
-                      onLoad={() => handleImageLoad(selectedDoll.id)}
-                      onError={(e) => handleImageError(e, selectedDoll.id, selectedDoll.name)}
-                      style={{
-                        display: imageLoadStates[selectedDoll.id] === 'loading' ? 'none' : 'block',
-                        cursor: 'zoom-in',
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    {selectedDoll.imageUrl ? (
+                      <>
+                        <img
+                          src={selectedDoll.imageUrl}
+                          className={selectedDoll.blur ? styles.blurred : ''}
+                          alt={selectedDoll.name}
+                          onLoad={() => handleImageLoad(selectedDoll.id)}
+                          onError={(e) => handleImageError(e, selectedDoll.id, selectedDoll.name)}
+                          style={{
+                            display: imageLoadStates[selectedDoll.id] === 'loading' ? 'none' : 'block',
+                            cursor: 'zoom-in',
+                            borderRadius: '12px',
+                            maxWidth: '100%',
+                            boxShadow: '0 0 18px #00f2ff33'
+                          }}
+                          onClick={() => setShowFullImage(true)}
+                        />
+                        {!selectedDoll.blur && imageLoadStates[selectedDoll.id] === 'loaded' && (
+                          <button
+                            className={styles.downloadIconSmall}
+                            title="Download image"
+                            onClick={e => {
+                              e.stopPropagation();
+                              downloadDoll(selectedDoll.imageUrl, selectedDoll.name);
+                            }}
+                          >
+                            📥
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      // ✅ אם אין תמונה, הצג הודעה
+                      <div style={{
+                        padding: '40px',
+                        background: 'rgba(255,0,85,0.1)',
                         borderRadius: '12px',
-                        maxWidth: '100%',
-                        boxShadow: '0 0 18px #00f2ff33'
-                      }}
-                      onClick={() => setShowFullImage(true)}
-                    />
-                    {!selectedDoll.blur && imageLoadStates[selectedDoll.id] === 'loaded' && (
-                      <button
-                        className={styles.downloadIconSmall}
-                        title="Download image"
-                        onClick={e => {
-                          e.stopPropagation();
-                          downloadDoll(selectedDoll.imageUrl, selectedDoll.name);
-                        }}
-                      >
-                        📥
-                      </button>
+                        textAlign: 'center',
+                        color: '#ff0055'
+                      }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '10px' }}>⚠️</div>
+                        <p>Image generation failed</p>
+                        <p style={{ fontSize: '0.9rem', marginTop: '8px' }}>
+                          {selectedDoll.generationMethod || 'Unknown error'}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -290,10 +308,10 @@ function PrivacyRoom({ gestureRef }) {
                     </div>
                   </div>
                 )}
-                
+
                 <h3>{selectedDoll.name}</h3>
                 <p className={styles.dollDescription}>{selectedDoll.description}</p>
-                
+
                 {selectedDoll.generationMethod && (
                   <p className={styles.generationInfo}>
                     Created with: {selectedDoll.generationMethod}
@@ -308,7 +326,7 @@ function PrivacyRoom({ gestureRef }) {
               </div>
             )}
           </div>
-          
+
           <div className={styles.albumContainer}>
             <h4>My AI Collection ({shopState?.generatedDolls?.length || 0})</h4>
             <div className={styles.dollGrid}>
@@ -319,8 +337,8 @@ function PrivacyRoom({ gestureRef }) {
                     className={`${styles.dollCard} ${selectedDoll?.id === doll.id ? styles.selected : ''}`}
                     onClick={() => handleSelectFromAlbum(doll)}
                   >
-                    <img 
-                      src={doll.imageUrl} 
+                    <img
+                      src={doll.imageUrl}
                       alt={doll.name}
                       onLoad={() => handleImageLoad(doll.id)}
                       onError={(e) => handleImageError(e, doll.id, doll.name)}
@@ -350,19 +368,19 @@ function PrivacyRoom({ gestureRef }) {
             fontSize: '1.1rem',
             lineHeight: 1.7
           }}>
-            <div style={{fontSize: '2.2rem', marginBottom: 10}}>
-              🌌 <span style={{color:'#00f2ff'}}>Create Your Own World!</span>
+            <div style={{ fontSize: '2.2rem', marginBottom: 10 }}>
+              🌌 <span style={{ color: '#00f2ff' }}>Create Your Own World!</span>
             </div>
-            <div style={{fontSize: '1.5rem', margin: '10px 0'}}>
+            <div style={{ fontSize: '1.5rem', margin: '10px 0' }}>
               <span role="img" aria-label="gift">🎁</span> Earn rewards for every creative doll you make!
             </div>
-            <div style={{fontSize: '1.2rem', margin: '10px 0'}}>
+            <div style={{ fontSize: '1.2rem', margin: '10px 0' }}>
               <span role="img" aria-label="star">✨</span> The more original and positive your world, the more coins you get!
             </div>
-            <div style={{fontSize: '1.2rem', margin: '10px 0'}}>
+            <div style={{ fontSize: '1.2rem', margin: '10px 0' }}>
               <span role="img" aria-label="robot">🤖</span> Robots love imagination!
             </div>
-            <div style={{fontSize: '1.1rem', margin: '18px 0 0 0', color:'#ff0055', fontWeight:'bold'}}>
+            <div style={{ fontSize: '1.1rem', margin: '18px 0 0 0', color: '#ff0055', fontWeight: 'bold' }}>
               <span role="img" aria-label="warning">⚠️</span> Inappropriate or unsafe creations lose points and may be removed.
             </div>
           </div>
@@ -374,7 +392,7 @@ function PrivacyRoom({ gestureRef }) {
               onKeyDown={e => e.stopPropagation()}
               placeholder="Describe your dream world or doll... (e.g., 'A neon robot princess in a glass city')"
               rows="3"
-            /> 
+            />
             <button
               className={styles.generateBtn}
               onClick={handleGenerateDoll}

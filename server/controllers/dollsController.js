@@ -3,8 +3,9 @@ import dollsService from '../services/dollsService.js';
 export const generateDoll = async (req, res) => {
   try {
     const { userId, dollDescription, privacySettings, useDALLE } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
-    const result = await dollsService.generateDoll(userId, dollDescription, privacySettings, useDALLE);
+    // אם אין userId, נשתמש ב-demo
+    const safeUserId = userId || 'demo';
+    const result = await dollsService.generateDoll(safeUserId, dollDescription, privacySettings, useDALLE);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Failed to generate doll.' });

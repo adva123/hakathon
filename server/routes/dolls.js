@@ -1,15 +1,13 @@
 import express from 'express';
-import dollsController from '../controllers/dollsController.js';
+import { generateDoll, getUserDolls } from '../controllers/dollsController.js';
 
 const router = express.Router();
 
+
 // POST /api/dolls/generate
-router.post('/generate', dollsController.generateDoll);
+router.post('/generate', generateDoll);
 
 // GET /api/dolls
-router.get('/', dollsController.getAllDolls);
-
-// DELETE /api/dolls/:id
-router.delete('/:id', dollsController.deleteDoll);
+router.get('/', getUserDolls);
 
 export default router;
