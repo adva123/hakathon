@@ -405,8 +405,10 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
       <div className={styles.cockpit}>
         <div className={styles.header}>
           <h2 className={styles.title}>Password Strength Detector</h2>
-          <div style={{ color: 'white', fontWeight: 700 }}>
-            Score: {score} | Coins: 🪙 {coins} | Lives: {'❤️'.repeat(lives)}
+          <div className={styles.statsRow}>
+            <div>Score: <span className={styles.neonTag}>{score}</span></div>
+            <div>Coins: <span className={styles.neonTag}>🪙 {coins}</span></div>
+            <div>Lives: <span className={styles.neonTag}>{'❤️'.repeat(lives)}</span></div>
           </div>
         </div>
 

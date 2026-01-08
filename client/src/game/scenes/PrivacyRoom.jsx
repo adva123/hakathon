@@ -25,7 +25,7 @@ function PrivacyRoom({ gestureRef }) {
   // Fullscreen image modal state
   const [showFullImage, setShowFullImage] = useState(false);
   const [useDALLE, setUseDALLE] = useState(false); // אופציה ל-DALL-E
-  const { addDollToInventory, setCoins, addScore, registerMistake, shopState, setMovementLocked, handleBack } = useContext(GameContext);
+  const { score, coins, energy, addDollToInventory, setCoins, addScore, registerMistake, shopState, setMovementLocked, handleBack } = useContext(GameContext);
   // Gesture-based navigation: listen for "iloveyou" gesture to go back
   useEffect(() => {
     if (!gestureRef?.current) return;
@@ -74,52 +74,39 @@ function PrivacyRoom({ gestureRef }) {
       const response = await api.post('/dolls/generate', {
         dollDescription,
         privacySettings,
-        useDALLE // שולח true אם רוצים DALL-E (בתשלום)
+        useDALLE
       });
 
-console.log('📦 Server response:', JSON.stringify(response.data, null, 2));
       if (response.data.success) {
-        setMessageKind('ok');
-        setMessage(response.data.message);
-
         const doll = response.data.doll;
-        console.log('✅ Doll created:', doll);
+        const isUnsafe = response.data.isUnsafe;
 
-        setGeneratedDoll(doll);
-        setSelectedDoll(doll);
-
-        // Add to inventory
-        if (addDollToInventory) {
-          addDollToInventory(doll);
-        }
-
-        // --- Reward/Penalty Logic ---
-        // Assume server returns a field: doll.isGood (true/false) or doll.quality ('good'|'bad')
-        const isGood = doll.isGood !== undefined ? doll.isGood : (doll.quality === 'good');
-        if (isGood) {
-          if (addScore) addScore(30);
-          if (setCoins) setCoins(prev => prev + 10);
-          badImageCountRef.current = 0;
+        if (!isUnsafe) {
+          // ✅ Good image: rewards
           setMessageKind('ok');
-          setMessage('🌟 Creative! +30 points, +10 coins!');
+          setMessage('🌟 Creative! +10 points, +5 coins!');
+          if (addScore) addScore(10);
+          if (setCoins) setCoins(prev => prev + 5);
+          setGeneratedDoll(doll);
+          setSelectedDoll(doll);
+          badImageCountRef.current = 0;
+          if (addDollToInventory) addDollToInventory(doll);
         } else {
+          // ❌ Unsafe image: penalty
+          setMessageKind('error');
+          setMessage('⚠️ Inappropriate or unsafe content detected! Energy decreased.');
+          const redXDoll = {
+            ...doll,
+            imageUrl: 'https://img.icons8.com/emoji/256/cross-mark.png',
+            name: 'Blocked Content',
+            description: 'This image was blocked for safety reasons.',
+            isGood: false
+          };
+          setGeneratedDoll(redXDoll);
+          setSelectedDoll(redXDoll);
+          if (registerMistake) registerMistake();
           if (addScore) addScore(-10);
-          badImageCountRef.current += 1;
-          setMessageKind('warn');
-          setMessage('⚠️ Inappropriate or unsafe creation. -10 points.');
-          if (badImageCountRef.current >= 3) {
-            if (registerMistake) registerMistake();
-            setMessageKind('warn');
-            setMessage('⚠️ 3 unsafe creations! Energy -10.');
-            badImageCountRef.current = 0;
-          }
         }
-
-        // Save in localStorage
-        const savedDolls = JSON.parse(localStorage.getItem('saved_dolls') || '[]');
-        savedDolls.push(doll);
-        localStorage.setItem('saved_dolls', JSON.stringify(savedDolls));
-
       } else {
         setMessageKind('warn');
         setMessage(response.data.message);
@@ -200,10 +187,14 @@ console.log('📦 Server response:', JSON.stringify(response.data, null, 2));
     <div className={styles.privacyRoom} onClick={e => e.stopPropagation()}>
       <h2 className={styles.neonTitle}>🎨 AI Doll Factory & Museum</h2>
 
-      {/* Status bar */}
-      <div className={styles.statusBar}>
+      {/* Enhanced Status bar with score, coins, energy */}
+      <div className={styles.statusBar} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <span>🎭 Collection: {shopState?.generatedDolls?.length || 0} dolls</span>
-        {/* <span>🎨 AI: {useDALLE ? 'DALL-E 3' : 'Pollinations (Free)'}</span> */}
+        <div style={{ display: 'flex', gap: 18, alignItems: 'center', fontSize: '1.1rem' }}>
+          <span title="Score" style={{ color: '#00f2ff', fontWeight: 600 }}>⭐ {score}</span>
+          <span title="Coins" style={{ color: '#ffd700', fontWeight: 600 }}>🪙 {coins}</span>
+          <span title="Energy" style={{ color: '#ff0055', fontWeight: 600 }}>⚡ {energy}</span>
+        </div>
       </div>
 
       <div className={styles.mainLayout}>

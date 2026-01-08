@@ -172,7 +172,8 @@ app.post('/api/dolls/generate', async (req, res) => {
     console.log('📝 Received doll request:', dollDescription);
 
     // 1. Safety check
-    const isUnsafe = dollDescription.toLowerCase().includes("קללה") || 
+    const forbiddenWords = ['כתובת', 'רחוב', 'עיר', 'מילה_רעה1', 'טלפון', 'email', 'מספר', 'דוא"ל'];
+    const isUnsafe = forbiddenWords.some(word => dollDescription.includes(word)) ||
                      privacySettings?.isPhonePublic ||
                      privacySettings?.isAddressPublic;
     if (isUnsafe) {
@@ -196,7 +197,7 @@ app.post('/api/dolls/generate', async (req, res) => {
             privacyApproved: false,
             createdAt: new Date()
         };
-        userData.generatedDolls.push(unsafeDoll);
+        // Do NOT add unsafe doll to userData.generatedDolls
         // הורד אנרגיה למשתמש (נניח energy קיים, אם לא - הוסף)
         if (typeof userData.energy !== 'number') userData.energy = 100;
         userData.energy = Math.max(0, userData.energy - 10);
@@ -204,7 +205,7 @@ app.post('/api/dolls/generate', async (req, res) => {
             success: true, 
             isUnsafe: true, 
             doll: unsafeDoll, 
-            message: "❌ Virus detected! Unsafe content. Energy decreased.",
+            message: "❌ Unsafe content detected! Energy decreased.",
             userData
         });
     }
