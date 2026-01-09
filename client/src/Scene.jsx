@@ -11,32 +11,23 @@ import Mission2Room from "./Missions/Mission2";
 import Mission3Room from "./Missions/Mission3";
 import Mission4Room from "./Missions/Mission4";
 
-
-
-// --- פונקציות עזר מתמטיות ---
-// הגבלת ערך בין מינימום למקסימום (למשל כדי שהרובוט לא יצא מהקירות)
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
 
-
-
-// --- רכיב האייקון של המשימה (MissionIcon) ---
 function MissionIcon({ position, tint = "#28f0e6" }) {
   const groupRef = useRef();
   const linesRef = useRef();
   const glowRef = useRef();
   const auraRef = useRef();
-  const tRef = useRef(Math.random() * 10); // זמן התחלתי רנדומלי כדי שהאייקונים לא יפעמו בסינכרון מושלם
+  const tRef = useRef(Math.random() * 10);
 
-  // יצירת טקסטורה של הילה (Aura) על הרצפה באמצעות Canvas
   const auraTex = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 256;
     c.height = 256;
     const ctx = c.getContext("2d");
 
-    // יצירת גרדיאנט מעגלי (Radial Gradient)
     const g = ctx.createRadialGradient(128, 128, 12, 128, 128, 120);
     g.addColorStop(0.0, "rgba(255,255,255,0.0)");
     g.addColorStop(0.25, "rgba(255,255,255,0.22)");
@@ -51,24 +42,20 @@ function MissionIcon({ position, tint = "#28f0e6" }) {
     return tex;
   }, []);
 
-  // לוגיקת האנימציה של האייקון (מתבצע בכל פריים)
   useFrame((_, delta) => {
     tRef.current += delta;
     if (!groupRef.current) return;
 
-    // 1. אפקט ריחוף (Hover) מעלה ומטה בעזרת פונקציית Sin
-    const baseHover = 3; 
-    const floatAmp = 0.18; 
-    const floatSpeed = 1.0; 
+    const baseHover = 3;
+    const floatAmp = 0.18;
+    const floatSpeed = 1.0;
     const floatY = Math.sin(tRef.current * floatSpeed) * floatAmp;
     groupRef.current.position.y = position[1] + baseHover + floatY;
 
-    // 2. סיבוב איטי סביב ציר ה-Y וטיה (Tilt) עדין למראה דינמי
     groupRef.current.rotation.y += delta * 0.6;
     groupRef.current.rotation.x = Math.sin(tRef.current * 0.6) * 0.06;
     groupRef.current.rotation.z = Math.cos(tRef.current * 0.6) * 0.04;
 
-    // 3. אפקט פעימה (Pulse) המשפיע על השקיפות והגודל
     const pulse = 0.5 + 0.5 * Math.sin(tRef.current * 2.2);
 
     if (linesRef.current?.material) {
@@ -83,16 +70,14 @@ function MissionIcon({ position, tint = "#28f0e6" }) {
 
     if (auraRef.current?.material) {
       auraRef.current.material.opacity = 0.16 + pulse * 0.10;
-      auraRef.current.rotation.z += delta * 0.15; // סיבוב ההילה שעל הרצפה
+      auraRef.current.rotation.z += delta * 0.15;
     }
   });
 
   return (
     <group ref={groupRef} position={[position[0], position[1], position[2]]}>
-      {/* אור ניאון קטן שבוקע ממרכז האייקון */}
       <pointLight position={[0, 0.3, 0]} intensity={1.15} color={tint} distance={10} />
 
-      {/* קווי המתאר של הקוביה (Wireframe) */}
       <lineSegments ref={linesRef}>
         <edgesGeometry args={[new THREE.BoxGeometry(1.25, 1.25, 1.25)]} />
         <lineBasicMaterial
@@ -104,7 +89,6 @@ function MissionIcon({ position, tint = "#28f0e6" }) {
         />
       </lineSegments>
 
-      {/* נפח "Glow" פנימי שקוף */}
       <mesh ref={glowRef}>
         <boxGeometry args={[1.32, 1.32, 1.32]} />
         <meshBasicMaterial
@@ -117,7 +101,6 @@ function MissionIcon({ position, tint = "#28f0e6" }) {
         />
       </mesh>
 
-      {/* מישור ההילה על הרצפה */}
       <mesh ref={auraRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -2.05, 0]}>
         <planeGeometry args={[4.2, 4.2]} />
         <meshBasicMaterial
@@ -137,8 +120,6 @@ MissionIcon.propTypes = {
   tint: PropTypes.string,
 };
 
-
-// --- רכיב הסצנה המרכזי (Scene) ---
 export default function Scene({
   roomId = "main",
   spawnKey,
@@ -151,7 +132,6 @@ export default function Scene({
 }) {
   const keys = useKeyboard();
 
-  // הגדרות מימדי החדר ומרחק בטיחות מהקירות
   const ROOM_W = 70;
   const ROOM_D = 70;
   const WALL_PADDING = 2.5;
@@ -164,37 +144,42 @@ export default function Scene({
   const robotRef = useRef();
   const controlsRef = useRef();
 
-  // מיקום וסיבוב הרובוט (נשמר ב-Ref כדי למנוע רנדר מיותר של כל ה-React)
   const pos = useRef(new THREE.Vector3(0, -1.15, 0));
   const yaw = useRef(0);
 
-  const SPEED = 10;
+  const velocityY = useRef(0);
+  const isGrounded = useRef(true);
+  const jumpLock = useRef(false);
 
-  // הגדרות מצלמה (גובה, מרחק והיסט צידי למראה קולנועי)
+  const SPEED = 10;
+  const JUMP_FORCE = 9.5;
+  const GRAVITY = 25;
+  const GROUND_Y = -1.15;
+
   const CAM_HEIGHT = 4.1;
   const CAM_DISTANCE = 12.0;
   const CAM_SIDE = 10.2;
-  const CAM_LERP = 0.07; // מהירות ה"מרדף" של המצלמה אחרי הרובוט
+  const CAM_LERP = 0.07;
 
   const camTargetPos = useRef(new THREE.Vector3());
   const camLookAt = useRef(new THREE.Vector3());
 
-  // הגדרת מיקומי כל האייקונים בעולם
-  const ALL_ICONS = useMemo(() => [
-    { id: "task1", label: "Mission 1", pos: new THREE.Vector3(16.5, -1.15, 14.0) },
-    { id: "task2", label: "Mission 2", pos: new THREE.Vector3(-20.0, -1.15, 10.5) },
-    { id: "task3", label: "Mission 3", pos: new THREE.Vector3(-14.5, -1.15, -21.0) },
-    { id: "task4", label: "Mission 4", pos: new THREE.Vector3(22.0, -1.15, -10.0) },
-  ], []);
+  const ALL_ICONS = useMemo(
+    () => [
+      { id: "task1", label: "Mission 1", pos: new THREE.Vector3(16.5, -1.15, 14.0) },
+      { id: "task2", label: "Mission 2", pos: new THREE.Vector3(-20.0, -1.15, 10.5) },
+      { id: "task3", label: "Mission 3", pos: new THREE.Vector3(-14.5, -1.15, -21.0) },
+      { id: "task4", label: "Mission 4", pos: new THREE.Vector3(22.0, -1.15, -10.0) },
+    ],
+    []
+  );
 
-  // פילטור האייקונים להצגה לפי החדר הנוכחי
   const iconsToShow = useMemo(() => {
     if (roomId === "main") return ALL_ICONS;
     const found = ALL_ICONS.find((x) => x.id === roomId);
     return found ? [found] : [];
   }, [roomId, ALL_ICONS]);
 
-  // עדכון המפה החיצונית במיקומי האייקונים
   useEffect(() => {
     onIconsForMap?.(
       iconsToShow.map((ic) => ({
@@ -210,118 +195,19 @@ export default function Scene({
   const poseTick = useRef(0);
   const lastNear = useRef("None");
 
-  // אתחול מיקום הרובוט בעת כניסה לחדר (Spawn)
   useEffect(() => {
     pos.current.set(spawn?.x ?? 0, spawn?.y ?? -1.15, spawn?.z ?? 0);
     yaw.current = spawn?.yaw ?? 0;
+
+    velocityY.current = 0;
+    isGrounded.current = true;
+    jumpLock.current = false;
+
     triggerCooldown.current = 1.6;
     lastNear.current = "None";
     onNearLabel?.("None");
   }, [spawnKey, spawn, onNearLabel]);
 
-  // לולאת העדכון הראשית של ה-3D
-  useFrame(({ camera }, delta) => {
-    const k = keys.current;
-    if (triggerCooldown.current > 0) triggerCooldown.current -= delta;
-
-    if (!inputEnabled) {
-      // אם התנועה חסומה (למשל בזמן מעבר חדר), הרובוט עובר למצב המתנה
-      if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
-    } else {
-      // 1. חישוב סיבוב (Rotation)
-      let turn = 0;
-      if (k.ArrowLeft || k.KeyA) turn += 1;
-      if (k.ArrowRight || k.KeyD) turn -= 1;
-      yaw.current += turn * 2.2 * delta;
-
-      // 2. חישוב תנועה (Movement)
-      let forward = 0;
-      if (k.ArrowUp || k.KeyW) forward = 1;
-      if (k.ArrowDown || k.KeyS) forward = -1;
-
-      const moving = forward !== 0;
-      if (moving) {
-        // המרת זווית הסיבוב לוקטור תנועה במרחב (Trigonometry)
-        const vx = Math.sin(yaw.current) * forward;
-        const vz = Math.cos(yaw.current) * forward;
-
-        const nextX = pos.current.x + vx * SPEED * delta;
-        const nextZ = pos.current.z + vz * SPEED * delta;
-
-        // מניעת יציאה מגבולות החדר
-        pos.current.x = clamp(nextX, minX, maxX);
-        pos.current.z = clamp(nextZ, minZ, maxZ);
-
-        if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Walk");
-      } else {
-        if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
-      }
-    }
-
-    // עדכון המודל התלת-ממדי של הרובוט
-    if (robotRef.current) {
-      robotRef.current.position.set(pos.current.x, pos.current.y, pos.current.z);
-      robotRef.current.rotation.y = yaw.current;
-    }
-
-    // 3. בדיקת קרבה למשימות (Collision/Trigger Logic)
-    if (inputEnabled) {
-      let nearestDist = Infinity;
-      let nearestLabel = "None";
-      const triggerDist = 4.6;
-
-      for (const ic of iconsToShow) {
-        const d = pos.current.distanceTo(ic.pos);
-        if (d < nearestDist) { nearestDist = d; nearestLabel = ic.label; }
-
-        // הפעלת המשימה אם הרובוט מספיק קרוב
-        if (d < triggerDist && triggerCooldown.current <= 0) {
-          triggerCooldown.current = 1.4;
-          onMissionTrigger?.(ic.id);
-        }
-      }
-
-      // עדכון ה-UI על המשימה הקרובה ביותר
-      const nearLabel = nearestDist < 11 ? nearestLabel : "None";
-      if (nearLabel !== lastNear.current) {
-        lastNear.current = nearLabel;
-        onNearLabel?.(nearLabel);
-      }
-    }
-
-    // דיווח מיקום למפה החיצונית (בתדירות נמוכה יותר לשיפור ביצועים)
-    poseTick.current += delta;
-    if (poseTick.current > 0.06) {
-      poseTick.current = 0;
-      onPose?.({ x: pos.current.x, z: pos.current.z, yaw: yaw.current, roomW: ROOM_W, roomD: ROOM_D, roomId });
-    }
-
-    // 4. לוגיקת מצלמה עוקבת (Chase Camera)
-    camLookAt.current.set(pos.current.x, 1.6, pos.current.z); // המצלמה תמיד מסתכלת על הרובוט
-
-    // חישוב המיקום האידיאלי של המצלמה מאחורי ובצד הרובוט
-    const backX = Math.sin(yaw.current) * CAM_DISTANCE;
-    const backZ = Math.cos(yaw.current) * CAM_DISTANCE;
-    const rightX = Math.sin(yaw.current + Math.PI / 2) * CAM_SIDE;
-    const rightZ = Math.cos(yaw.current + Math.PI / 2) * CAM_SIDE;
-
-    camTargetPos.current.set(
-      pos.current.x - backX + rightX,
-      CAM_HEIGHT,
-      pos.current.z - backZ + rightZ
-    );
-
-    // הגבלת המצלמה שלא תצא מהקירות
-    const CAM_PADDING = 2.5;
-    camTargetPos.current.x = clamp(camTargetPos.current.x, -ROOM_W / 2 + CAM_PADDING, ROOM_W / 2 - CAM_PADDING);
-    camTargetPos.current.z = clamp(camTargetPos.current.z, -ROOM_D / 2 + CAM_PADDING, ROOM_D / 2 - CAM_PADDING);
-
-    // תנועת מצלמה חלקה (Lerp) ומיקוד
-    camera.position.lerp(camTargetPos.current, CAM_LERP);
-    camera.lookAt(camLookAt.current);
-  });
-
-  // יצירת חומר שקוף לקירות (משותף לכל הקירות)
   const wallMat = useMemo(() => {
     return new THREE.MeshBasicMaterial({
       color: "#ffffff",
@@ -332,14 +218,138 @@ export default function Scene({
     });
   }, []);
 
+  useFrame(({ camera }, delta) => {
+    const k = keys.current;
+
+    if (triggerCooldown.current > 0) triggerCooldown.current -= delta;
+
+    // Jump trigger on Space press (with lock so holding Space doesn't re-trigger)
+    if (k.Space) {
+      if (!jumpLock.current && isGrounded.current && inputEnabled) {
+        jumpLock.current = true;
+        isGrounded.current = false;
+        velocityY.current = JUMP_FORCE;
+
+        if (robotRef.current?.userData?.setAction) {
+          robotRef.current.userData.setAction("Jump");
+        }
+      }
+    } else {
+      jumpLock.current = false;
+    }
+
+    // Gravity
+    velocityY.current -= GRAVITY * delta;
+    pos.current.y += velocityY.current * delta;
+
+    // Ground collision
+    if (pos.current.y <= GROUND_Y) {
+      pos.current.y = GROUND_Y;
+      velocityY.current = 0;
+      isGrounded.current = true;
+    }
+
+    // Movement + animation
+    if (!inputEnabled) {
+      if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
+    } else {
+      let turn = 0;
+      if (k.ArrowLeft || k.KeyA) turn += 1;
+      if (k.ArrowRight || k.KeyD) turn -= 1;
+      yaw.current += turn * 2.2 * delta;
+
+      let forward = 0;
+      if (k.ArrowUp || k.KeyW) forward = 1;
+      if (k.ArrowDown || k.KeyS) forward = -1;
+
+      const moving = forward !== 0;
+
+      if (moving) {
+        const vx = Math.sin(yaw.current) * forward;
+        const vz = Math.cos(yaw.current) * forward;
+
+        const nextX = pos.current.x + vx * SPEED * delta;
+        const nextZ = pos.current.z + vz * SPEED * delta;
+
+        pos.current.x = clamp(nextX, minX, maxX);
+        pos.current.z = clamp(nextZ, minZ, maxZ);
+
+        // Run instead of Walk
+        if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Walk");
+      } else {
+        // If in air, keep Jump (do not force Idle)
+        if (isGrounded.current) {
+          if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
+        }
+      }
+    }
+
+    if (robotRef.current) {
+      robotRef.current.position.set(pos.current.x, pos.current.y, pos.current.z);
+      robotRef.current.rotation.y = yaw.current;
+    }
+
+    // Mission triggers
+    if (inputEnabled) {
+      let nearestDist = Infinity;
+      let nearestLabel = "None";
+      const triggerDist = 4.6;
+
+      for (const ic of iconsToShow) {
+        const d = pos.current.distanceTo(ic.pos);
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearestLabel = ic.label;
+        }
+        if (d < triggerDist && triggerCooldown.current <= 0) {
+          triggerCooldown.current = 1.4;
+          onMissionTrigger?.(ic.id);
+        }
+      }
+
+      const nearLabel = nearestDist < 11 ? nearestLabel : "None";
+      if (nearLabel !== lastNear.current) {
+        lastNear.current = nearLabel;
+        onNearLabel?.(nearLabel);
+      }
+    }
+
+    poseTick.current += delta;
+    if (poseTick.current > 0.06) {
+      poseTick.current = 0;
+      onPose?.({
+        x: pos.current.x,
+        z: pos.current.z,
+        yaw: yaw.current,
+        roomW: ROOM_W,
+        roomD: ROOM_D,
+        roomId,
+      });
+    }
+
+    camLookAt.current.set(pos.current.x, 1.6, pos.current.z);
+
+    const backX = Math.sin(yaw.current) * CAM_DISTANCE;
+    const backZ = Math.cos(yaw.current) * CAM_DISTANCE;
+    const rightX = Math.sin(yaw.current + Math.PI / 2) * CAM_SIDE;
+    const rightZ = Math.cos(yaw.current + Math.PI / 2) * CAM_SIDE;
+
+    camTargetPos.current.set(pos.current.x - backX + rightX, CAM_HEIGHT, pos.current.z - backZ + rightZ);
+
+    const CAM_PADDING = 2.5;
+    camTargetPos.current.x = clamp(camTargetPos.current.x, -ROOM_W / 2 + CAM_PADDING, ROOM_W / 2 - CAM_PADDING);
+    camTargetPos.current.z = clamp(camTargetPos.current.z, -ROOM_D / 2 + CAM_PADDING, ROOM_D / 2 - CAM_PADDING);
+
+    camera.position.lerp(camTargetPos.current, CAM_LERP);
+    camera.lookAt(camLookAt.current);
+  });
+
   return (
     <>
-      {/* תאורה סביבתית ותאורת כיוון (שמש) ליצירת צללים */}
       <hemisphereLight intensity={1.2} skyColor="#ffffff" groundColor="#e1e6f0" />
       <directionalLight position={[6, 10, 8]} intensity={0.5} color="#f0f4ff" castShadow />
       <directionalLight position={[-8, 6, -6]} intensity={0.35} color="#dde7ff" />
 
-      {/* בניית ארבעת קירות החדר */}
       {roomId === "task1" ? (
         <Mission1Room />
       ) : roomId === "task2" ? (
@@ -377,22 +387,17 @@ export default function Scene({
         })()
       )}
 
-
-      {/* הרצפה - מקבלת צללים מהרובוט */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.15, 0]} receiveShadow>
         <planeGeometry args={[ROOM_W * 3, ROOM_D * 3]} />
         <meshStandardMaterial roughness={0.9} metalness={0} color="#c5d0e8" />
       </mesh>
 
-      {/* רינדור האייקונים */}
       {iconsToShow.map((ic) => (
         <MissionIcon key={ic.id} position={[ic.pos.x, ic.pos.y, ic.pos.z]} />
       ))}
 
-      {/* מודל הרובוט */}
       <Robot ref={robotRef} scale={1.25} position={[0, -1.15, 0]} />
 
-      {/* בקרת מצלמה (מושבתת לשליטה ידנית, משמשת רק למיקוד) */}
       <OrbitControls
         ref={controlsRef}
         enablePan={false}
