@@ -115,10 +115,10 @@ export default function SideNavigation({
             </button>
             <button
               type="button"
-              className={styles.dyingBtn}
+              className={styles.kpi_bank}
               onClick={() => setOpenBank(true)}
             >
-              About to die! 😱
+              About to die?! 😱
             </button>
           </div>
         </div>

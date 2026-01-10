@@ -46,19 +46,66 @@
   bottom: 0;
   text-align: center;
 }
-  .userProfile {
+.userProfile {
+  /* מיקום בפינה הימנית העליונה */
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 14px;
+  right: 14px;
+  z-index: 2000;
+
   display: flex;
   align-items: center;
   gap: 12px;
+  
+  /* רקע זכוכית עדין עם פינות מעוגלות קלות (כמו ב-Side Panel) */
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 6px 14px;
+  border-radius: 12px; 
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.userAvatar {
+  /* תמונה עגולה מושלמת */
+  width: 32px;
+  height: 32px;
+  border-radius: 50%; /* זה מה שהופך את התמונה לעיגול */
+  border: 2px solid #00f2ff; /* מסגרת ניאון דקה סביב העיגול */
+  object-fit: cover;
+  display: block;
+}
+
+.userName {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: capitalize;
+}
+
+.userProfile:hover {
   background: rgba(0, 242, 255, 0.1);
-  padding: 8px 16px;
-  border-radius: 50px;
-  border: 1px solid rgba(0, 242, 255, 0.3);
-  backdrop-filter: blur(5px);
-  z-index: 1000;
+  border-color: rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
+}
+
+/* עיצוב התמונה (האוואטר) */
+.userProfile img {
+  width: 24px;
+  height: 24px;
+  border-radius: 14px; /* תואם לפינות של הפאנל */
+  border: 1px solid #00f2ff;
+  object-fit: cover;
+}
+
+/* עיצוב שם המשתמש */
+.userProfile span {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 5px rgba(0, 242, 255, 0.5);
 }
 .greeting {
   color: #fff;
