@@ -73,6 +73,7 @@ export const MAP_NODES = Object.freeze({
   hub: CANDY_PATH_POINTS[0],
   // Candy houses (levels) on the road.
   [SCENES.password]: CANDY_PATH_POINTS[16],
+  [SCENES.miniPassword]: CANDY_PATH_POINTS[12],
   [SCENES.privacy]: CANDY_PATH_POINTS[32],
   [SCENES.shop]: CANDY_PATH_POINTS[48],
   [SCENES.strength]: CANDY_PATH_POINTS[64],

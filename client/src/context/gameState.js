@@ -4,6 +4,7 @@ export const SCENES = Object.freeze({
   entry: 'entry',
   lobby: 'lobby',
   password: 'password',
+  miniPassword: 'miniPassword',
   privacy: 'privacy',
   shop: 'shop',
   strength: 'strength',

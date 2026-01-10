@@ -22,7 +22,7 @@ export default function MainGameContainer({ gestureRef } = {}) {
       case SCENES.password:
         return <PasswordShield addScore={addScore} awardBadge={awardBadge} gestureRef={gestureRef} />;
       case SCENES.privacy:
-        return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} />;
+        return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} gestureRef={gestureRef} />;
       case SCENES.shop:
         return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.strength:
@@ -48,7 +48,7 @@ export default function MainGameContainer({ gestureRef } = {}) {
       case SCENES.password:
         return <PasswordShield addScore={addScore} awardBadge={awardBadge} gestureRef={gestureRef} />;
       case SCENES.privacy:
-        return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} />;
+        return <PrivacyScanner addScore={addScore} awardBadge={awardBadge} gestureRef={gestureRef} />;
       case SCENES.shop:
         return <UpgradePod addScore={addScore} awardBadge={awardBadge} />;
       case SCENES.strength:

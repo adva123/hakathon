@@ -139,6 +139,13 @@ export default function SideNavigation({
             <button
               type="button"
               className={`${styles.kpi} ${styles.mapPin}`}
+              onClick={() => switchRoomWithRobot(SCENES.miniPassword, MAP_NODES[SCENES.miniPassword])}
+            >
+              🔐 Mini Password
+            </button>
+            <button
+              type="button"
+              className={`${styles.kpi} ${styles.mapPin}`}
               onClick={() => switchRoomWithRobot(SCENES.shop, MAP_NODES[SCENES.shop])}
             >
               🤖 Robot Shop

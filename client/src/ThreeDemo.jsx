@@ -3188,6 +3188,8 @@ import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from './game/mapTargets.js';
 import { useKeyboard } from './useKeyboard';
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 import { forestTerrainHeight, FOREST_PATH_SURFACE_LIFT, ForestSky, ForestWorld } from './ForestWorld.jsx';
+import MiniPassword3D from "./game/scenes/MiniPassword3D.jsx";
+
 
 function smoothstep01(x) {
   const t = Math.max(0, Math.min(1, x));
@@ -6017,18 +6019,29 @@ export default function ThreeDemo({
         </group>
 
         <ForestSky />
+        {sceneId !== SCENES.miniPassword && (
+          <group ref={worldRef}>
+            <ForestWorld
+              floorY={floorY}
+              curveData={curveData}
+              robotRef={robotRef}
+              gestureRef={gestureRef}
+              roomPortals={roomPortals}
+              completion={completion}
+              onPortalEnter={onLobbyPortalEnter}
+            />
+          </group>
+        )}
 
-        <group ref={worldRef}>
-          <ForestWorld
-            floorY={floorY}
-            curveData={curveData}
-            robotRef={robotRef}
-            gestureRef={gestureRef}
-            roomPortals={roomPortals}
-            completion={completion}
-            onPortalEnter={onLobbyPortalEnter}
-          />
-        </group>
+        
+
+        {/* ✅ ADD MINI ROOM HERE */}
+        <MiniPassword3D
+          visible={sceneId === SCENES.miniPassword}
+          robotRef={robotRef}
+          position={[0, floorY, 50]}
+        />
+
 
         <RobotController
           robotRef={robotRef}

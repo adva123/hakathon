@@ -325,15 +325,14 @@ export function GameProvider({ children }) {
       return;
     }
     // Strength is a real scene (not forest overlay), Shop is overlay.
-    if (pendingScene === SCENES.strength) {
-      console.log('📍 Setting strength as scene');
+    if (pendingScene === SCENES.strength || pendingScene === SCENES.miniPassword) {
+      // ✅ These are full 3D scenes
       setActiveOverlayRoom(null);
       setCurrentScene(pendingScene);
     } else if (pendingScene === SCENES.shop) {
-      console.log('📍 Setting shop as overlay');
       setActiveOverlayRoom(SCENES.shop);
     } else {
-      console.log('📍 Setting as overlay:', pendingScene);
+      // ✅ overlay rooms
       setActiveOverlayRoom(pendingScene);
     }
     setPendingScene(null);
