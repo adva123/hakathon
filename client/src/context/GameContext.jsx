@@ -7,13 +7,12 @@ const defaultBadges = Object.freeze({
   privacyShield: false,
 });
 
-
 const defaultOwned = Object.freeze({
   ownedItems: [],
   equippedItems: [],
-  ownedRobots: [], // array of robot ids
-  selectedRobotId: null, // id of selected robot
-  generatedDolls: [], // array of doll objects
+  ownedRobots: [],
+  selectedRobotId: null,
+  generatedDolls: [],
 });
 
 const storageKey = 'hakathon.gameState.v1';
@@ -41,7 +40,6 @@ function readPersisted() {
 
 function readPersistedAvatar() {
   if (typeof window === 'undefined') return '';
-  // Prefer sessionStorage (avoids quota issues); fall back to localStorage if present.
   const s = window.sessionStorage.getItem(avatarStorageKey);
   if (s && typeof s === 'string') return s;
   const l = window.localStorage.getItem(avatarStorageKey);
@@ -51,7 +49,6 @@ function readPersistedAvatar() {
 
 function persistAvatar(dataUrl) {
   if (typeof window === 'undefined') return;
-  // Store large data in sessionStorage; attempt localStorage only for reasonably small strings.
   const value = typeof dataUrl === 'string' ? dataUrl : '';
   if (!value) {
     try {
@@ -67,15 +64,12 @@ function persistAvatar(dataUrl) {
     return;
   }
 
-  // Always keep a session copy.
   try {
     window.sessionStorage.setItem(avatarStorageKey, value);
   } catch {
     // ignore
   }
 
-  // Best-effort localStorage if small enough.
-  // (Typical localStorage quota is ~5MB; keep a safe margin.)
   if (value.length <= 220_000) {
     try {
       window.localStorage.setItem(avatarStorageKey, value);
@@ -94,7 +88,6 @@ function persistAvatar(dataUrl) {
 function readPersistedAvatarColor(persisted) {
   if (persisted && typeof persisted.avatarDominantColor === 'string') return persisted.avatarDominantColor;
   if (typeof window === 'undefined') return '';
-  // Backward/side-channel storage (small, safe for localStorage).
   try {
     const v = window.localStorage.getItem(avatarColorKey);
     return typeof v === 'string' ? v : '';
@@ -117,6 +110,7 @@ function persistAvatarColor(color) {
 export function GameProvider({ children }) {
   const persisted = useMemo(() => readPersisted(), []);
 
+  // Core game state
   const [currentScene, setCurrentScene] = useState(SCENES.lobby);
   const [playerName, setPlayerName] = useState(() =>
     persisted && typeof persisted.playerName === 'string' ? persisted.playerName : ''
@@ -124,17 +118,43 @@ export function GameProvider({ children }) {
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(50);
   const [energy, setEnergy] = useState(100);
+  const [openBank, setOpenBank] = useState(false);
+
+  // Convert points to coins
+  const exchangePointsForCoins = useCallback((pointsToSpend) => {
+    const rate = 2; // 2 points = 1 coin
+    if (score >= pointsToSpend) {
+      setScore(prev => prev - pointsToSpend);
+      setCoins(prev => prev + Math.floor(pointsToSpend / rate));
+      return { success: true, message: "ההחלפה בוצעה בהצלחה!" };
+    }
+    return { success: false, message: "אין לך מספיק נקודות!" };
+  }, [score]);
+
+  // Buy energy with coins
+  const buyEnergyWithCoins = useCallback((cost) => {
+    if (coins >= cost) {
+      setCoins(prev => prev - cost);
+      setEnergy(prev => Math.min(prev + 1, 100));
+      return { success: true, message: "קנית אנרגיה! ⚡" };
+    }
+    return { success: false, message: "אין לך מספיק מטבעות!" };
+  }, [coins]);
+
   const [badges, setBadges] = useState(() => {
     if (persisted?.badges && typeof persisted.badges === 'object') {
       return { ...defaultBadges, ...persisted.badges };
     }
     return { ...defaultBadges };
   });
+
   const [audioMuted, setAudioMuted] = useState(() =>
     persisted && typeof persisted.audioMuted === 'boolean' ? persisted.audioMuted : false
   );
+
   const [avatarFaceDataUrl, setAvatarFaceDataUrl] = useState(() => readPersistedAvatar());
   const [avatarDominantColor, setAvatarDominantColor] = useState(() => readPersistedAvatarColor(persisted));
+
   const [shopState, setShopState] = useState(() => {
     if (persisted?.shopState && typeof persisted.shopState === 'object') {
       const ownedItems = Array.isArray(persisted.shopState.ownedItems)
@@ -154,16 +174,18 @@ export function GameProvider({ children }) {
     }
     return { ...defaultOwned };
   });
-    // Add a generated doll to inventory
-    const addDollToInventory = useCallback((doll) => {
-      if (!doll) return;
-      setShopState((prev) => {
-        const generatedDolls = Array.isArray(prev.generatedDolls)
-          ? [...prev.generatedDolls, doll]
-          : [doll];
-        return { ...prev, generatedDolls };
-      });
-    }, []);
+
+  // Add a generated doll to inventory
+  const addDollToInventory = useCallback((doll) => {
+    if (!doll) return;
+    setShopState((prev) => {
+      const generatedDolls = Array.isArray(prev.generatedDolls)
+        ? [...prev.generatedDolls, doll]
+        : [doll];
+      return { ...prev, generatedDolls };
+    });
+  }, []);
+
   // Buy a robot and select it
   const buyRobot = useCallback(({ robotId, price, useCoins = false }) => {
     if (!robotId || typeof price !== 'number') return { ok: false, reason: 'invalid' };
@@ -193,32 +215,35 @@ export function GameProvider({ children }) {
       return { ...prev, ownedRobots, selectedRobotId: robotId };
     });
     return { ok: true };
-  }, [setScore]);
+  }, []);
 
   // Select a robot (must be owned)
   const selectRobot = useCallback((robotId) => {
     setShopState((prev) => {
       if (!prev.ownedRobots.includes(robotId)) return prev;
       const newState = { ...prev, selectedRobotId: robotId };
-      // Persist robot selection in localStorage (id only)
+      // Persist robot selection in localStorage
       try {
         window.localStorage.setItem('selected_robot_skin', robotId);
-        window.localStorage.setItem('robot_shop_save', JSON.stringify(newState)); // for backward compatibility
-      } catch {}
+        window.localStorage.setItem('robot_shop_save', JSON.stringify(newState));
+      } catch {
+        // ignore storage errors
+      }
       return newState;
     });
   }, []);
 
   // Robot walk-to-switch handshake with ThreeDemo
-  const [robotAutoWalkTarget, setRobotAutoWalkTarget] = useState(null); // [x,y,z]
+  const [robotAutoWalkTarget, setRobotAutoWalkTarget] = useState(null);
   const [pendingScene, setPendingScene] = useState(null);
-  const [activeOverlayRoom, setActiveOverlayRoom] = useState(null); // password | privacy | shop | null
+  const [activeOverlayRoom, setActiveOverlayRoom] = useState(null);
 
-  // Lobby-return safety (prevents immediate re-entry after Back)
-  const [lobbyReturnEvent, setLobbyReturnEvent] = useState(null); // { nonce, fromScene, at }
-  const [gateCollisionCooldownUntil, setGateCollisionCooldownUntil] = useState(0); // performance.now timestamp
+  // Lobby-return safety
+  const [lobbyReturnEvent, setLobbyReturnEvent] = useState(null);
+  const [gateCollisionCooldownUntil, setGateCollisionCooldownUntil] = useState(0);
   const lobbyReturnNonceRef = useRef(0);
 
+  // Persist state to localStorage
   useEffect(() => {
     const payload = {
       playerName,
@@ -266,16 +291,14 @@ export function GameProvider({ children }) {
       setGateCollisionCooldownUntil(now + 1500);
       lobbyReturnNonceRef.current += 1;
       setLobbyReturnEvent({ nonce: lobbyReturnNonceRef.current, fromScene, at: now });
-      // Clear any in-flight auto-walk transitions.
       setRobotAutoWalkTarget(null);
       setPendingScene(null);
     },
-    [setRobotAutoWalkTarget, setPendingScene]
+    []
   );
 
   const switchRoom = useCallback(
     (targetScene) => {
-      // If we're leaving a room back to lobby, do the safe-return choreography.
       if (
         targetScene === SCENES.lobby &&
         (currentScene === SCENES.password ||
@@ -285,14 +308,12 @@ export function GameProvider({ children }) {
       ) {
         prepareLobbyReturn(currentScene);
       }
-
       setCurrentScene(targetScene);
     },
     [currentScene, prepareLobbyReturn]
   );
 
   const handleBack = useCallback(() => {
-    // Explicit Back handler used by mini-games.
     if (activeOverlayRoom) {
       prepareLobbyReturn(activeOverlayRoom);
       setActiveOverlayRoom(null);
@@ -310,8 +331,6 @@ export function GameProvider({ children }) {
   }, [activeOverlayRoom, currentScene, prepareLobbyReturn]);
 
   const switchRoomWithRobot = useCallback((targetScene, targetPosition) => {
-    // Waze-style navigation: stay in lobby while the robot moves,
-    // then show the room UI as an overlay when it arrives.
     setCurrentScene(SCENES.lobby);
     setActiveOverlayRoom(null);
     setPendingScene(targetScene);
@@ -324,7 +343,6 @@ export function GameProvider({ children }) {
       setRobotAutoWalkTarget(null);
       return;
     }
-    // Strength is a real scene (not forest overlay), Shop is overlay.
     if (pendingScene === SCENES.strength) {
       console.log('📍 Setting strength as scene');
       setActiveOverlayRoom(null);
@@ -338,7 +356,7 @@ export function GameProvider({ children }) {
     }
     setPendingScene(null);
     setRobotAutoWalkTarget(null);
-  }, [pendingScene, score]);
+  }, [pendingScene]);
 
   const addScore = useCallback((delta) => {
     setScore((s) => Math.max(0, s + delta));
@@ -348,7 +366,6 @@ export function GameProvider({ children }) {
     setEnergy((e) => {
       const next = e - 10;
       if (next <= 0) {
-        // Switch to try again screen; keep score visible
         setCurrentScene(SCENES.tryAgain);
         return 0;
       }
@@ -390,13 +407,12 @@ export function GameProvider({ children }) {
       if (!allowed) return { ok: false, reason: 'insufficient' };
       setShopState((prev) => {
         const ownedItems = uniqueArray([...prev.ownedItems, itemId]);
-        // Auto-equip purchased item
         const equippedItems = uniqueArray([...prev.equippedItems, itemId]);
-        return { ownedItems, equippedItems };
+        return { ...prev, ownedItems, equippedItems };
       });
       return { ok: true };
     },
-    [setScore]
+    []
   );
 
   const equipItem = useCallback((itemId) => {
@@ -424,6 +440,8 @@ export function GameProvider({ children }) {
       activeOverlayRoom,
       lobbyReturnEvent,
       gateCollisionCooldownUntil,
+      openBank,
+      setOpenBank,
       startGame,
       resetRun,
       switchRoom,
@@ -442,13 +460,14 @@ export function GameProvider({ children }) {
       buyRobot,
       selectRobot,
       addDollToInventory,
+      exchangePointsForCoins,
+      buyEnergyWithCoins,
     }),
     [
       currentScene,
       playerName,
       score,
       coins,
-      setCoins,
       energy,
       badges,
       audioMuted,
@@ -459,6 +478,7 @@ export function GameProvider({ children }) {
       activeOverlayRoom,
       lobbyReturnEvent,
       gateCollisionCooldownUntil,
+      openBank,
       startGame,
       resetRun,
       switchRoom,
@@ -474,6 +494,8 @@ export function GameProvider({ children }) {
       buyRobot,
       selectRobot,
       addDollToInventory,
+      exchangePointsForCoins,
+      buyEnergyWithCoins,
     ]
   );
 

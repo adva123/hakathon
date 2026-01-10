@@ -1,0 +1,241 @@
+/* Resource Bank Modal Styles */
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 3px solid #ffd700;
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.5);
+  position: relative;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.closeBtn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 0, 85, 0.3);
+  border-color: #ff0055;
+  transform: rotate(90deg);
+}
+
+.title {
+  text-align: center;
+  font-size: 2rem;
+  color: #ffd700;
+  margin: 0 0 30px 0;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  font-weight: bold;
+}
+
+.resources {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  gap: 15px;
+}
+
+.resource {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon {
+  font-size: 2.5rem;
+}
+
+.amount {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.label {
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.exchanges {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.exchangeBtn,
+.energyBtn {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  border: none;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.energyBtn {
+  background: linear-gradient(135deg, #ff0055 0%, #ff4088 100%);
+  box-shadow: 0 4px 15px rgba(255, 0, 85, 0.3);
+}
+
+.exchangeBtn:hover,
+.energyBtn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+}
+
+.energyBtn:hover {
+  box-shadow: 0 6px 20px rgba(255, 0, 85, 0.5);
+}
+
+.exchangeBtn:active,
+.energyBtn:active {
+  transform: translateY(0);
+}
+
+.exchangeContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.exchangeBtn .exchangeContent {
+  color: #000;
+}
+
+.energyBtn .exchangeContent {
+  color: #fff;
+}
+
+.from,
+.to {
+  font-size: 1.3rem;
+}
+
+.arrow {
+  font-size: 1.8rem;
+}
+
+.btnLabel {
+  display: block;
+  font-size: 1rem;
+  font-weight: normal;
+  opacity: 0.8;
+}
+
+.exchangeBtn .btnLabel {
+  color: #333;
+}
+
+.energyBtn .btnLabel {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.message {
+  background: rgba(0, 242, 255, 0.1);
+  border: 2px solid #00f2ff;
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  animation: pulse 0.5s ease;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.info {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.95rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .modal {
+    padding: 20px;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .resources {
+    flex-wrap: wrap;
+  }
+
+  .exchangeContent {
+    font-size: 1.2rem;
+  }
+}

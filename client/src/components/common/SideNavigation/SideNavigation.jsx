@@ -77,7 +77,7 @@ export default function SideNavigation({
   showCalibration,
   activeGesture,
 }) {
-  const { playerName, score, coins, energy, audioMuted, setAudioMuted, switchRoomWithRobot } = useContext(GameContext);
+  const { playerName, score, coins, energy, audioMuted, setAudioMuted, switchRoomWithRobot, setOpenBank } = useContext(GameContext);
 
   const items = [
     { key: 'openPalm', name: 'Open Palm', action: 'Start Robot', icon: <IconPalm /> },
@@ -112,6 +112,13 @@ export default function SideNavigation({
               onClick={() => setAudioMuted((m) => !m)}
             >
               {audioMuted ? 'Music: Off' : 'Music: On'}
+            </button>
+            <button
+              type="button"
+              className={styles.dyingBtn}
+              onClick={() => setOpenBank(true)}
+            >
+              About to die! 😱
             </button>
           </div>
         </div>

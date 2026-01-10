@@ -1,12 +1,15 @@
-
-
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { GameContext } from '../../context/gameState.js';
 import api from '../../services/api';
 import styles from './PrivacyRoom.module.css';
 
-function PrivacyRoom({ gestureRef }) {
+/**
+ * Privacy Room Component - AI Doll Factory & Museum
+ * WITH VISIBLE RESOURCE BANK (Inline Styles)
+ */
+const PrivacyRoom = ({ gestureRef }) => {
+  // State management
   const [dollDescription, setDollDescription] = useState('');
   const [privacySettings, setPrivacySettings] = useState({
     isNamePublic: false,
@@ -22,11 +25,29 @@ function PrivacyRoom({ gestureRef }) {
   const [generatedDoll, setGeneratedDoll] = useState(null);
   const [selectedDoll, setSelectedDoll] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  // Fullscreen image modal state
   const [showFullImage, setShowFullImage] = useState(false);
-  const [useDALLE, setUseDALLE] = useState(false); // אופציה ל-DALL-E
-  const { score, coins, energy, addDollToInventory, setCoins, addScore, registerMistake, shopState, setMovementLocked, handleBack } = useContext(GameContext);
-  // Gesture-based navigation: listen for "iloveyou" gesture to go back
+  const [useDALLE, setUseDALLE] = useState(false);
+  const [imageLoadStates, setImageLoadStates] = useState({});
+  
+  // Refs
+  const badImageCountRef = useRef(0);
+
+  // Context
+  const {
+    score,
+    coins,
+    energy,
+    addDollToInventory,
+    setCoins,
+    addScore,
+    registerMistake,
+    shopState,
+    handleBack,
+    exchangePointsForCoins,
+    buyEnergyWithCoins
+  } = useContext(GameContext);
+
+  // Gesture-based navigation
   useEffect(() => {
     if (!gestureRef?.current) return;
     const interval = setInterval(() => {
@@ -39,9 +60,23 @@ function PrivacyRoom({ gestureRef }) {
     }, 200);
     return () => clearInterval(interval);
   }, [gestureRef, handleBack]);
-  // Track number of consecutive bad images
-  const badImageCountRef = useRef(0);
 
+  // Load dolls from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('saved_dolls');
+    if (saved) {
+      try {
+        const dolls = JSON.parse(saved);
+        if (Array.isArray(dolls) && dolls.length > 0) {
+          setSelectedDoll(dolls[dolls.length - 1]);
+        }
+      } catch (err) {
+        console.error('Failed to load saved dolls:', err);
+      }
+    }
+  }, []);
+
+  // Handlers
   const handleToggle = (field) => {
     setPrivacySettings(prev => ({ ...prev, [field]: !prev[field] }));
     setMessage('');
@@ -80,7 +115,6 @@ function PrivacyRoom({ gestureRef }) {
       if (response.data.success) {
         const isUnsafe = response.data.isUnsafe;
         if (isUnsafe) {
-          // ❌ Unsafe content: show red X, penalty
           const redXDoll = {
             id: 'blocked_' + Date.now(),
             name: 'Blocked Content',
@@ -93,7 +127,6 @@ function PrivacyRoom({ gestureRef }) {
           setMessage('⚠️ Safety Warning: Do not share personal info! -1 Energy.');
           if (registerMistake) registerMistake();
         } else {
-          // ✅ Good image: rewards
           const doll = response.data.doll;
           setGeneratedDoll(doll);
           setSelectedDoll(doll);
@@ -119,14 +152,11 @@ function PrivacyRoom({ gestureRef }) {
     setGeneratedDoll(doll);
   };
 
-  // Download doll image
   const downloadDoll = async (url, name) => {
     console.log('📥 Downloading:', url);
     try {
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -139,27 +169,9 @@ function PrivacyRoom({ gestureRef }) {
       console.log('✅ Download successful');
     } catch (e) {
       console.error('❌ Download failed:', e);
-      alert('Download failed. The image might still be generating. Try again in a few seconds.');
+      alert('Download failed. Try again in a few seconds.');
     }
   };
-
-  // Load dolls from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('saved_dolls');
-    if (saved) {
-      try {
-        const dolls = JSON.parse(saved);
-        if (Array.isArray(dolls) && dolls.length > 0) {
-          setSelectedDoll(dolls[dolls.length - 1]);
-        }
-      } catch (err) {
-        console.error('Failed to load saved dolls:', err);
-      }
-    }
-  }, []);
-
-  // ✅ Image loading handler
-  const [imageLoadStates, setImageLoadStates] = useState({});
 
   const handleImageLoad = (dollId) => {
     console.log('✅ Image loaded:', dollId);
@@ -169,8 +181,6 @@ function PrivacyRoom({ gestureRef }) {
   const handleImageError = (e, dollId, dollName) => {
     console.error('❌ Image failed:', dollId);
     setImageLoadStates(prev => ({ ...prev, [dollId]: 'error' }));
-
-    // Fallback placeholder
     e.target.src = `https://via.placeholder.com/500/cccccc/666666?text=${encodeURIComponent(dollName)}`;
   };
 
@@ -180,7 +190,7 @@ function PrivacyRoom({ gestureRef }) {
     <div className={styles.privacyRoom} onClick={e => e.stopPropagation()}>
       <h2 className={styles.neonTitle}>🎨 AI Doll Factory & Museum</h2>
 
-      {/* Enhanced Status bar with score, coins, energy */}
+      {/* Status bar */}
       <div className={styles.statusBar} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <span>🎭 Collection: {shopState?.generatedDolls?.length || 0} dolls</span>
         <div style={{ display: 'flex', gap: 18, alignItems: 'center', fontSize: '1.1rem' }}>
@@ -191,7 +201,7 @@ function PrivacyRoom({ gestureRef }) {
       </div>
 
       <div className={styles.mainLayout}>
-        {/* Back button for returning to forest/lobby */}
+        {/* Back button */}
         <button
           className={styles.backButton}
           onClick={handleBack}
@@ -213,8 +223,6 @@ function PrivacyRoom({ gestureRef }) {
         >
           ← Back
         </button>
-
-
 
         {/* Display side */}
         <div className={styles.displaySide}>
@@ -260,7 +268,6 @@ function PrivacyRoom({ gestureRef }) {
                         )}
                       </>
                     ) : (
-                      // ✅ אם אין תמונה, הצג הודעה
                       <div style={{
                         padding: '40px',
                         background: 'rgba(255,0,85,0.1)',
@@ -278,16 +285,10 @@ function PrivacyRoom({ gestureRef }) {
                   </div>
                 </div>
 
-                {/* Fullscreen modal for image */}
-
                 {showFullImage && (
                   <div className={styles.fullImageOverlay} onClick={() => setShowFullImage(false)}>
                     <div className={styles.fullImageContainer} onClick={e => e.stopPropagation()}>
-                      <img
-                        src={selectedDoll.imageUrl}
-                        alt={selectedDoll.name}
-                        className={styles.fullImage}
-                      />
+                      <img src={selectedDoll.imageUrl} alt={selectedDoll.name} className={styles.fullImage} />
                       <button className={styles.closeFullImage} onClick={e => { e.stopPropagation(); setShowFullImage(false); }}>✖</button>
                     </div>
                   </div>
@@ -295,11 +296,8 @@ function PrivacyRoom({ gestureRef }) {
 
                 <h3>{selectedDoll.name}</h3>
                 <p className={styles.dollDescription}>{selectedDoll.description}</p>
-
                 {selectedDoll.generationMethod && (
-                  <p className={styles.generationInfo}>
-                    Created with: {selectedDoll.generationMethod}
-                  </p>
+                  <p className={styles.generationInfo}>Created with: {selectedDoll.generationMethod}</p>
                 )}
               </div>
             ) : (
@@ -331,16 +329,15 @@ function PrivacyRoom({ gestureRef }) {
                   </div>
                 ))
               ) : (
-                <p className={styles.emptyAlbum}>
-                  No dolls yet. Create your first AI doll!
-                </p>
+                <p className={styles.emptyAlbum}>No dolls yet. Create your first AI doll!</p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Control side - Futuristic motivational panel */}
+        {/* Control side */}
         <div className={styles.controlSide}>
+          {/* Motivational panel */}
           <div style={{
             background: 'rgba(0,0,0,0.18)',
             borderRadius: '18px',
@@ -356,18 +353,149 @@ function PrivacyRoom({ gestureRef }) {
               🌌 <span style={{ color: '#00f2ff' }}>Create Your Own World!</span>
             </div>
             <div style={{ fontSize: '1.5rem', margin: '10px 0' }}>
-              <span role="img" aria-label="gift">🎁</span> Earn rewards for every creative doll you make!
+              🎁 Earn rewards for every creative doll you make!
             </div>
             <div style={{ fontSize: '1.2rem', margin: '10px 0' }}>
-              <span role="img" aria-label="star">✨</span> The more original and positive your world, the more coins you get!
+              ✨ The more original and positive your world, the more coins you get!
             </div>
             <div style={{ fontSize: '1.2rem', margin: '10px 0' }}>
-              <span role="img" aria-label="robot">🤖</span> Robots love imagination!
+              🤖 Robots love imagination!
             </div>
             <div style={{ fontSize: '1.1rem', margin: '18px 0 0 0', color: '#ff0055', fontWeight: 'bold' }}>
-              <span role="img" aria-label="warning">⚠️</span> Inappropriate or unsafe creations lose points and may be removed.
+              ⚠️ Inappropriate or unsafe creations lose points and may be removed.
             </div>
           </div>
+
+          {/* 🏦 RESOURCE BANK - WITH INLINE STYLES (GUARANTEED VISIBLE!) */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(40, 20, 60, 0.85) 100%)',
+            border: '3px solid #ffd700',
+            borderRadius: '18px',
+            padding: '25px 20px',
+            marginBottom: '25px',
+            boxShadow: '0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 20px rgba(255, 215, 0, 0.1)',
+            position: 'relative',
+            zIndex: 1000
+          }}>
+            <h4 style={{
+              color: '#ffd700',
+              margin: '0 0 20px 0',
+              fontSize: '1.6rem',
+              textAlign: 'center',
+              textShadow: '0 0 10px rgba(255, 215, 0, 0.8)',
+              fontWeight: 'bold'
+            }}>
+              🏦 בנק המשאבים
+            </h4>
+            
+            <div style={{
+              display: 'flex',
+              gap: '15px',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              {/* Exchange Points for Coins */}
+              <button
+                onClick={() => {
+                  console.log('🔄 Attempting to exchange points for coins...');
+                  if (!exchangePointsForCoins) {
+                    console.error('❌ exchangePointsForCoins function not available!');
+                    setMessage('❌ שגיאה: הפונקציה לא זמינה');
+                    return;
+                  }
+                  const res = exchangePointsForCoins(50);
+                  console.log('📊 Exchange result:', res);
+                  if (res?.success) {
+                    setMessage('✅ המרת 50 נקודות ל-25 מטבעות! 💰');
+                    setMessageKind('ok');
+                  } else {
+                    setMessage(res?.message || '❌ שגיאה בהמרה');
+                    setMessageKind('error');
+                  }
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
+                  color: '#000',
+                  border: 'none',
+                  padding: '15px 25px',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
+                  transition: 'all 0.3s',
+                  minWidth: '160px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(255, 215, 0, 0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 15px rgba(255, 215, 0, 0.4)';
+                }}
+              >
+                ⭐ 50 ➔ 💰 25
+              </button>
+
+              {/* Buy Energy with Coins */}
+              <button
+                onClick={() => {
+                  console.log('⚡ Attempting to buy energy...');
+                  if (!buyEnergyWithCoins) {
+                    console.error('❌ buyEnergyWithCoins function not available!');
+                    setMessage('❌ שגיאה: הפונקציה לא זמינה');
+                    return;
+                  }
+                  const res = buyEnergyWithCoins(30);
+                  console.log('📊 Buy energy result:', res);
+                  if (res?.success) {
+                    setMessage('✅ האנרגיה התחדשה! ⚡');
+                    setMessageKind('ok');
+                  } else {
+                    setMessage(res?.message || '❌ אין מספיק מטבעות');
+                    setMessageKind('error');
+                  }
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #ff0055 0%, #ff4088 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '15px 25px',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(255, 0, 85, 0.4)',
+                  transition: 'all 0.3s',
+                  minWidth: '160px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(255, 0, 85, 0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 15px rgba(255, 0, 85, 0.4)';
+                }}
+              >
+                💰 30 ➔ ⚡ +1
+              </button>
+            </div>
+
+            {/* Info text */}
+            <p style={{
+              marginTop: '15px',
+              fontSize: '0.9rem',
+              color: '#aaa',
+              textAlign: 'center',
+              lineHeight: 1.5
+            }}>
+              💡 המר נקודות למטבעות או קנה אנרגיה!
+            </p>
+          </div>
+
+          {/* Input area */}
           <div className={styles.inputArea}>
             <textarea
               className={styles.dollInput}
@@ -399,5 +527,10 @@ function PrivacyRoom({ gestureRef }) {
   );
 };
 
+PrivacyRoom.propTypes = {
+  gestureRef: PropTypes.shape({
+    current: PropTypes.any
+  })
+};
 
 export default PrivacyRoom;
