@@ -34,13 +34,22 @@ const login = async (token) => {
   return { success: true, user };
 };
 
+
 const getProfile = async (userId) => {
   const user = await userModel.getUserById(userId);
   if (!user) throw new Error('User not found');
   return user;
 };
 
+const updateUserPointsAndCoins = async (userId, coins, score) => {
+  await userModel.updateUserPointsAndCoins(userId, coins, score);
+  return { success: true };
+};
+
 export default {
   login,
   getProfile,
+  getOwnedRobots,
+  addOwnedRobot,
+  updateUserPointsAndCoins,
 };

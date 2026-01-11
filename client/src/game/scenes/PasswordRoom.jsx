@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { GameContext } from '../../context/GameContext.jsx';
+import api from '../../services/api';
 import styles from './PasswordRoom.module.css';
 import RoomOverlayBg from './RoomOverlayBg';
 
@@ -15,7 +16,8 @@ function evaluatePassword(pw) {
 }
 
 export default function PasswordRoom({ addScore: addScoreProp, awardBadge: awardBadgeProp, gestureRef } = {}) {
-  const { playerName, addScore, registerMistake, awardBadge, handleBack, badges, coins, setCoins } = useContext(GameContext);
+  // הוספת user מה-Context
+  const { user, addScore, registerMistake, awardBadge, handleBack, badges, coins, setCoins, score, setScore } = useContext(GameContext);
   const addScoreFn = addScoreProp || addScore;
   const awardBadgeFn = awardBadgeProp || awardBadge;
 
@@ -23,7 +25,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   const [passwordSamples, setPasswordSamples] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPasswordIndex, setCurrentPasswordIndex] = useState(0);
-  const [score, setScore] = useState(0);
+  // score is now from context only
   const [lives, setLives] = useState(3);
   const [message, setMessage] = useState('');
   const [gameOver, setGameOver] = useState(false);
@@ -96,9 +98,12 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
 
     if (isCorrect) {
       const points = 20;
-      setScore(s => s + points);
-      addScoreFn(points);
-      setCoins(c => c + 10);
+      const newCoins = coins + 10;
+
+      // ה-Context שלך כבר מוגדר לעדכן את ה-DB בתוך setScore ו-setCoins!
+      // פשוט תשתמש ב-Setters של ה-Context:
+      setScore(prev => prev + points);
+      setCoins(newCoins);
       setMessage('✅ Correct! (+10 coins)');
 
       gestureTimeoutRef.current = setTimeout(() => {

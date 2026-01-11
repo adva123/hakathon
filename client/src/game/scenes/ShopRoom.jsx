@@ -1,4 +1,17 @@
 import { useContext, useEffect, useMemo, useRef, useState, Suspense } from 'react';
+// Utility to play a sound
+function playCoinSound() {
+  try {
+    const audio = new window.Audio(require('../../music/drop-coins.mp3'));
+    audio.volume = 0.7;
+    audio.play().catch(() => {});
+  } catch (e) {
+    // fallback for Vite/webpack static import
+    const audio = new window.Audio('/music/drop-coins.mp3');
+    audio.volume = 0.7;
+    audio.play().catch(() => {});
+  }
+}
 import styles from '../game.module.css';
 import room from './ShopRoom.module.css';
 import { Canvas } from '@react-three/fiber';
@@ -169,6 +182,7 @@ export default function ShopRoom() {
           setMessageKind('ok');
           setMessage(response.data.message || `Unlocked ${robot.name}!`);
           triggerEquipFx();
+          playCoinSound();
         }
       } else {
         setMessageKind('warn');

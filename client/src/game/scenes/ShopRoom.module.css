@@ -171,6 +171,11 @@ justify-content: center;
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.05), transparent);
 }
 
+.shopItemSpecial {
+  border-color: #ff69b4;
+  background: linear-gradient(90deg, rgba(255, 105, 180, 0.05), transparent);
+}
+
 .btnBuy, .btnEquip, .btnSelected {
   padding: 8px 20px;
   border-radius: 999px;

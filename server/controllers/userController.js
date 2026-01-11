@@ -39,10 +39,20 @@ const getProfile = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+const updateUserPointsAndCoins = async (req, res) => {
+  try {
+    const { userId, coins, score } = req.body;
+    await userService.updateUserPointsAndCoins(userId, coins, score);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 export default {
   login,
   getProfile,
   getOwnedRobots,
   addOwnedRobot,
+  updateUserPointsAndCoins,
 };

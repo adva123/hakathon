@@ -622,3 +622,41 @@ app.get('/api/shop/robots/:userId', async (req, res) => {
         });
     }
 });
+// ✅ עדכון נקודות ומטבעות של משתמש ב-DB
+app.post('/api/user/update-points-coins', async (req, res) => {
+    const { userId, score, coins } = req.body;
+
+    console.log('💰 Update points request:', { userId, score, coins });
+
+    if (!userId) {
+        return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    try {
+        // ביצוע העדכון במסד הנתונים
+        const [result] = await pool.execute(
+            'UPDATE users SET score = ?, coins = ? WHERE id = ?',
+            [score, coins, userId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        console.log(`✅ Successfully updated DB for user ${userId}: Score=${score}, Coins=${coins}`);
+
+        res.json({
+            success: true,
+            message: 'Points and coins updated in database',
+            data: { score, coins }
+        });
+
+    } catch (error) {
+        console.error('❌ DB Error updating points:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error',
+            error: error.message 
+        });
+    }
+});
