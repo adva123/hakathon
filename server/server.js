@@ -607,31 +607,35 @@ app.get('/api/shop/robots/:userId', async (req, res) => {
 });
 // ✅ עדכון נקודות ומטבעות של משתמש ב-DB
 app.post('/api/user/update-points-coins', async (req, res) => {
-    const { userId, score, coins } = req.body;
+    const { userId, score, coins, energy } = req.body;
 
-    console.log('💰 Update points request:', { userId, score, coins });
+    console.log('💰 Update points request:', { userId, score, coins, energy });
 
     if (!userId) {
         return res.status(400).json({ success: false, message: 'User ID is required' });
     }
 
     try {
-        // ביצוע העדכון במסד הנתונים
-        const [result] = await pool.execute(
-            'UPDATE users SET score = ?, coins = ? WHERE id = ?',
-            [score, coins, userId]
-        );
+        let query, params;
+        if (typeof energy !== 'undefined') {
+            query = 'UPDATE users SET score = ?, coins = ?, energy = ? WHERE id = ?';
+            params = [score, coins, energy, userId];
+        } else {
+            query = 'UPDATE users SET score = ?, coins = ? WHERE id = ?';
+            params = [score, coins, userId];
+        }
+        const [result] = await pool.execute(query, params);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        console.log(`✅ Successfully updated DB for user ${userId}: Score=${score}, Coins=${coins}`);
+        console.log(`✅ Successfully updated DB for user ${userId}: Score=${score}, Coins=${coins}, Energy=${energy}`);
 
         res.json({
             success: true,
-            message: 'Points and coins updated in database',
-            data: { score, coins }
+            message: 'Points, coins, and energy updated in database',
+            data: { score, coins, energy }
         });
 
     } catch (error) {

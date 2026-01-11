@@ -95,7 +95,19 @@ export function GameProvider({ children }) {
   const _scoreRef = useRef(score);
   useEffect(() => { _scoreRef.current = score; }, [score]);
   const _getLatestScore = () => _scoreRef.current;
-  const [energy, setEnergy] = useState(100);
+  const [energy, _setEnergy] = useState(100);
+
+  // Setter שמעדכן גם ב-DB
+  const setEnergy = (valOrUpdater) => {
+    _setEnergy((prevEnergy) => {
+      const newEnergy = typeof valOrUpdater === 'function' ? valOrUpdater(prevEnergy) : valOrUpdater;
+      if (userId != null) {
+        // נעדכן גם את האנרגיה ב-DB (נשתמש ב-updateUserEnergy אם יש, אחרת נשתמש ב-updateUserPointsAndCoins)
+        updateUserPointsAndCoins(userId, score, coins, newEnergy); // נניח שה-API תומך
+      }
+      return newEnergy;
+    });
+  };
   const [openBank, setOpenBank] = useState(false);
   const [userId, setUserId] = useState(null);
   const [googleUser, setGoogleUser] = useState(null);

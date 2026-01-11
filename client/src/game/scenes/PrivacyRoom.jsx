@@ -231,11 +231,36 @@ const PrivacyRoom = ({ gestureRef }) => {
 
         {/* Status bar */}
         <div className={styles.statusBar} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-          <span>🎭 Collection: {shopState?.generatedDolls?.length || 0} dolls</span>
+          <span>🎭 Collection: {userDolls.length} dolls</span>
           <div style={{ display: 'flex', gap: 18, alignItems: 'center', fontSize: '1.1rem' }}>
             <span title="Score" style={{ color: '#00f2ff', fontWeight: 600 }}>⭐ {score}</span>
             <span title="Coins" style={{ color: '#ffd700', fontWeight: 600 }}>🪙 {coins}</span>
             <span title="Energy" style={{ color: '#ff0055', fontWeight: 600 }}>⚡ {energy}</span>
+            <button
+              style={{ marginLeft: 8, padding: '2px 10px', borderRadius: 8, background: 'rgb(40 18 46 / 92%)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              onClick={() => {
+                if (coins >= 5 && energy < 100) {
+                  const newCoins = coins - 5;
+                  const newEnergy = Math.min(energy + 10, 100);
+                  setCoins(newCoins);
+                  setEnergy(newEnergy);
+                  // עדכון ב-DB
+                  if (userId) {
+                    import('../../api/pointsApi').then(({ updateUserPointsAndCoins }) => {
+                      updateUserPointsAndCoins(userId, score, newCoins);
+                    });
+                  }
+                  setMessageKind('ok');
+                  setMessage('⚡ Energy increased!');
+                } else if (energy >= 100) {
+                  setMessageKind('warn');
+                  setMessage('Energy is already full!');
+                } else {
+                  setMessageKind('error');
+                  setMessage('Not enough coins to buy energy!');
+                }
+              }}
+            ></button>
           </div>
         </div>
 

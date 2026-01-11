@@ -1,8 +1,7 @@
 import { useContext, useMemo } from 'react';
+import GlobalGestureOverlay from './GlobalGestureOverlay.jsx';
 import PropTypes from 'prop-types';
 import { GameContext, SCENES } from '../context/GameContext.jsx';
-
-import EntryPoint from './scenes/EntryPoint.jsx';
 import ResourceBank from '../components/ResourceBank.jsx';
 import Lobby from './scenes/Lobby.jsx';
 
@@ -64,6 +63,7 @@ export default function MainGameContainer({ gestureRef } = {}) {
   return (
     <>
       {/* <EnergyNavBar /> */}
+      <GlobalGestureOverlay gestureRef={gestureRef} />
       <ResourceBank />
       {view}
     </>

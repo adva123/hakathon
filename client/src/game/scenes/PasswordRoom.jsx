@@ -17,7 +17,7 @@ function evaluatePassword(pw) {
 
 export default function PasswordRoom({ addScore: addScoreProp, awardBadge: awardBadgeProp, gestureRef } = {}) {
   // הוספת user מה-Context
-  const { user, addScore, registerMistake, awardBadge, handleBack, badges, coins, setCoins, score, setScore } = useContext(GameContext);
+  const { user, addScore, registerMistake, awardBadge, handleBack, badges, coins, setCoins, score, setScore, energy, setEnergy, userId } = useContext(GameContext);
   const addScoreFn = addScoreProp || addScore;
   const awardBadgeFn = awardBadgeProp || awardBadge;
 
@@ -96,12 +96,11 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
     setShowFeedback(true);
     setFeedbackType(isCorrect ? 'correct' : 'wrong');
 
+
+
     if (isCorrect) {
       const points = 20;
       const newCoins = coins + 10;
-
-      // ה-Context שלך כבר מוגדר לעדכן את ה-DB בתוך setScore ו-setCoins!
-      // פשוט תשתמש ב-Setters של ה-Context:
       setScore(prev => prev + points);
       setCoins(newCoins);
       setMessage('✅ Correct! (+10 coins)');
@@ -122,16 +121,19 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
       }, 1000);
     } else {
       registerMistake();
+      // הורדת אנרגיה רק כאשר התשובה שגויה
+      const ENERGY_COST = 10;
+      if (energy > 0) {
+        setEnergy(prev => Math.max(prev - ENERGY_COST, 0)); // גם מעדכן ב-DB
+      }
       const newLives = lives - 1;
       setLives(newLives);
-      
       if (newLives <= 0) {
         setGameOver(true);
         setMessage('❌ Game over!');
       } else {
         setMessage(`❌ Wrong! ${newLives} lives left`);
       }
-
       gestureTimeoutRef.current = setTimeout(() => {
         setMessage('');
         setShowFeedback(false);

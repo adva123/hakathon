@@ -1,7 +1,7 @@
 import CyberpunkCanvasBackdrop from './CyberpunkCanvasBackdrop.jsx';
 /* eslint-disable react/no-unknown-property */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import PropTypes from 'prop-types';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'; // ✅ הוסף useCallback
 import * as THREE from 'three';
@@ -1062,66 +1062,49 @@ function RobotController({
     }
 
     // Transition FX near spur junctions: camera tilt/zoom + slow environmental tint.
-    if (Array.isArray(roomPortals) && roomPortals.length && mode === 'forest') {
+    // --- לוגיקת זיהוי קרבה לחדרים ---
+    if (Array.isArray(roomPortals) && roomPortals.length && curveData?.curve) {
       let bestDist = Infinity;
-      let bestSide = 0;
-      let bestScene = '';
-      let bestLabel = '';
-
-      const pAt = scratch2.current; // reuse scratch
-      const tanAt = scratch3.current;
-      const leftAt = tmpV.current;
-
-      for (let i = 0; i < roomPortals.length; i += 1) {
-        const r = roomPortals[i];
-        const rt = Number(r?.t ?? 0);
-        curveData.curve.getPointAt(rt, pAt);
-        curveData.curve.getTangentAt(rt, tanAt);
-        tanAt.y = 0;
-        if (tanAt.lengthSq() < 1e-9) tanAt.set(0, 0, 1);
-        tanAt.normalize();
-        leftAt.set(0, 1, 0).cross(tanAt).normalize();
-
-        const side = typeof r?.side === 'number' ? Math.sign(r.side) || 1 : (i % 2 === 0 ? 1 : -1);
-        const isPassword = r?.scene === 'password';
-        const jx = pAt.x + leftAt.x * (isPassword ? 1.25 : 1.65) * side + tanAt.x * (isPassword ? -0.85 : 0);
-        const jz = pAt.z + leftAt.z * (isPassword ? 1.25 : 1.65) * side + tanAt.z * (isPassword ? -0.85 : 0);
-
-        const dx = robot.position.x - jx;
-        const dz = robot.position.z - jz;
-        const d = Math.hypot(dx, dz);
-        if (d < bestDist) {
-          bestDist = d;
-          bestSide = side;
-          bestScene = String(r?.scene || '');
-          bestLabel = r?.label || '';
+      let closestPortal = null;
+      roomPortals.forEach((portal) => {
+        const portalPos = curveData.curve.getPointAt(Number(portal.t || 0));
+        const dist = robot.position.distanceTo(portalPos);
+        if (dist < bestDist) {
+          bestDist = dist;
+          closestPortal = portal;
+        }
+      });
+      // אם המרחק קטן מ-1.8 מטר והמודל לא פתוח כרגע
+      if (bestDist < 1.8 && closestPortal && !showRoomModal) {
+        setPendingRoom(closestPortal);
+        setShowRoomModal(true);
+        // כניסה אוטומטית אם לא מדובר בלחיצה על כפתור
+        if (onLobbyPortalEnter) {
+          // Stop all walking (auto-walk and hand movement), but keep hand gesture detection enabled
+          if (typeof setAutoWalkTarget === 'function') {
+            setAutoWalkTarget([]); // clear auto-walk target if setter exists
+          } else if (robot.userData.nav) {
+            robot.userData.nav.arrived = true;
+          }
+          // Stop hand-controlled walking (but not gesture detection)
+          if (robot.userData.handControl) {
+            robot.userData.handControl.enabled = false;
+          }
+          onLobbyPortalEnter(closestPortal.scene);
         }
       }
-
-      const amt = smoothstep01(1 - (bestDist - 1.8) / 7.0);
-      robot.userData.turnFx = { side: bestSide, amount: amt };
-      robot.userData.envFx = { scene: bestScene, amount: amt };
-      // } else {
-      //   robot.userData.turnFx = { side: 0, amount: 0 };
-      //   robot.userData.envFx = { scene: '', amount: 0 };
-      // }
-      const closeEnough = bestDist < 4.0 && bestScene;
-      if (closeEnough) {
-        // הצג מודל רק אם עדיין לא מוצג או אם זה חדר אחר
-        if (!showRoomModal || (pendingRoom && pendingRoom.scene !== bestScene)) {
-          setPendingRoom({ scene: bestScene, label: bestLabel });
-          setShowRoomModal(true);
-        }
-      } else {
-        // סגור מודל אם התרחקנו
-        if (showRoomModal) {
-          setShowRoomModal(false);
-          setPendingRoom(null);
-        }
+      // אם המשתמש התרחק מעבר ל-3 מטר, נסגור את ההודעה אוטומטית
+      else if (bestDist > 3.0 && showRoomModal) {
+        setShowRoomModal(false);
+        setPendingRoom(null);
       }
     } else {
       robot.userData.turnFx = { side: 0, amount: 0 };
       robot.userData.envFx = { scene: '', amount: 0 };
+      // Re-enable hand gesture walking only if not in overlay/room
+      if (robot.userData.handControl && !pendingRoom && !showRoomModal) {
+        robot.userData.handControl.enabled = true;
+      }
       if (showRoomModal) {
         setShowRoomModal(false);
         setPendingRoom(null);
@@ -1150,13 +1133,7 @@ function RobotController({
         laptopCanvas={laptopCanvas || undefined}
         equippedItem={equippedItem || undefined}
       />
-      {showRoomModal && pendingRoom && (
-        <RoomEntryModal
-          roomLabel={pendingRoom.label}
-          onConfirm={handleRoomModalConfirm}
-          onCancel={handleRoomModalCancel}
-        />
-      )}
+      {/* Room entry modal removed: user enters rooms automatically without prompt */}
     </>
   );
 }
