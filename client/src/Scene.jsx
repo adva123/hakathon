@@ -5,8 +5,9 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import Robot from "./components/Robot";
 import { useKeyboard } from "./useKeyboard";
-import { useHandControls } from "./useHandControls";
+import GestureManager from "./GestureManager";
 import Mission1 from "./Missions/Mission1.jsx";
+import PropTypes from "prop-types";
 
 // --- פונקציות עזר מתמטיות ---
 // הגבלת ערך בין מינימום למקסימום (למשל כדי שהרובוט לא יצא מהקירות)
@@ -143,7 +144,8 @@ export default function Scene({
   onMissionTrigger,
 }) {
   const keys = useKeyboard();
-  const handControls = useHandControls();
+  const gestureVelRef = useRef({ x: 0, z: 0 });
+  const gestureActiveRef = useRef(false);
 
   // הגדרות מימדי החדר ומרחק בטיחות מהקירות
   const ROOM_W = 70;
@@ -213,42 +215,79 @@ export default function Scene({
     onNearLabel?.("None");
   }, [spawnKey, spawn, onNearLabel]);
 
-  // לולאת העדכון הראשית של ה-3D
+  // Handler: gesture input from hand tracking
+  const handleGesture = (data) => {
+    gestureVelRef.current = data.velocity || { x: 0, z: 0 };
+    gestureActiveRef.current = data.hasHand;
+  };
+
+  // لولאת העדכון הראשית של ה-3D
   useFrame(({ camera }, delta) => {
-    const k = handControls?.current?.active ? handControls.current : keys.current;
     if (triggerCooldown.current > 0) triggerCooldown.current -= delta;
 
     if (!inputEnabled) {
       // אם התנועה חסומה (למשל בזמן מעבר חדר), הרובוט עובר למצב המתנה
       if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
     } else {
-      // 1. חישוב סיבוב (Rotation)
-      let turn = 0;
-      if (k.ArrowLeft || k.KeyA) turn += 1;
-      if (k.ArrowRight || k.KeyD) turn -= 1;
-      yaw.current += turn * 2.2 * delta;
-
-      // 2. חישוב תנועה (Movement)
-      let forward = 0;
-      if (k.ArrowUp || k.KeyW) forward = 1;
-      if (k.ArrowDown || k.KeyS) forward = -1;
-
-      const moving = forward !== 0;
-      if (moving) {
-        // המרת זווית הסיבוב לוקטור תנועה במרחב (Trigonometry)
-        const vx = Math.sin(yaw.current) * forward;
-        const vz = Math.cos(yaw.current) * forward;
-
-        const nextX = pos.current.x + vx * SPEED * delta;
-        const nextZ = pos.current.z + vz * SPEED * delta;
-
-        // מניעת יציאה מגבולות החדר
-        pos.current.x = clamp(nextX, minX, maxX);
-        pos.current.z = clamp(nextZ, minZ, maxZ);
-
-        if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Walk");
+      // בחר בין קלט מקלידבור או מחיישן הת-ממדי
+      const gx = gestureVelRef.current.x;
+      const gz = gestureVelRef.current.z;
+      const usingGesture = gestureActiveRef.current && (gx !== 0 || gz !== 0);
+      
+      if (usingGesture) {
+        // קלט מחיישן הת-ממדי
+        // תנועה לפנים/אחורה בהתאם לציר Z
+        if (gz !== 0) {
+          const vx = Math.sin(yaw.current) * gz;
+          const vz = Math.cos(yaw.current) * gz;
+          
+          const nextX = pos.current.x + vx * SPEED * delta;
+          const nextZ = pos.current.z + vz * SPEED * delta;
+          
+          pos.current.x = clamp(nextX, minX, maxX);
+          pos.current.z = clamp(nextZ, minZ, maxZ);
+          
+          if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Walk");
+        } else if (robotRef.current?.userData?.setAction) {
+          robotRef.current.userData.setAction("Idle");
+        }
+        
+        // סיבוב בהתאם לציר X (ימין/שמאל)
+        if (gx !== 0) {
+          yaw.current += gx * 2.2 * delta;
+        }
       } else {
-        if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
+        // קלט מקלידבור
+        const k = keys.current;
+        
+        // 1. חישוב סיבוב (Rotation)
+        let turn = 0;
+        if (k.ArrowLeft || k.KeyA) turn += 1;
+        if (k.ArrowRight || k.KeyD) turn -= 1;
+        yaw.current += turn * 2.2 * delta;
+
+        // 2. חישוב תנועה (Movement)
+        let forward = 0;
+        if (k.ArrowUp || k.KeyW) forward = 1;
+        if (k.ArrowDown || k.KeyS) forward = -1;
+
+        const moving = forward !== 0;
+        if (moving) {
+          // המרת זווית הסיבוב לוקטור תנועה במרחב (Trigonometry)
+          const vx = Math.sin(yaw.current) * forward;
+          const vz = Math.cos(yaw.current) * forward;
+
+          const nextX = pos.current.x + vx * SPEED * delta;
+          const nextZ = pos.current.z + vz * SPEED * delta;
+
+          // מניעת יציאה מגבולות החדר
+          pos.current.x = clamp(nextX, minX, maxX);
+          pos.current.z = clamp(nextZ, minZ, maxZ);
+
+          if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Walk");
+        } else {
+          if (robotRef.current?.userData?.setAction) robotRef.current.userData.setAction("Idle");
+        }
       }
     }
 
@@ -376,7 +415,6 @@ export default function Scene({
         <Mission1 robotRef={robotRef} onExit={() => onMissionTrigger("task1")} />
       )}
 
-
       {/* מודל הרובוט */}
       <Robot ref={robotRef} scale={1.25} position={[0, -1.15, 0]} />
 
@@ -390,6 +428,20 @@ export default function Scene({
         minPolarAngle={Math.PI / 3}
         maxPolarAngle={Math.PI / 1.8}
       />
+      
+      {/* עדכון קלט מחיישן יד */}
+      <GestureManager enabled onGesture={handleGesture} />
     </>
   );
 }
+
+Scene.propTypes = {
+  roomId: PropTypes.string,
+  spawnKey: PropTypes.number,
+  spawn: PropTypes.object,
+  inputEnabled: PropTypes.bool,
+  onPose: PropTypes.func,
+  onIconsForMap: PropTypes.func,
+  onNearLabel: PropTypes.func,
+  onMissionTrigger: PropTypes.func,
+};
