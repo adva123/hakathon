@@ -286,7 +286,7 @@ export default function ShopRoom() {
           </div>
         </div>
         <div className={room.podStatus}>
-          {userId ? `POD ONLINE • User: ${userId.toString().substring(0, 8)}...` : 'POD OFFLINE - NOT LOGGED IN'}
+          {userId ? `POD ONLINE ` : 'POD OFFLINE - NOT LOGGED IN'}
         </div>
       </div>
 

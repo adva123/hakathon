@@ -1,3 +1,20 @@
+// Get owned robots for a user
+const getOwnedRobots = async (userId) => {
+  const user = await userModel.getUserById(userId);
+  return user?.ownedRobots || [];
+};
+
+// Add a robot to user's owned robots
+const addOwnedRobot = async (userId, robotId) => {
+  const user = await userModel.getUserById(userId);
+  if (!user) throw new Error('User not found');
+  const ownedRobots = user.ownedRobots || [];
+  if (!ownedRobots.includes(robotId)) {
+    ownedRobots.push(robotId);
+    await userModel.updateUserOwnedRobots(userId, ownedRobots);
+  }
+  return ownedRobots;
+};
 
 import { verifyGoogleToken } from '../utils/authUtils.js';
 import * as userModel from '../models/user.js';

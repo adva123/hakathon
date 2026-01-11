@@ -7,6 +7,7 @@ CREATE TABLE users (
   email VARCHAR(100) UNIQUE,
   coins INT DEFAULT 100, -- money
   score INT DEFAULT 0,   -- points
+  owned_robots JSON DEFAULT '[]', -- robots the user owns
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
