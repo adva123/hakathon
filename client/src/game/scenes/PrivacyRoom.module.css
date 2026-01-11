@@ -668,7 +668,7 @@
   font-family: 'Courier New', Courier, monospace;
   pointer-events: auto !important;
   cursor: text !important;
-  z-index: 1010;
+  z-index: 10010;
 }
 
 /* אפקט הולוגרמה (קווים סורקים) */
@@ -927,6 +927,8 @@
 }
 .room {
   width: min(820px, 92vw);
+  position: relative; /* 👈 זה מה שחסר! זה מפעיל את ה-z-index */
+  z-index: 1000;      /* עכשיו הערך הזה באמת יקבל משמעות */
 }
 
 .header {
@@ -995,7 +997,8 @@
   padding: 15px;
   border-radius: 8px;
   pointer-events: auto;
-  z-index: 1021;
+  position: relative;
+  z-index: 10000021;
 }
 .generateBtn {
   background: #00f2ff;

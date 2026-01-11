@@ -79,6 +79,8 @@
   border-radius: 28px;
   padding: 30px;
   color: white;
+  position: relative;
+  z-index: 10000;
 }
 
 .layout {

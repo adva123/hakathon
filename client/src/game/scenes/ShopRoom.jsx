@@ -6,6 +6,7 @@ import MiniRobotPreview from '../../components/common/MiniRobotPreview/MiniRobot
 import { GameContext } from '../../context/GameContext.jsx';
 import { ROBOT_CATALOG } from '../../features/robot/robotCatalog.js';
 import api from '../../services/api';
+import RoomOverlayBg from './RoomOverlayBg';
 
 export default function ShopRoom() {
   const gameContext = useContext(GameContext);
@@ -274,166 +275,169 @@ export default function ShopRoom() {
   };
 
   return (
-    <div className={`${styles.panel} ${room.room}`}>
-      <div className={room.header}>
-        <button className={room.btnBack} onClick={handleBack}>
-          ← Back
-        </button>
-        <div>
-          <h2 className={room.title}>🛍️ Robot Upgrade Pod</h2>
-          <div className={`${styles.small} ${room.subtitle}`}>
-            Spend coins to customize your appearance. Selected skins persist in the forest.
-          </div>
-        </div>
-        <div className={room.podStatus}>
-          {userId ? `POD ONLINE ` : 'POD OFFLINE - NOT LOGGED IN'}
-        </div>
-      </div>
-
-      {/* DEBUG PANEL */}
-      {!userId && (
-        <div style={{
-          background: 'rgba(255, 0, 85, 0.1)',
-          border: '2px solid #ff0055',
-          borderRadius: '12px',
-          padding: '20px',
-          margin: '20px',
-          color: '#fff'
-        }}>
-          <h3 style={{ color: '#ff0055', marginTop: 0 }}>⚠️ Debug: No User ID Found</h3>
-          <p>Check the browser console (F12) for detailed debugging info.</p>
-          <p><strong>Possible solutions:</strong></p>
-          <ul>
-            <li>Make sure you're logged in with Google</li>
-            <li>Check if userId is saved in GameContext</li>
-            <li>Check localStorage for 'google_user' or 'userId'</li>
-          </ul>
-          <button 
-            onClick={getUserId}
-            style={{
-              background: '#ff0055',
-              color: '#fff',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              cursor: 'pointer'
-            }}
-          >
-            🔍 Re-check userId (see console)
+    <>
+      <RoomOverlayBg />
+      <div className={`${styles.panel} ${room.room}`}>
+        <div className={room.header}>
+          <button className={room.btnBack} onClick={handleBack}>
+            ← Back
           </button>
-        </div>
-      )}
-
-      <div className={room.layout}>
-        {/* Left side: Preview */}
-        <div className={`${room.pod} ${room.glassNeon}`}>
-          <div className={room.podTop}>
-            <div className={room.podLabel}>PREVIEW UNIT</div>
-            <div className={room.kpi}>Wallet: {coins} 🪙</div>
+          <div>
+            <h2 className={room.title}>🛍️ Robot Upgrade Pod</h2>
+            <div className={`${styles.small} ${room.subtitle}`}>
+              Spend coins to customize your appearance. Selected skins persist in the forest.
+            </div>
           </div>
+          <div className={room.podStatus}>
+            {userId ? `POD ONLINE ` : 'POD OFFLINE - NOT LOGGED IN'}
+          </div>
+        </div>
 
-          <div className={room.robotStage}>
-            <div className={room.robotGlow} style={{ '--robot-glow-color': previewSkin.color }} />
-            <div className={room.robotScan} />
+        {/* DEBUG PANEL */}
+        {!userId && (
+          <div style={{
+            background: 'rgba(255, 0, 85, 0.1)',
+            border: '2px solid #ff0055',
+            borderRadius: '12px',
+            padding: '20px',
+            margin: '20px',
+            color: '#fff'
+          }}>
+            <h3 style={{ color: '#ff0055', marginTop: 0 }}>⚠️ Debug: No User ID Found</h3>
+            <p>Check the browser console (F12) for detailed debugging info.</p>
+            <p><strong>Possible solutions:</strong></p>
+            <ul>
+              <li>Make sure you're logged in with Google</li>
+              <li>Check if userId is saved in GameContext</li>
+              <li>Check localStorage for 'google_user' or 'userId'</li>
+            </ul>
+            <button 
+              onClick={getUserId}
+              style={{
+                background: '#ff0055',
+                color: '#fff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              🔍 Re-check userId (see console)
+            </button>
+          </div>
+        )}
+
+        <div className={room.layout}>
+          {/* Left side: Preview */}
+          <div className={`${room.pod} ${room.glassNeon}`}>
+            <div className={room.podTop}>
+              <div className={room.podLabel}>PREVIEW UNIT</div>
+              <div className={room.kpi}>Wallet: {coins} 🪙</div>
+            </div>
+
+            <div className={room.robotStage}>
+              <div className={room.robotGlow} style={{ '--robot-glow-color': previewSkin.color }} />
+              <div className={room.robotScan} />
+              
+              <Suspense fallback={<div className={room.loading}>Loading Systems...</div>}>
+                <Canvas 
+                  camera={{ position: [0, 1.5, 6], fov: 45 }} 
+                  style={{ width: '100%', height: '100%', zIndex: 3 }}
+                >
+                  <ambientLight intensity={0.8} />
+                  <pointLight position={[5, 5, 5]} intensity={1.5} />
+                  <MiniRobotPreview color={previewSkin.color} type={previewSkin.type} />
+                </Canvas>
+              </Suspense>
+
+              <div className={room.previewLabel}>
+                {previewSkin.name}
+              </div>
+            </div>
             
-            <Suspense fallback={<div className={room.loading}>Loading Systems...</div>}>
-              <Canvas 
-                camera={{ position: [0, 1.5, 6], fov: 45 }} 
-                style={{ width: '100%', height: '100%', zIndex: 3 }}
-              >
-                <ambientLight intensity={0.8} />
-                <pointLight position={[5, 5, 5]} intensity={1.5} />
-                <MiniRobotPreview color={previewSkin.color} type={previewSkin.type} />
-              </Canvas>
-            </Suspense>
-
-            <div className={room.previewLabel}>
-              {previewSkin.name}
+            <div className={room.podHint}>
+              Hover to preview • Click to action
             </div>
           </div>
-          
-          <div className={room.podHint}>
-            Hover to preview • Click to action
+
+          {/* Right side: Shop */}
+          <div className={room.shop}>
+            <div className={room.podTop}>
+              <div className={room.podLabel}>AVAILABLE SKINS</div>
+            </div>
+
+            <div className={room.items}>
+               {ROBOT_CATALOG.map((robot) => (
+                 <div
+                   key={robot.id}
+                   className={`${room.shopItem} ${selectedRobotId === robot.id ? room.shopItemActive : ''} ${robot.type === 'luxury' ? room.shopItemLuxury : ''} ${robot.type === 'special' ? room.shopItemSpecial : ''}`}
+                   onMouseEnter={() => setPreviewId(robot.id)}
+                 >
+                   <div className={room.itemInfo}>
+                     <div className={room.itemName}>
+                       {robot.name}
+                       {selectedRobotId === robot.id && <span className={room.tagEquipped}>SELECTED</span>}
+                     </div>
+                     <div className={room.itemMeta}>
+                       Price: {robot.price} • {robot.type.toUpperCase()}
+                     </div>
+                   </div>
+                   <div className={room.itemAction}>
+                     {renderRobotAction(robot)}
+                   </div>
+                 </div>
+               ))}
+            </div>
           </div>
         </div>
 
-        {/* Right side: Shop */}
-        <div className={room.shop}>
-          <div className={room.podTop}>
-            <div className={room.podLabel}>AVAILABLE SKINS</div>
+        {/* Message notification */}
+        {message && (
+          <div className={`${room.notice} ${messageKind === 'ok' ? room.noticeOk : room.noticeWarn}`}>
+            {message}
           </div>
+        )}
 
-          <div className={room.items}>
-             {ROBOT_CATALOG.map((robot) => (
-               <div
-                 key={robot.id}
-                 className={`${room.shopItem} ${selectedRobotId === robot.id ? room.shopItemActive : ''} ${robot.type === 'luxury' ? room.shopItemLuxury : ''} ${robot.type === 'special' ? room.shopItemSpecial : ''}`}
-                 onMouseEnter={() => setPreviewId(robot.id)}
-               >
-                 <div className={room.itemInfo}>
-                   <div className={room.itemName}>
-                     {robot.name}
-                     {selectedRobotId === robot.id && <span className={room.tagEquipped}>SELECTED</span>}
-                   </div>
-                   <div className={room.itemMeta}>
-                     Price: {robot.price} • {robot.type.toUpperCase()}
-                   </div>
-                 </div>
-                 <div className={room.itemAction}>
-                   {renderRobotAction(robot)}
-                 </div>
-               </div>
-             ))}
+        {/* Loading indicator */}
+        {isLoading && (
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(0, 0, 0, 0.8)',
+            padding: '20px 40px',
+            borderRadius: '12px',
+            color: '#00f2ff',
+            fontSize: '1.2rem',
+            zIndex: 10000
+          }}>
+            Processing transaction...
           </div>
-        </div>
+        )}
+
+        {/* Confirmation Modal */}
+        {pendingEquip && (
+          <div className={room.modalOverlay}>
+            <div className={room.modal}>
+              <h3>Confirm Component Sync</h3>
+              <p>Sync robot interface with <span style={{color: pendingEquip.color}}>{pendingEquip.name}</span>?</p>
+              <div className={room.modalActions}>
+                <button 
+                  className={room.btnEquip} 
+                  onClick={() => { 
+                    selectRobotWithDB(pendingEquip.id); 
+                    setPendingEquip(null); 
+                  }}
+                >
+                  SYNC
+                </button>
+                <button className={room.btnCancel} onClick={() => setPendingEquip(null)}>CANCEL</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Message notification */}
-      {message && (
-        <div className={`${room.notice} ${messageKind === 'ok' ? room.noticeOk : room.noticeWarn}`}>
-          {message}
-        </div>
-      )}
-
-      {/* Loading indicator */}
-      {isLoading && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(0, 0, 0, 0.8)',
-          padding: '20px 40px',
-          borderRadius: '12px',
-          color: '#00f2ff',
-          fontSize: '1.2rem',
-          zIndex: 10000
-        }}>
-          Processing transaction...
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {pendingEquip && (
-        <div className={room.modalOverlay}>
-          <div className={room.modal}>
-            <h3>Confirm Component Sync</h3>
-            <p>Sync robot interface with <span style={{color: pendingEquip.color}}>{pendingEquip.name}</span>?</p>
-            <div className={room.modalActions}>
-              <button 
-                className={room.btnEquip} 
-                onClick={() => { 
-                  selectRobotWithDB(pendingEquip.id); 
-                  setPendingEquip(null); 
-                }}
-              >
-                SYNC
-              </button>
-              <button className={room.btnCancel} onClick={() => setPendingEquip(null)}>CANCEL</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { GameContext } from '../../context/GameContext.jsx';
 import styles from './PasswordRoom.module.css';
+import RoomOverlayBg from './RoomOverlayBg';
 
 function evaluatePassword(pw) {
   if (!pw) return { met: 0, isStrong: false };
@@ -222,50 +223,53 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
   };
 
   return (
-    <div className={styles.wrap}>
-      <div className={styles.cockpit}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>Password Strength Detector</h2>
-          <div className={styles.statsRow}>
-            <div>Score: <span className={styles.neonTag}>{score}</span></div>
-            <div>Coins: <span className={styles.neonTag}>🪙 {coins}</span></div>
-            <div>Lives: <span className={styles.neonTag}>{'❤️'.repeat(lives)}</span></div>
+    <>
+      <RoomOverlayBg />
+      <div className={styles.wrap}>
+        <div className={styles.cockpit}>
+          <div className={styles.header}>
+            <h2 className={styles.title}>Password Strength Detector</h2>
+            <div className={styles.statsRow}>
+              <div>Score: <span className={styles.neonTag}>{score}</span></div>
+              <div>Coins: <span className={styles.neonTag}>🪙 {coins}</span></div>
+              <div>Lives: <span className={styles.neonTag}>{'❤️'.repeat(lives)}</span></div>
+            </div>
+          </div>
+
+          <div className={styles.panel}>
+            {!gameOver && !victory && currentPassword && (
+              <div className={styles.passwordDisplay}>
+                <h3>Analyze this password:</h3>
+                <div className={styles.passwordText}>{currentPassword.password}</div>
+                <div className={styles.hint}>
+                  👍 Thumbs Up = Strong | 👎 Thumbs Down = Weak
+                </div>
+                <div className={styles.progress}>
+                  {currentPasswordIndex + 1} / {passwordSamples.length}
+                </div>
+              </div>
+            )}
+
+            {showFeedback && (
+              <div className={`${styles.feedbackOverlay} ${styles[feedbackType]}`}>
+                {feedbackType === 'correct' ? '✅ Correct!' : '❌ Wrong!'}
+              </div>
+            )}
+
+            {(gameOver || victory) && (
+              <div className={victory ? styles.victoryScreen : styles.gameOverScreen}>
+                <h3>{victory ? '🎉 Victory!' : '❌ Game Over'}</h3>
+                <p>Final Score: {score}</p>
+                <button className={styles.btn} onClick={restart}>Try Again</button>
+                <button className={styles.btn} onClick={handleBack}>Back to Lobby</button>
+              </div>
+            )}
+
+            {message && <div className={styles.message}>{message}</div>}
           </div>
         </div>
-
-        <div className={styles.panel}>
-          {!gameOver && !victory && currentPassword && (
-            <div className={styles.passwordDisplay}>
-              <h3>Analyze this password:</h3>
-              <div className={styles.passwordText}>{currentPassword.password}</div>
-              <div className={styles.hint}>
-                👍 Thumbs Up = Strong | 👎 Thumbs Down = Weak
-              </div>
-              <div className={styles.progress}>
-                {currentPasswordIndex + 1} / {passwordSamples.length}
-              </div>
-            </div>
-          )}
-
-          {showFeedback && (
-            <div className={`${styles.feedbackOverlay} ${styles[feedbackType]}`}>
-              {feedbackType === 'correct' ? '✅ Correct!' : '❌ Wrong!'}
-            </div>
-          )}
-
-          {(gameOver || victory) && (
-            <div className={victory ? styles.victoryScreen : styles.gameOverScreen}>
-              <h3>{victory ? '🎉 Victory!' : '❌ Game Over'}</h3>
-              <p>Final Score: {score}</p>
-              <button className={styles.btn} onClick={restart}>Try Again</button>
-              <button className={styles.btn} onClick={handleBack}>Back to Lobby</button>
-            </div>
-          )}
-
-          {message && <div className={styles.message}>{message}</div>}
-        </div>
       </div>
-    </div>
+    </>
   );
 }
 
