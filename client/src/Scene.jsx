@@ -5,6 +5,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import Robot from "./components/Robot";
 import { useKeyboard } from "./useKeyboard";
+import Mission1 from "./Missions/Mission1.jsx";
 
 // --- פונקציות עזר מתמטיות ---
 // הגבלת ערך בין מינימום למקסימום (למשל כדי שהרובוט לא יצא מהקירות)
@@ -368,6 +369,11 @@ export default function Scene({
       {iconsToShow.map((ic) => (
         <MissionIcon key={ic.id} position={[ic.pos.x, ic.pos.y, ic.pos.z]} />
       ))}
+
+      {roomId === "task1" && (
+        <Mission1 robotRef={robotRef} onExit={() => onMissionTrigger("task1")} />
+      )}
+
 
       {/* מודל הרובוט */}
       <Robot ref={robotRef} scale={1.25} position={[0, -1.15, 0]} />
