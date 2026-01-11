@@ -5,8 +5,8 @@ CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
   email VARCHAR(100) UNIQUE,
-  coins INT DEFAULT 100,
-  score INT DEFAULT 0,
+  coins INT DEFAULT 100, -- money
+  score INT DEFAULT 0,   -- points
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

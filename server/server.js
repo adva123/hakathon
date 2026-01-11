@@ -406,3 +406,219 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log("OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
 });
+
+// 🤖 ROBOT SHOP - Server Endpoints with MySQL Integration
+
+/**
+ * POST /api/shop/buy-robot
+ * Buy a robot and save to database
+ */
+app.post('/api/shop/buy-robot', async (req, res) => {
+    const { userId, robotId, price } = req.body;
+
+    console.log('🛍️ Buy robot request:', { userId, robotId, price });
+
+    try {
+        // 1. Get current user data
+        const [userRows] = await pool.execute(
+            'SELECT id, coins, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const user = userRows[0];
+        const currentCoins = user.coins;
+
+        // 2. Check if user has enough coins
+        if (currentCoins < price) {
+            return res.json({
+                success: false,
+                message: `Not enough coins! You need ${price - currentCoins} more.`,
+                coinsNeeded: price - currentCoins
+            });
+        }
+
+        // 3. Parse owned_robots (JSON string or comma-separated)
+        let ownedRobots = [];
+        if (user.owned_robots) {
+            try {
+                // Try parsing as JSON first
+                ownedRobots = JSON.parse(user.owned_robots);
+            } catch (e) {
+                // Fallback: treat as comma-separated string
+                ownedRobots = user.owned_robots.split(',').filter(Boolean);
+            }
+        }
+
+        // 4. Check if robot already owned
+        if (ownedRobots.includes(robotId)) {
+            return res.json({
+                success: false,
+                message: 'You already own this robot!'
+            });
+        }
+
+        // 5. Add robot to owned list
+        ownedRobots.push(robotId);
+        const updatedOwnedRobots = JSON.stringify(ownedRobots);
+
+        // 6. Update database: deduct coins and add robot
+        await pool.execute(
+            'UPDATE users SET coins = coins - ?, owned_robots = ? WHERE id = ?',
+            [price, updatedOwnedRobots, userId]
+        );
+
+        // 7. Fetch updated user data
+        const [updatedUserRows] = await pool.execute(
+            'SELECT id, username, coins, score, energy, robot_color, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        const updatedUser = updatedUserRows[0];
+
+        console.log('✅ Robot purchased successfully:', robotId);
+
+        res.json({
+            success: true,
+            message: `Robot unlocked! -${price} coins`,
+            robotId: robotId,
+            userData: {
+                id: updatedUser.id,
+                coins: updatedUser.coins,
+                score: updatedUser.score,
+                energy: updatedUser.energy,
+                ownedRobots: JSON.parse(updatedUser.owned_robots || '[]')
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error buying robot:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * POST /api/shop/select-robot
+ * Select/equip a robot (change robot_color)
+ */
+app.post('/api/shop/select-robot', async (req, res) => {
+    const { userId, robotId, robotColor } = req.body;
+
+    console.log('🎨 Select robot request:', { userId, robotId, robotColor });
+
+    try {
+        // 1. Get current user data
+        const [userRows] = await pool.execute(
+            'SELECT id, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const user = userRows[0];
+
+        // 2. Check if user owns this robot
+        let ownedRobots = [];
+        if (user.owned_robots) {
+            try {
+                ownedRobots = JSON.parse(user.owned_robots);
+            } catch (e) {
+                ownedRobots = user.owned_robots.split(',').filter(Boolean);
+            }
+        }
+
+        if (!ownedRobots.includes(robotId)) {
+            return res.json({
+                success: false,
+                message: 'You do not own this robot!'
+            });
+        }
+
+        // 3. Update robot_color in database
+        await pool.execute(
+            'UPDATE users SET robot_color = ? WHERE id = ?',
+            [robotColor, userId]
+        );
+
+        console.log('✅ Robot selected:', robotId);
+
+        res.json({
+            success: true,
+            message: 'Robot equipped!',
+            robotId: robotId,
+            robotColor: robotColor
+        });
+
+    } catch (error) {
+        console.error('❌ Error selecting robot:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/shop/robots/:userId
+ * Get user's robot shop data
+ */
+app.get('/api/shop/robots/:userId', async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const [userRows] = await pool.execute(
+            'SELECT id, coins, robot_color, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const user = userRows[0];
+
+        // Parse owned_robots
+        let ownedRobots = [];
+        if (user.owned_robots) {
+            try {
+                ownedRobots = JSON.parse(user.owned_robots);
+            } catch (e) {
+                ownedRobots = user.owned_robots.split(',').filter(Boolean);
+            }
+        }
+
+        res.json({
+            success: true,
+            coins: user.coins,
+            robotColor: user.robot_color,
+            ownedRobots: ownedRobots
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching robot data:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
