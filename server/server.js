@@ -230,37 +230,35 @@ app.post('/api/dolls/generate', async (req, res) => {
 
     if (isUnsafe) {
         console.log('⚠️ Unsafe content detected');
-
-        // Save blocked doll to DB
         try {
             const blockedImageUrl = 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png';
-
             await pool.execute(
                 'INSERT INTO dolls (user_id, name, description, image_url, is_good) VALUES (?, ?, ?, ?, ?)',
-                [userId, 'Blocked Content', 'This creation was blocked for safety reasons', blockedImageUrl, 0]
+                [userId, 'Blocked Content', 'Unsafe content', blockedImageUrl, 0]
             );
-
-            // Penalty: -5 score, -10 energy
+            // ✅ עדכון DB: ירידת ניקוד ואנרגיה במקום אחד
             await pool.execute(
-                'UPDATE users SET score = score - 5, energy = energy - 10 WHERE id = ?',
+                'UPDATE users SET score = GREATEST(0, score - 5), energy = GREATEST(0, energy - 10) WHERE id = ?',
                 [userId]
             );
-
+            // שליפת המשתמש המעודכן מה-DB כדי להחזיר לפרונט
+            const [updatedUser] = await pool.execute('SELECT * FROM users WHERE id = ?', [userId]);
+            return res.json({
+                success: true,
+                isUnsafe: true,
+                doll: {
+                    id: 'blocked_' + Date.now(),
+                    name: "Blocked Content",
+                    description: "Unsafe content",
+                    imageUrl: blockedImageUrl
+                },
+                userData: updatedUser[0], // מחזירים את האנרגיה והניקוד המעודכנים
+                message: "⚠️ הניקוד והאנרגיה ירדו בשל הפרת פרטיות."
+            });
         } catch (dbError) {
-            console.error('❌ DB error saving blocked doll:', dbError);
+            console.error(dbError);
+            return res.status(500).json({ success: false, message: 'DB error saving blocked doll', error: dbError.message });
         }
-
-        return res.json({
-            success: true,
-            isUnsafe: true,
-            message: "⚠️ Privacy violation: Please do not share personal info!",
-            doll: {
-                id: 'blocked_' + Date.now(),
-                name: "Blocked Content",
-                description: "Unsafe content",
-                imageUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png'
-            }
-        });
     }
 
     // ========================================
@@ -314,30 +312,15 @@ app.post('/api/dolls/generate', async (req, res) => {
         const newDollId = dollResult.insertId;
         console.log('✅ Doll saved to DB with ID:', newDollId);
 
-        // ========================================
-        // 5. UPDATE USER RESOURCES (users table)
-        // ========================================
-        console.log('💰 Updating user resources...');
-
+        // ✅ עדכון DB: עליית ניקוד וכסף
         await pool.execute(
             'UPDATE users SET score = score + 10, coins = coins + 10 WHERE id = ?',
             [userId]
         );
 
-        // ========================================
-        // 6. FETCH UPDATED USER DATA
-        // ========================================
-        const [updatedUserRows] = await pool.execute(
-            'SELECT id, username, email, score, coins, energy FROM users WHERE id = ?',
-            [userId]
-        );
+        // שליפת המשתמש המעודכן
+        const [updatedUser] = await pool.execute('SELECT * FROM users WHERE id = ?', [userId]);
 
-        const updatedUser = updatedUserRows[0];
-        console.log('✅ User resources updated:', updatedUser);
-
-        // ========================================
-        // 7. SEND RESPONSE
-        // ========================================
         res.json({
             success: true,
             isUnsafe: false,
@@ -349,8 +332,8 @@ app.post('/api/dolls/generate', async (req, res) => {
                 generationMethod: generationMethod,
                 createdAt: new Date()
             },
-            userData: updatedUser,
-            message: `✨ Doll created with ${generationMethod}! +10 points & +10 coins!`
+            userData: updatedUser[0], // מחזירים את הנתונים המעודכנים
+            message: "✨you earned 10 points and 10 coins for creating a doll!"
         });
 
     } catch (error) {

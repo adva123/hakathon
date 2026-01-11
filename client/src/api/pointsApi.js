@@ -1,4 +1,4 @@
 import API from './axiosInstance';
 
-export const updateUserPointsAndCoins = (userId, coins, score) =>
-  API.post(`/user/update-points-coins`, { userId, coins, score });
+export const updateUserPointsAndCoins = (userId, score, coins) =>
+  API.post(`/user/update-points-coins`, { userId, score, coins });

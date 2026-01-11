@@ -49,7 +49,7 @@ function RoomEntryModal({ roomLabel, onConfirm, onCancel }) {
           fontWeight: 'bold',
           textShadow: '0 2px 10px rgba(0,0,0,0.3)'
         }}>
-          🚪 כניסה לחדר
+          🚪 room entrance
         </div>
         <div style={{
           fontSize: 20,
@@ -101,7 +101,7 @@ function RoomEntryModal({ roomLabel, onConfirm, onCancel }) {
               e.target.style.transform = 'scale(1)';
             }}
           >
-            ✗ לא
+            ✗ no
           </button>
         </div>
       </div>

@@ -21,6 +21,7 @@ const PrivacyRoom = ({ gestureRef }) => {
   const [messageKind, setMessageKind] = useState('');
   const [generatedDoll, setGeneratedDoll] = useState(null);
   const [selectedDoll, setSelectedDoll] = useState(null);
+  const [userDolls, setUserDolls] = useState([]); // כל הבובות של המשתמש
   const [isLoading, setIsLoading] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const [useDALLE, setUseDALLE] = useState(true); // Always use DALL-E
@@ -37,6 +38,8 @@ const PrivacyRoom = ({ gestureRef }) => {
     energy,
     addDollToInventory,
     setCoins,
+    setScore,
+    setEnergy,
     addScore,
     registerMistake,
     shopState,
@@ -45,13 +48,11 @@ const PrivacyRoom = ({ gestureRef }) => {
 
   useEffect(() => {
     if (!userId) return;
-
     const loadDollsFromDB = async () => {
       try {
-        // שימוש ב-userId שהגיע מהקונטקסט
         const response = await api.get(`/dolls/${userId}`);
-        if (response.data) {
-          // עדכון ה-UI
+        if (response.data && Array.isArray(response.data)) {
+          setUserDolls(response.data);
           if (response.data.length > 0) {
             setSelectedDoll(response.data[0]);
           }
@@ -60,7 +61,6 @@ const PrivacyRoom = ({ gestureRef }) => {
         console.error('❌ Failed to load dolls:', err);
       }
     };
-
     loadDollsFromDB();
   }, [userId]);
 
@@ -129,85 +129,57 @@ const PrivacyRoom = ({ gestureRef }) => {
    * Sends request to server which handles DALL-E + DB saving
    */
   const handleGenerateDoll = async () => {
+    // ... בדיקות קלט ...
     if (!dollDescription.trim() || !userId) {
       setMessageKind('warn');
       setMessage('Please describe your doll first!');
       return;
     }
-
     if (!userId || userId === 'anonymous') {
       setMessageKind('error');
       setMessage('⚠️ Please log in to create dolls!');
       return;
     }
-
     setIsLoading(true);
-    setMessage('Creating your AI doll... 🎨');
-    setMessageKind('info');
-    setGeneratedDoll(null);
-
-    console.log('🎭 Generating doll:', { dollDescription, userId });
-
     try {
-      // Single API call - server handles everything
       const response = await api.post('/dolls/generate', {
         dollDescription,
         privacySettings,
-        userId,  // ← CRITICAL: Send userId to server
+        userId,
         useDALLE
       });
-
-      console.log('📦 Server response:', response.data);
-
       if (response.data.success) {
-        const isUnsafe = response.data.isUnsafe;
-
-        if (isUnsafe) {
-          // ❌ Unsafe content
-          const doll = response.data.doll;
-          setGeneratedDoll(doll);
-          setSelectedDoll(doll);
-          setMessageKind('error');
-          setMessage('⚠️ Safety Warning: Do not share personal info! -5 points, -10 energy.');
-
-          if (registerMistake) registerMistake();
-
-        } else {
-          // ✅ Good doll
-          const doll = response.data.doll;
-          const userData = response.data.userData;
-
-          console.log('✅ Doll created:', doll);
-          console.log('💰 Updated user:', userData);
-
-          setGeneratedDoll(doll);
-          setSelectedDoll(doll);
-
-          // Update local state with server values
-          if (addScore && userData?.score !== undefined) {
-            // Calculate the delta instead of setting absolute value
-            addScore(10);
-          }
-          if (setCoins && userData?.coins !== undefined) {
-            setCoins(userData.coins); // Use exact value from server
-          }
-
-          setMessageKind('ok');
-          setMessage(response.data.message || '🌟 Amazing! +10 points & +10 coins!');
-
-          // Add to local inventory
-          if (addDollToInventory) {
-            addDollToInventory(doll);
-          }
+        const { doll, userData, isUnsafe } = response.data;
+        setGeneratedDoll(doll);
+        setSelectedDoll(doll);
+        // עדכון ה-Context
+        if (userData) {
+          if (setScore) setScore(userData.score);
+          if (setCoins) setCoins(userData.coins);
+          if (setEnergy) setEnergy(userData.energy);
         }
-      } else {
-        throw new Error(response.data.message || 'Failed to generate doll');
+        // טען מחדש את כל הבובות מה-DB אחרי יצירה
+        try {
+          const dollsRes = await api.get(`/dolls/${userId}`);
+          if (dollsRes.data && Array.isArray(dollsRes.data)) {
+            setUserDolls(dollsRes.data);
+          }
+        } catch (e) {
+          // לא קריטי
+        }
+        if (isUnsafe) {
+          setMessageKind('error');
+          setMessage('⚠️caution: you cannot share unsafe or personal content.');
+        } else {
+          setMessageKind('ok');
+          setMessage('🌟 awesome! you earned 10 points and 10 coins!');
+          if (addDollToInventory) addDollToInventory(doll);
+        }
       }
-
     } catch (error) {
-      console.error('❌ Error generating doll:', error);
+      console.error('❌ Error:', error);
       setMessageKind('error');
-      setMessage(error.response?.data?.message || error.message || 'Failed to create doll. Check your connection.');
+      setMessage('❌ Failed to create doll. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -377,10 +349,10 @@ const PrivacyRoom = ({ gestureRef }) => {
             </div>
 
             <div className={styles.albumContainer}>
-              <h4>My AI Collection ({shopState?.generatedDolls?.length || 0})</h4>
+              <h4>My AI Collection ({userDolls.length})</h4>
               <div className={styles.dollGrid}>
-                {shopState?.generatedDolls?.length > 0 ? (
-                  shopState.generatedDolls.map((doll) => (
+                {userDolls.length > 0 ? (
+                  userDolls.map((doll) => (
                     <div
                       key={doll.id}
                       className={`${styles.dollCard} ${selectedDoll?.id === doll.id ? styles.selected : ''}`}

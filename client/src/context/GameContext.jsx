@@ -75,8 +75,8 @@ export function GameProvider({ children }) {
     _setScore((prevScore) => {
       const newScore = typeof valOrUpdater === 'function' ? valOrUpdater(prevScore) : valOrUpdater;
       if (userId != null) {
-        // וודא ש-updateUserPointsAndCoins שולחת לכתובת המלאה בשרת
-        updateUserPointsAndCoins(userId, coins, newScore); 
+        // סדר נכון: userId, newScore, coins
+        updateUserPointsAndCoins(userId, newScore, coins);
       }
       return newScore;
     });
@@ -85,7 +85,7 @@ export function GameProvider({ children }) {
     _setCoins((prevCoins) => {
       const newCoins = typeof valOrUpdater === 'function' ? valOrUpdater(prevCoins) : valOrUpdater;
       if (userId != null) {
-        updateUserPointsAndCoins(userId, newCoins, _getLatestScore());
+        updateUserPointsAndCoins(userId, score, newCoins);
       }
       return newCoins;
     });
@@ -215,7 +215,7 @@ export function GameProvider({ children }) {
       setCoins(prev => prev + Math.floor(pointsToSpend / rate));
       return { success: true, message: "ההחלפה בוצעה בהצלחה!" };
     }
-    return { success: false, message: "אין לך מספיק נקודות!" };
+    return { success: false, message: "you do not have enough points!" };
   }, [score]);
 
   // Buy energy with coins
@@ -223,9 +223,9 @@ export function GameProvider({ children }) {
     if (coins >= cost) {
       setCoins(prev => prev - cost);
       setEnergy(prev => Math.min(prev + 1, 100));
-      return { success: true, message: "קנית אנרגיה! ⚡" };
+      return { success: true, message: "⚡ Energy purchased!" };
     }
-    return { success: false, message: "אין לך מספיק מטבעות!" };
+    return { success: false, message: "You do not have enough coins!" };
   }, [coins]);
 
   const [badges, setBadges] = useState(() => {
