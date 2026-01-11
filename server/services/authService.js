@@ -10,11 +10,17 @@ const login = async (token) => {
   let user;
   if (rows.length === 0) {
     // יצירת משתמש חדש אם הוא לא קיים
-    const [result] = await pool.execute(
-      'INSERT INTO users (username, email, coins, score, energy) VALUES (?, ?, ?, ?, ?)',
-      [userData.name, userData.email, 100, 0, 100]
-    );
-    user = { id: result.insertId, name: userData.name, email: userData.email, coins: 100, score: 0, energy: 100 };
+    try {
+      const [result] = await pool.execute(
+        'INSERT INTO users (username, email, coins, score, energy) VALUES (?, ?, ?, ?, ?)',
+        [userData.name, userData.email, 100, 0, 100]
+      );
+      console.log('המשתמש נשמר בהצלחה! User ID:', result.insertId);
+      user = { id: result.insertId, name: userData.name, email: userData.email, coins: 100, score: 0, energy: 100 };
+    } catch (error) {
+      console.error('שגיאה בשמירה ל-DB:', error);
+      throw error;
+    }
   } else {
     user = rows[0];
   }

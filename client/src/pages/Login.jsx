@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
-// import { jwtDecode } from 'jwt-decode';
 import './Login.css';
 
 const Login = ({ onClose, onLoginSuccess }) => {
@@ -12,33 +11,60 @@ const Login = ({ onClose, onLoginSuccess }) => {
         onSuccess: async (tokenResponse) => {
             try {
                 setIsLoading(true);
-                // Fetch user info from Google using the access_token
+                
+                // 1. קבלת פרטים מגוגל
                 const userInfo = await axios.get(
                     'https://www.googleapis.com/oauth2/v3/userinfo',
-                    {
-                        headers: {
-                            Authorization: `Bearer ${tokenResponse.access_token}`,
-                        },
-                    }
+                    { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }
                 );
-                const user = {
-                    id: userInfo.data.sub,
-                    name: userInfo.data.given_name || userInfo.data.name,
+
+                console.log('📧 Google user info:', userInfo.data);
+
+                // 2. שליחה לשרת שלך
+                const serverResponse = await axios.post('http://localhost:5000/api/auth/login', {
                     email: userInfo.data.email,
-                    picture: userInfo.data.picture,
-                    provider: 'google'
-                };
-                onLoginSuccess(user);
+                    username: userInfo.data.given_name || userInfo.data.name
+                });
+
+                console.log('🎯 Server response:', serverResponse.data);
+
+                if (serverResponse.data.success) {
+                    const userData = serverResponse.data.user;
+                    const googlePicture = userInfo.data.picture;
+                    
+                    // ✅ קריאה ל-onLoginSuccess עם הפרטים המלאים + תמונה
+                    onLoginSuccess(userData, googlePicture);
+                    
+                    console.log('✅ Login Success! User ID:', userData.id);
+                    setShowMessage(serverResponse.data.message);
+                    
+                    setTimeout(() => {
+                        onClose();
+                    }, 1000);
+                } else {
+                    setShowMessage('Login failed: ' + serverResponse.data.message);
+                }
+                
             } catch (error) {
-                console.error('Error fetching user info:', error);
-                setShowMessage('Login failed. Please try again.');
-                setTimeout(() => setShowMessage(''), 3000);
+                console.error('❌ Error during login:', error);
+                let errorMsg = 'Login failed. ';
+                
+                if (error.response?.status === 404) {
+                    errorMsg += 'Server endpoint not found';
+                } else if (error.response?.data?.message) {
+                    errorMsg += error.response.data.message;
+                } else {
+                    errorMsg += 'Connection error';
+                }
+                
+                setShowMessage(errorMsg);
+                setTimeout(() => setShowMessage(''), 4000);
             } finally {
                 setIsLoading(false);
             }
         },
         onError: () => {
-            setShowMessage('Login failed. Please try again.');
+            setShowMessage('Google login failed. Please try again.');
             setTimeout(() => setShowMessage(''), 3000);
         },
     });
@@ -63,7 +89,7 @@ const Login = ({ onClose, onLoginSuccess }) => {
                 <button className="login-close" onClick={onClose}>✕</button>
                 <div className="login-header">
                     <h2>Welcome! ✨</h2>
-                    <p>Sign in to save your wardrobe and preferences</p>
+                    <p>Sign in to play and have fun!</p>
                 </div>
                 {showMessage && (
                     <div className="login-message">

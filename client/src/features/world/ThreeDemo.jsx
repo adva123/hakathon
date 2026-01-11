@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Bloom, EffectComposer, GodRays } from '@react-three/postprocessing';
 import RobotModel from '../robot/RobotModel.jsx';
-import { SCENES } from '../../context/gameState.js';
+import { SCENES } from '../../context/GameContext.jsx';
 import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from '../../game/mapTargets.js';
 // import { useKeyboard } from '../../useKeyboard.js';
 import { useKeyboard } from "../../hooks/useKeyboard.js";

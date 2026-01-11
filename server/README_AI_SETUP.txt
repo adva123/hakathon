@@ -11,4 +11,4 @@
 - By default, Pollinations.ai is used for free AI images.
 - Toggle DALL-E 3 in the UI for premium images if you have an OpenAI key.
 - All image URLs are direct and do not require /public in the path.
-- Dolls are saved in localStorage and can be reloaded.
+- Dolls are saved in Mysql and can be reloaded.

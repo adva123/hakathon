@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import PropTypes from 'prop-types';
-import { GameContext, SCENES } from '../../../context/gameState.js';
+import { GameContext, SCENES } from '../../../context/GameContext.jsx';
 import { MAP_NODES } from '../../../game/mapTargets.js';
 import EnergyBar from '../../../game/ui/EnergyBar.jsx';
 import styles from './SideNavigation.module.css';

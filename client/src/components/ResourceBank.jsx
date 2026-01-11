@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
-import { GameContext } from '../context/gameState.js';
+import { GameContext } from '../context/GameContext.jsx';
 import styles from './ResourceBank.module.css';
 
 /**

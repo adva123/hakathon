@@ -1,13 +1,9 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { GameContext } from '../../context/gameState.js';
+import { GameContext } from '../../context/GameContext.jsx';
 import api from '../../services/api';
 import styles from './PrivacyRoom.module.css';
 
-/**
- * Privacy Room Component - AI Doll Factory & Museum
- * WITH VISIBLE RESOURCE BANK (Inline Styles)
- */
 const PrivacyRoom = ({ gestureRef }) => {
   // State management
   const [dollDescription, setDollDescription] = useState('');
@@ -26,14 +22,15 @@ const PrivacyRoom = ({ gestureRef }) => {
   const [selectedDoll, setSelectedDoll] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
-  const [useDALLE, setUseDALLE] = useState(false);
+  const [useDALLE, setUseDALLE] = useState(true); // Always use DALL-E
   const [imageLoadStates, setImageLoadStates] = useState({});
-  
+
   // Refs
   const badImageCountRef = useRef(0);
 
   // Context
   const {
+    userId,
     score,
     coins,
     energy,
@@ -42,10 +39,29 @@ const PrivacyRoom = ({ gestureRef }) => {
     addScore,
     registerMistake,
     shopState,
-    handleBack,
-    exchangePointsForCoins,
-    buyEnergyWithCoins
+    handleBack
   } = useContext(GameContext);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadDollsFromDB = async () => {
+      try {
+        // שימוש ב-userId שהגיע מהקונטקסט
+        const response = await api.get(`/dolls/${userId}`);
+        if (response.data) {
+          // עדכון ה-UI
+          if (response.data.length > 0) {
+            setSelectedDoll(response.data[0]);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to load dolls:', err);
+      }
+    };
+
+    loadDollsFromDB();
+  }, [userId]);
 
   // Gesture-based navigation
   useEffect(() => {
@@ -61,20 +77,36 @@ const PrivacyRoom = ({ gestureRef }) => {
     return () => clearInterval(interval);
   }, [gestureRef, handleBack]);
 
-  // Load dolls from localStorage
+  // Load dolls from DB on mount
   useEffect(() => {
-    const saved = localStorage.getItem('saved_dolls');
-    if (saved) {
+    if (!userId || userId === 'anonymous') {
+      console.warn('⚠️ No userId available, skipping DB load');
+      return;
+    }
+
+    const loadDollsFromDB = async () => {
       try {
-        const dolls = JSON.parse(saved);
-        if (Array.isArray(dolls) && dolls.length > 0) {
-          setSelectedDoll(dolls[dolls.length - 1]);
+        console.log('📦 Loading dolls from DB for user:', userId);
+        const response = await api.get(`/dolls/${userId}`);
+
+        if (response.data && Array.isArray(response.data)) {
+          console.log('✅ Loaded', response.data.length, 'dolls from DB');
+
+          // Select the latest doll
+          if (response.data.length > 0) {
+            setSelectedDoll(response.data[0]); // Most recent (DESC order)
+          }
+
+          // TODO: Update shopState with DB dolls if needed
+          // You might want to add a function in GameContext to sync this
         }
       } catch (err) {
-        console.error('Failed to load saved dolls:', err);
+        console.error('❌ Failed to load dolls from DB:', err);
       }
-    }
-  }, []);
+    };
+
+    loadDollsFromDB();
+  }, [userId]);
 
   // Handlers
   const handleToggle = (field) => {
@@ -91,10 +123,20 @@ const PrivacyRoom = ({ gestureRef }) => {
     return risk;
   };
 
+  /**
+   * 🎨 Generate Doll Handler
+   * Sends request to server which handles DALL-E + DB saving
+   */
   const handleGenerateDoll = async () => {
-    if (!dollDescription.trim()) {
+    if (!dollDescription.trim() || !userId) {
       setMessageKind('warn');
       setMessage('Please describe your doll first!');
+      return;
+    }
+
+    if (!userId || userId === 'anonymous') {
+      setMessageKind('error');
+      setMessage('⚠️ Please log in to create dolls!');
       return;
     }
 
@@ -103,44 +145,68 @@ const PrivacyRoom = ({ gestureRef }) => {
     setMessageKind('info');
     setGeneratedDoll(null);
 
-    console.log('🎭 Generating doll with AI:', dollDescription);
+    console.log('🎭 Generating doll:', { dollDescription, userId });
 
     try {
+      // Single API call - server handles everything
       const response = await api.post('/dolls/generate', {
         dollDescription,
         privacySettings,
+        userId,  // ← CRITICAL: Send userId to server
         useDALLE
       });
 
+      console.log('📦 Server response:', response.data);
+
       if (response.data.success) {
         const isUnsafe = response.data.isUnsafe;
+
         if (isUnsafe) {
-          const redXDoll = {
-            id: 'blocked_' + Date.now(),
-            name: 'Blocked Content',
-            imageUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png',
-            description: 'This creation was blocked for safety reasons.'
-          };
-          setGeneratedDoll(redXDoll);
-          setSelectedDoll(redXDoll);
-          setMessageKind('error');
-          setMessage('⚠️ Safety Warning: Do not share personal info! -1 Energy.');
-          if (registerMistake) registerMistake();
-        } else {
+          // ❌ Unsafe content
           const doll = response.data.doll;
           setGeneratedDoll(doll);
           setSelectedDoll(doll);
-          if (addScore) addScore(10);
-          if (setCoins) setCoins(prev => prev + 5);
+          setMessageKind('error');
+          setMessage('⚠️ Safety Warning: Do not share personal info! -5 points, -10 energy.');
+
+          if (registerMistake) registerMistake();
+
+        } else {
+          // ✅ Good doll
+          const doll = response.data.doll;
+          const userData = response.data.userData;
+
+          console.log('✅ Doll created:', doll);
+          console.log('💰 Updated user:', userData);
+
+          setGeneratedDoll(doll);
+          setSelectedDoll(doll);
+
+          // Update local state with server values
+          if (addScore && userData?.score !== undefined) {
+            // Calculate the delta instead of setting absolute value
+            addScore(10);
+          }
+          if (setCoins && userData?.coins !== undefined) {
+            setCoins(userData.coins); // Use exact value from server
+          }
+
           setMessageKind('ok');
-          setMessage('🌟 Amazing! +10 points & +5 coins!');
-          if (addDollToInventory) addDollToInventory(doll);
+          setMessage(response.data.message || '🌟 Amazing! +10 points & +10 coins!');
+
+          // Add to local inventory
+          if (addDollToInventory) {
+            addDollToInventory(doll);
+          }
         }
+      } else {
+        throw new Error(response.data.message || 'Failed to generate doll');
       }
+
     } catch (error) {
       console.error('❌ Error generating doll:', error);
       setMessageKind('error');
-      setMessage(error.response?.data?.message || 'Failed to create doll. Check your internet connection.');
+      setMessage(error.response?.data?.message || error.message || 'Failed to create doll. Check your connection.');
     } finally {
       setIsLoading(false);
     }
@@ -183,8 +249,6 @@ const PrivacyRoom = ({ gestureRef }) => {
     setImageLoadStates(prev => ({ ...prev, [dollId]: 'error' }));
     e.target.src = `https://via.placeholder.com/500/cccccc/666666?text=${encodeURIComponent(dollName)}`;
   };
-
-  const currentRisk = calculateRisk();
 
   return (
     <div className={styles.privacyRoom} onClick={e => e.stopPropagation()}>
@@ -364,135 +428,6 @@ const PrivacyRoom = ({ gestureRef }) => {
             <div style={{ fontSize: '1.1rem', margin: '18px 0 0 0', color: '#ff0055', fontWeight: 'bold' }}>
               ⚠️ Inappropriate or unsafe creations lose points and may be removed.
             </div>
-          </div>
-
-          {/* 🏦 RESOURCE BANK - WITH INLINE STYLES (GUARANTEED VISIBLE!) */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(40, 20, 60, 0.85) 100%)',
-            border: '3px solid #ffd700',
-            borderRadius: '18px',
-            padding: '25px 20px',
-            marginBottom: '25px',
-            boxShadow: '0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 20px rgba(255, 215, 0, 0.1)',
-            position: 'relative',
-            zIndex: 1000
-          }}>
-            <h4 style={{
-              color: '#ffd700',
-              margin: '0 0 20px 0',
-              fontSize: '1.6rem',
-              textAlign: 'center',
-              textShadow: '0 0 10px rgba(255, 215, 0, 0.8)',
-              fontWeight: 'bold'
-            }}>
-              🏦 בנק המשאבים
-            </h4>
-            
-            <div style={{
-              display: 'flex',
-              gap: '15px',
-              justifyContent: 'center',
-              flexWrap: 'wrap'
-            }}>
-              {/* Exchange Points for Coins */}
-              <button
-                onClick={() => {
-                  console.log('🔄 Attempting to exchange points for coins...');
-                  if (!exchangePointsForCoins) {
-                    console.error('❌ exchangePointsForCoins function not available!');
-                    setMessage('❌ שגיאה: הפונקציה לא זמינה');
-                    return;
-                  }
-                  const res = exchangePointsForCoins(50);
-                  console.log('📊 Exchange result:', res);
-                  if (res?.success) {
-                    setMessage('✅ המרת 50 נקודות ל-25 מטבעות! 💰');
-                    setMessageKind('ok');
-                  } else {
-                    setMessage(res?.message || '❌ שגיאה בהמרה');
-                    setMessageKind('error');
-                  }
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
-                  color: '#000',
-                  border: 'none',
-                  padding: '15px 25px',
-                  borderRadius: '12px',
-                  fontWeight: 'bold',
-                  fontSize: '1.1rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
-                  transition: 'all 0.3s',
-                  minWidth: '160px'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 6px 20px rgba(255, 215, 0, 0.6)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 15px rgba(255, 215, 0, 0.4)';
-                }}
-              >
-                ⭐ 50 ➔ 💰 25
-              </button>
-
-              {/* Buy Energy with Coins */}
-              <button
-                onClick={() => {
-                  console.log('⚡ Attempting to buy energy...');
-                  if (!buyEnergyWithCoins) {
-                    console.error('❌ buyEnergyWithCoins function not available!');
-                    setMessage('❌ שגיאה: הפונקציה לא זמינה');
-                    return;
-                  }
-                  const res = buyEnergyWithCoins(30);
-                  console.log('📊 Buy energy result:', res);
-                  if (res?.success) {
-                    setMessage('✅ האנרגיה התחדשה! ⚡');
-                    setMessageKind('ok');
-                  } else {
-                    setMessage(res?.message || '❌ אין מספיק מטבעות');
-                    setMessageKind('error');
-                  }
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, #ff0055 0%, #ff4088 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '15px 25px',
-                  borderRadius: '12px',
-                  fontWeight: 'bold',
-                  fontSize: '1.1rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(255, 0, 85, 0.4)',
-                  transition: 'all 0.3s',
-                  minWidth: '160px'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = '0 6px 20px rgba(255, 0, 85, 0.6)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 4px 15px rgba(255, 0, 85, 0.4)';
-                }}
-              >
-                💰 30 ➔ ⚡ +1
-              </button>
-            </div>
-
-            {/* Info text */}
-            <p style={{
-              marginTop: '15px',
-              fontSize: '0.9rem',
-              color: '#aaa',
-              textAlign: 'center',
-              lineHeight: 1.5
-            }}>
-              💡 המר נקודות למטבעות או קנה אנרגיה!
-            </p>
           </div>
 
           {/* Input area */}

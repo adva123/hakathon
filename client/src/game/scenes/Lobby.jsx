@@ -1,6 +1,6 @@
 import { useContext, useMemo } from 'react';
 import styles from '../game.module.css';
-import { GameContext } from '../../context/gameState.js';
+import { GameContext } from '../../context/GameContext.jsx';
 import Hud from '../ui/Hud.jsx';
 import BadgeWall from '../ui/BadgeWall.jsx';
 

@@ -3,7 +3,7 @@ import styles from '../game.module.css';
 import room from './ShopRoom.module.css';
 import { Canvas } from '@react-three/fiber';
 import MiniRobotPreview from '../../components/common/MiniRobotPreview/MiniRobotPreview';
-import { GameContext } from '../../context/gameState.js';
+import { GameContext } from '../../context/GameContext.jsx';
 import { ROBOT_CATALOG } from '../../features/robot/robotCatalog.js';
 
 export default function ShopRoom() {

@@ -52,12 +52,13 @@ const generateDoll = async (userId, dollDescription, privacySettings) => {
     const imageUrl = await generateDallEImage(dollDescription);
     const [result] = await pool.execute(
       'INSERT INTO dolls (user_id, name, description, image_url, is_good) VALUES (?, ?, ?, ?, ?)',
-      [userId, dollDescription.substring(0, 15), `בובה מיוחדת שנוצרה עבורך לפי התיאור: ${dollDescription}`, imageUrl, true]
+      [userId, dollDescription.substring(0, 15), `בובה מיוחדת שנוצרה עבורך לתיאור: ${dollDescription}`, imageUrl, true]
     );
+    console.log('הבובה נשמרה בהצלחה! Doll ID:', result.insertId);
     const newDoll = {
       id: result.insertId,
       name: dollDescription.substring(0, 15),
-      description: `בובה מיוחדת שנוצרה עבורך לפי התיאור: ${dollDescription}`,
+      description: `בובה מיוחדת שנוצרה עבורך לתיאור: ${dollDescription}`,
       imageUrl: imageUrl,
       createdAt: new Date()
     };

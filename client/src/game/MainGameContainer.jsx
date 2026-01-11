@@ -1,10 +1,9 @@
 import { useContext, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { GameContext, SCENES } from '../context/gameState.js';
+import { GameContext, SCENES } from '../context/GameContext.jsx';
 
 import EntryPoint from './scenes/EntryPoint.jsx';
 import ResourceBank from '../components/ResourceBank.jsx';
-// import EnergyNavBar from '../components/EnergyNavBar.jsx';
 import Lobby from './scenes/Lobby.jsx';
 
 // Mini-games (Feature 1-3)

@@ -1,6 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
-import { GameContext, SCENES } from './gameState.js';
+
+// ✅ יצירת ה-Context
+export const GameContext = createContext(null);
+
+// ✅ ייבוא SCENES מקובץ נפרד (אם קיים)
+// אם אין לך קובץ gameState.js, הוסיפי את SCENES כאן:
+export const SCENES = {
+  entry: 'entry',
+  lobby: 'lobby',
+  password: 'password',
+  privacy: 'privacy',
+  shop: 'shop',
+  strength: 'strength',
+  tryAgain: 'tryAgain'
+};
 
 const defaultBadges = Object.freeze({
   goldenKey: false,
@@ -15,10 +29,6 @@ const defaultOwned = Object.freeze({
   generatedDolls: [],
 });
 
-const storageKey = 'hakathon.gameState.v1';
-const avatarStorageKey = 'hakathon.avatarFaceDataUrl.v1';
-const avatarColorKey = 'hakathon.avatarDominantColor.v1';
-
 function safeParse(json) {
   try {
     return JSON.parse(json);
@@ -32,80 +42,20 @@ function uniqueArray(values) {
 }
 
 function readPersisted() {
-  if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(storageKey);
-  if (!raw) return null;
-  return safeParse(raw);
+  return null;
 }
 
 function readPersistedAvatar() {
-  if (typeof window === 'undefined') return '';
-  const s = window.sessionStorage.getItem(avatarStorageKey);
-  if (s && typeof s === 'string') return s;
-  const l = window.localStorage.getItem(avatarStorageKey);
-  if (l && typeof l === 'string') return l;
   return '';
 }
 
-function persistAvatar(dataUrl) {
-  if (typeof window === 'undefined') return;
-  const value = typeof dataUrl === 'string' ? dataUrl : '';
-  if (!value) {
-    try {
-      window.sessionStorage.removeItem(avatarStorageKey);
-    } catch {
-      // ignore
-    }
-    try {
-      window.localStorage.removeItem(avatarStorageKey);
-    } catch {
-      // ignore
-    }
-    return;
-  }
-
-  try {
-    window.sessionStorage.setItem(avatarStorageKey, value);
-  } catch {
-    // ignore
-  }
-
-  if (value.length <= 220_000) {
-    try {
-      window.localStorage.setItem(avatarStorageKey, value);
-    } catch {
-      // ignore quota errors
-    }
-  } else {
-    try {
-      window.localStorage.removeItem(avatarStorageKey);
-    } catch {
-      // ignore
-    }
-  }
-}
+function persistAvatar(dataUrl) {}
 
 function readPersistedAvatarColor(persisted) {
-  if (persisted && typeof persisted.avatarDominantColor === 'string') return persisted.avatarDominantColor;
-  if (typeof window === 'undefined') return '';
-  try {
-    const v = window.localStorage.getItem(avatarColorKey);
-    return typeof v === 'string' ? v : '';
-  } catch {
-    return '';
-  }
+  return '';
 }
 
-function persistAvatarColor(color) {
-  if (typeof window === 'undefined') return;
-  const v = typeof color === 'string' ? color : '';
-  try {
-    if (v) window.localStorage.setItem(avatarColorKey, v);
-    else window.localStorage.removeItem(avatarColorKey);
-  } catch {
-    // ignore
-  }
-}
+function persistAvatarColor(color) {}
 
 export function GameProvider({ children }) {
   const persisted = useMemo(() => readPersisted(), []);
@@ -119,6 +69,33 @@ export function GameProvider({ children }) {
   const [coins, setCoins] = useState(50);
   const [energy, setEnergy] = useState(100);
   const [openBank, setOpenBank] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [googleUser, setGoogleUser] = useState(null);
+
+  // ✅ פונקציה מתוקנת שמעדכנת את כל הפרטים מה-DB
+  const handleLogin = useCallback((userData) => {
+    console.log("🔐 handleLogin called with:", userData);
+    
+    if (!userData || !userData.id) {
+      console.error("❌ Invalid user data:", userData);
+      return;
+    }
+    
+    // עדכן את כל ה-state מהנתונים שקיבלנו מה-DB
+    setUserId(userData.id);
+    setPlayerName(userData.username || '');
+    setScore(userData.score || 0);
+    setCoins(userData.coins || 50);
+    setEnergy(userData.energy || 100);
+    
+    console.log("✅ User state updated:", {
+      id: userData.id,
+      name: userData.username,
+      score: userData.score,
+      coins: userData.coins,
+      energy: userData.energy
+    });
+  }, []);
 
   // Convert points to coins
   const exchangePointsForCoins = useCallback((pointsToSpend) => {
@@ -175,7 +152,6 @@ export function GameProvider({ children }) {
     return { ...defaultOwned };
   });
 
-  // Add a generated doll to inventory
   const addDollToInventory = useCallback((doll) => {
     if (!doll) return;
     setShopState((prev) => {
@@ -186,7 +162,6 @@ export function GameProvider({ children }) {
     });
   }, []);
 
-  // Buy a robot and select it
   const buyRobot = useCallback(({ robotId, price, useCoins = false }) => {
     if (!robotId || typeof price !== 'number') return { ok: false, reason: 'invalid' };
     let allowed = false;
@@ -217,55 +192,19 @@ export function GameProvider({ children }) {
     return { ok: true };
   }, []);
 
-  // Select a robot (must be owned)
   const selectRobot = useCallback((robotId) => {
     setShopState((prev) => {
       if (!prev.ownedRobots.includes(robotId)) return prev;
-      const newState = { ...prev, selectedRobotId: robotId };
-      // Persist robot selection in localStorage
-      try {
-        window.localStorage.setItem('selected_robot_skin', robotId);
-        window.localStorage.setItem('robot_shop_save', JSON.stringify(newState));
-      } catch {
-        // ignore storage errors
-      }
-      return newState;
+      return { ...prev, selectedRobotId: robotId };
     });
   }, []);
 
-  // Robot walk-to-switch handshake with ThreeDemo
   const [robotAutoWalkTarget, setRobotAutoWalkTarget] = useState(null);
   const [pendingScene, setPendingScene] = useState(null);
   const [activeOverlayRoom, setActiveOverlayRoom] = useState(null);
-
-  // Lobby-return safety
   const [lobbyReturnEvent, setLobbyReturnEvent] = useState(null);
   const [gateCollisionCooldownUntil, setGateCollisionCooldownUntil] = useState(0);
   const lobbyReturnNonceRef = useRef(0);
-
-  // Persist state to localStorage
-  useEffect(() => {
-    const payload = {
-      playerName,
-      audioMuted,
-      badges,
-      shopState,
-      avatarDominantColor,
-    };
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch {
-      // ignore quota/blocked storage
-    }
-  }, [playerName, audioMuted, badges, shopState, avatarDominantColor]);
-
-  useEffect(() => {
-    persistAvatar(avatarFaceDataUrl);
-  }, [avatarFaceDataUrl]);
-
-  useEffect(() => {
-    persistAvatarColor(avatarDominantColor);
-  }, [avatarDominantColor]);
 
   const startGame = useCallback((name) => {
     setPlayerName(name || '');
@@ -423,14 +362,17 @@ export function GameProvider({ children }) {
     });
   }, []);
 
+  // ✅ Context value עם כל הפונקציות והערכים
   const value = useMemo(
     () => ({
       currentScene,
       playerName,
       score,
+      setScore, // ✅ הוספה
       coins,
       setCoins,
       energy,
+      setEnergy, // ✅ הוספה
       badges,
       audioMuted,
       avatarFaceDataUrl,
@@ -462,6 +404,11 @@ export function GameProvider({ children }) {
       addDollToInventory,
       exchangePointsForCoins,
       buyEnergyWithCoins,
+      userId,
+      setUserId,
+      googleUser,
+      setGoogleUser,
+      handleLogin,
     }),
     [
       currentScene,
@@ -496,6 +443,9 @@ export function GameProvider({ children }) {
       addDollToInventory,
       exchangePointsForCoins,
       buyEnergyWithCoins,
+      userId,
+      googleUser,
+      handleLogin, // ✅ הוספה ל-dependencies
     ]
   );
 

@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import styles from '../game.module.css';
 import room from './ClothingRoom.module.css';
-import { GameContext } from '../../context/gameState.js';
+import { GameContext } from '../../context/GameContext.jsx';
 
 const clothingItems = [
   // Clothing

@@ -1,8 +1,5 @@
-import { SCENES } from '../context/gameState.js';
+import { SCENES } from '../context/GameContext.jsx';
 
-// Candy-Cyber Journey map layout.
-// Coordinates are [x, y, z] in Three.js world space.
-// The robot is constrained to the spline built from CANDY_PATH_POINTS.
 export const MAP_Y = -1.05;
 
 function prand(n) {

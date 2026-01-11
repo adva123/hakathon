@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import styles from '../game.module.css';
-import { GameContext } from '../../context/gameState.js';
+import { GameContext } from '../../context/GameContext.jsx';
 
 export default function TryAgain() {
   const { score, resetRun } = useContext(GameContext);

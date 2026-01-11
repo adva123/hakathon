@@ -120,3 +120,24 @@
   border: 2px solid #00f2ff;
   box-shadow: 0 0 10px #00f2ff;
 }
+
+.logoutBtn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logoutBtn:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+.logoutBtn:active {
+  transform: scale(0.95);
+}

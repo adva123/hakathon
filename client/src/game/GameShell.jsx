@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import ThreeDemo from '../features/world/ThreeDemo.jsx';
-import { GameContext, SCENES } from '../context/gameState.js';
+import { GameContext, SCENES } from '../context/GameContext.jsx';
 import { MAP_NODES } from './mapTargets.js';
 import styles from './game.module.css';
 import MainGameContainer from './MainGameContainer.jsx';
