@@ -14,7 +14,6 @@ const Robot = forwardRef((props, ref) => {
     () =>
       new THREE.MeshToonMaterial({
         color: new THREE.Color("#ffd6ff"), // פסטלי-ורדרד
-        skinning: true,
       }),
     []
   );
@@ -28,7 +27,6 @@ const Robot = forwardRef((props, ref) => {
         const skinned = obj.isSkinnedMesh;
         obj.material = obj.material.clone();
         obj.material.color.multiplyScalar(1.1); // קצת יותר בהיר
-        if (skinned) obj.material.skinning = true;
         if (skinned) obj.material.skinning = true;
       }
     });

@@ -5,6 +5,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import Robot from "./components/Robot";
 import { useKeyboard } from "./useKeyboard";
+import { useHandControls } from "./useHandControls";
 import Mission1 from "./Missions/Mission1.jsx";
 
 // --- פונקציות עזר מתמטיות ---
@@ -142,6 +143,7 @@ export default function Scene({
   onMissionTrigger,
 }) {
   const keys = useKeyboard();
+  const handControls = useHandControls();
 
   // הגדרות מימדי החדר ומרחק בטיחות מהקירות
   const ROOM_W = 70;
@@ -213,7 +215,7 @@ export default function Scene({
 
   // לולאת העדכון הראשית של ה-3D
   useFrame(({ camera }, delta) => {
-    const k = keys.current;
+    const k = handControls?.current?.active ? handControls.current : keys.current;
     if (triggerCooldown.current > 0) triggerCooldown.current -= delta;
 
     if (!inputEnabled) {
