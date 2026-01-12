@@ -94,6 +94,7 @@ export default function ShopRoom() {
   }, [userId]);
 
   const ownedRobots = useMemo(() => new Set(shopState?.ownedRobots || []), [shopState?.ownedRobots]);
+  owned.add(defaultRobotId);
   
   const hasOwnedRobots = (shopState?.ownedRobots && shopState.ownedRobots.length > 0);
   const selectedRobotId = shopState?.selectedRobotId || (hasOwnedRobots ? ROBOT_CATALOG[0].id : null);
@@ -232,6 +233,7 @@ export default function ShopRoom() {
    * 🎯 Render robot action button
    */
   const renderRobotAction = (robot) => {
+    const isDefaultRobot = robot.id === ROBOT_CATALOG[0].id;
     const isOwned = ownedRobots.has(robot.id);
     const isSelected = selectedRobotId === robot.id;
     const canAfford = coins >= robot.price;
