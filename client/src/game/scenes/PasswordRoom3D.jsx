@@ -5,21 +5,34 @@ import * as THREE from 'three';
 import PropTypes from 'prop-types';
 
 // Underground bunker-style Password Room with industrial tech aesthetic
-export function PasswordRoom3D({ position = [0, 0, 0], visible = false }) {
+export function PasswordRoom3D({ position = [0, 0, 0], visible = false, gestureRef }) {
   const groupRef = useRef();
   const neonLightsRef = useRef([]);
-  
+  const lastGesture = useRef('none');
+
   useFrame(({ clock }) => {
     if (!visible || !groupRef.current) return;
-    
+
     const time = clock.getElapsedTime();
-    
+
     // Pulse neon lights
     neonLightsRef.current.forEach((light, i) => {
       if (light) {
         light.intensity = 1.2 + Math.sin(time * 2 + i * 0.5) * 0.3;
       }
     });
+
+    // Handle gestures
+    const gesture = gestureRef?.current?.gesture || 'none';
+    if (gesture !== lastGesture.current) {
+      // TODO: Implement actual gesture actions here
+      // For now, just log the gesture change
+      // You can replace this with actual movement/interaction logic
+      // Example: if (gesture === 'moveForward') { ... }
+      // eslint-disable-next-line no-console
+      console.log('[PasswordRoom3D] Gesture changed:', gesture);
+      lastGesture.current = gesture;
+    }
   });
 
   const wallMaterial = useMemo(() => new THREE.MeshStandardMaterial({
@@ -190,4 +203,5 @@ export function PasswordRoom3D({ position = [0, 0, 0], visible = false }) {
 PasswordRoom3D.propTypes = {
   position: PropTypes.arrayOf(PropTypes.number),
   visible: PropTypes.bool,
+  gestureRef: PropTypes.shape({ current: PropTypes.any }),
 };

@@ -2,10 +2,10 @@ import { useContext, useEffect, useRef } from 'react';
 import { GameContext } from '../context/GameContext.jsx';
 
 const SCENE_MUSIC = {
-  lobby: '/music/forest-ambient.mp3',
-  password: '/music/cyber-puzzle.mp3',
-  privacy: '/music/creative-factory.mp3',
-  shop: '/music/shop-theme.mp3',
+  lobby: '/sounds/A.mp3', // fallback to available file
+  password: '/sounds/AB.mp3', // fallback to available file
+  privacy: '/sounds/ABC.mp3', // fallback to available file
+  shop: '/sounds/ABCD.mp3', // fallback to available file
 };
 
 export default function AudioManager() {

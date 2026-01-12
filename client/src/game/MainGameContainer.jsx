@@ -6,7 +6,6 @@ import PropTypes from 'prop-types';
 import { GameContext, SCENES } from '../context/GameContext.jsx';
 import ResourceBank from '../components/ResourceBank.jsx';
 import ThreeDemo from '../features/world/ThreeDemo.jsx';
-import Lobby from './scenes/Lobby.jsx';
 
 // Mini-games (Feature 1-3)
 import PasswordShield from './scenes/PasswordRoom.jsx';
@@ -28,6 +27,7 @@ export default function MainGameContainer() {
     window.addEventListener('open-mission1', handler);
     return () => window.removeEventListener('open-mission1', handler);
   }, []);
+  
 
   // Handler for exiting the mission, returns to lobby (forest world)
   const handleMissionExit = () => {

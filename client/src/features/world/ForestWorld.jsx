@@ -2909,6 +2909,7 @@ export function ForestWorld({ floorY, curveData, robotRef, gestureRef, roomPorta
                 passwordPortal.platform.z + 1.5
               ]}
               rotation={[0, passwordPortal.yaw || 0, 0]}
+              gestureRef={gestureRef}
             />
           );
         })()
