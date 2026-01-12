@@ -12,107 +12,53 @@ import { SCENES } from '../../context/GameContext.jsx';
 import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from '../../game/mapTargets.js';
 import { useKeyboard } from "../../hooks/useKeyboard.js";
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
-import { forestTerrainHeight, FOREST_PATH_SURFACE_LIFT, ForestSky, ForestWorld } from './ForestWorld.jsx';
+
+
+import { ForestWorld } from './ForestWorld.jsx';
 
 
 
 
-// Simple modal for room entry
-function RoomEntryModal({ roomLabel, onConfirm, onCancel }) {
+
+export default function ThreeDemo({
+  gestureRef,
+  autoWalkTarget,
+  controlsEnabled,
+  neonMode,
+  sceneId,
+  avatarFaceUrl,
+  onLobbyPoiNavigate,
+  onLobbyPortalEnter,
+  lobbyReturnEvent,
+  badges,
+  shopState
+}) {
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      background: 'rgba(0,0,0,0.6)',
-      zIndex: 99999,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backdropFilter: 'blur(8px)'
-    }}>
-      <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: 20,
-        padding: 40,
-        minWidth: 320,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        textAlign: 'center',
-        border: '2px solid rgba(255,255,255,0.2)'
-      }}>
-        <div style={{
-          fontSize: 28,
-          marginBottom: 24,
-          color: '#fff',
-          fontWeight: 'bold',
-          textShadow: '0 2px 10px rgba(0,0,0,0.3)'
-        }}>
-          🚪 room entrance
-        </div>
-        <div style={{
-          fontSize: 20,
-          marginBottom: 30,
-          color: '#f0f0f0',
-          lineHeight: '1.5'
-        }}>
-          האם להיכנס ל<strong style={{ color: '#FFD700' }}>{roomLabel}</strong>?
-        </div>
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-          <button
-            style={{
-              padding: '14px 32px',
-              fontSize: 18,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #00f2ff 0%, #00a8ff 100%)',
-              color: '#fff',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              boxShadow: '0 4px 15px rgba(0,242,255,0.4)',
-              transition: 'transform 0.2s'
-            }}
-            onClick={onConfirm}
-            onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-          >
-            ✓ כן
-          </button>
-          <button
-            style={{
-              padding: '14px 32px',
-              fontSize: 18,
-              borderRadius: 12,
-              background: 'rgba(255,255,255,0.15)',
-              color: '#fff',
-              border: '2px solid rgba(255,255,255,0.3)',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              transition: 'all 0.2s'
-            }}
-            onClick={onCancel}
-            onMouseEnter={(e) => {
-              e.target.style.background = 'rgba(255,255,255,0.25)';
-              e.target.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = 'rgba(255,255,255,0.15)';
-              e.target.style.transform = 'scale(1)';
-            }}
-          >
-            ✗ no
-          </button>
-        </div>
-      </div>
-    </div>
+    <Canvas
+      shadows
+      camera={{ position: [0, 10, 30], fov: 50 }}
+      style={{ width: '100vw', height: '100vh' }}
+    >
+      <ForestWorld
+        gestureRef={gestureRef}
+        // TODO: Pass other required props: floorY, curveData, robotRef, roomPortals, completion, onPortalEnter, etc.
+      />
+    </Canvas>
   );
 }
 
-RoomEntryModal.propTypes = {
-  roomLabel: PropTypes.string.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
+ThreeDemo.propTypes = {
+  gestureRef: PropTypes.object,
+  autoWalkTarget: PropTypes.any,
+  controlsEnabled: PropTypes.bool,
+  neonMode: PropTypes.bool,
+  sceneId: PropTypes.string,
+  avatarFaceUrl: PropTypes.string,
+  onLobbyPoiNavigate: PropTypes.func,
+  onLobbyPortalEnter: PropTypes.func,
+  lobbyReturnEvent: PropTypes.object,
+  badges: PropTypes.object,
+  shopState: PropTypes.object,
 };
 function smoothstep01(x) {
   const t = Math.max(0, Math.min(1, x));

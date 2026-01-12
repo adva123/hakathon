@@ -10,7 +10,7 @@ export default function Footer() {
       <div className={styles.container}>
         <div className={styles.grid}>
           <div className={styles.brand}>
-            <h3 className={styles.logo}>Netropolise</h3>
+            <h3 className={styles.logo}>SafeForest</h3>
             <p className={styles.tagline}>
               Learn cybersecurity through immersive gameplay
             </p>
@@ -41,8 +41,8 @@ export default function Footer() {
             <h4 className={styles.heading}>Contact</h4>
             <ul className={styles.linkList}>
               <li>
-                <a href="mailto:info@netropolise.com" className={styles.link}>
-                  info@netropolise.com
+                <a href="mailto:info@SafeForest.com" className={styles.link}>
+                  info@SafeForest.com
                 </a>
               </li>
               <li>
@@ -61,7 +61,7 @@ export default function Footer() {
 
         <div className={styles.bottom}>
           <p className={styles.copyright}>
-            © {currentYear} Netropolise. All rights reserved.
+            © {currentYear} SafeForest. All rights reserved.
           </p>
         </div>
       </div>
