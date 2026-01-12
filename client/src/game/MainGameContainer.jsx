@@ -1,3 +1,4 @@
+import { Canvas } from '@react-three/fiber';
 import { useContext, useMemo } from 'react';
 import GlobalGestureOverlay from './GlobalGestureOverlay.jsx';
 import PropTypes from 'prop-types';
@@ -81,7 +82,9 @@ export default function MainGameContainer({ gestureRef } = {}) {
       <GlobalGestureOverlay gestureRef={gestureRef} />
       <ResourceBank />
       {showMission1 ? (
-        <Mission1Page gestureRef={gestureRef} onExit={handleMissionExit} />
+        <Canvas shadows camera={{ position: [0, 10, 30], fov: 50 }} style={{ width: '100vw', height: '100vh', background: '#222' }}>
+          <Mission1Page gestureRef={gestureRef} onExit={handleMissionExit} />
+        </Canvas>
       ) : (
         <>
           {view}
