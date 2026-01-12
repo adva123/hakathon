@@ -1,60 +1,62 @@
-
-import React, { useMemo } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useGLTF, Center } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 
+const MiniRobotPreview = ({ color = "#ffffff", type = "basic" }) => {
+  const groupRef = useRef();
+  
+  const { scene } = useGLTF('/models/RobotExpressive.glb');
 
-export default function MiniRobotPreview({ color, type }) {
-  const { nodes, materials, scene } = useGLTF('/models/RobotExpressive.glb');
+  // ✅ עדכון צבעים כל פעם שה-color או type משתנים
+  useEffect(() => {
+    if (!scene) return;
 
-  // Animate rotation
-  useFrame((state) => {
-    scene.rotation.y = state.clock.getElapsedTime() * 0.5;
-  });
+    const isLuxury = type === 'luxury' || type === 'SPECIAL' || type === 'LUXURY';
 
-  // Memoize mesh list for performance
-  const meshes = useMemo(() => {
-    const found = [];
     scene.traverse((child) => {
-      if (child.isMesh) {
-        found.push(child);
+      if (child.isMesh && child.material) {
+        const isBody = child.name && child.name.toLowerCase().includes('body');
+        
+        // עדכון צבע
+        child.material.color.set(isBody ? color : '#222222');
+        
+        // עדכון תכונות מטריאל
+        const fullSolidTypes = ['neon red', 'lime strike', 'night black'];
+        const isFullSolid = fullSolidTypes.includes(type?.toLowerCase());
+        if (isBody && isFullSolid) {
+          child.material.emissive = child.material.color;
+          child.material.emissiveIntensity = 1;
+          child.material.metalness = 0;
+          child.material.roughness = 0;
+        } else {
+          child.material.metalness = isLuxury ? 0.9 : 0.2;
+          child.material.roughness = isLuxury ? 0.1 : 0.7;
+        }
+        
+        // ✅ חשוב! אמור ל-Three.js לעדכן את המטריאל
+        child.material.needsUpdate = true;
       }
     });
-    return found;
-  }, [scene]);
+  }, [scene, color, type]);
 
-  // Selective coloring logic
-  const getMaterialProps = (mesh) => {
-    // If mesh name includes 'body', apply user color, else use dark color for outlines/details
-    const isBody = mesh.name && mesh.name.toLowerCase().includes('body');
-    const baseProps = type === 'luxury'
-      ? { metalness: 1.0, roughness: 0.1 }
-      : { metalness: 0.2, roughness: 0.7 };
-    return {
-      color: isBody ? color : '#222',
-      ...baseProps,
-    };
-  };
+  // אנימציה
+  useFrame((state) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.5;
+    }
+  });
+
+  if (!scene) return null;
 
   return (
     <Center>
-      <group scale={1.2} rotation={[0, Math.PI / 8, 0]}>
-        {meshes.map((mesh) => (
-          <mesh
-            key={mesh.uuid}
-            geometry={mesh.geometry}
-            position={mesh.position}
-            rotation={mesh.rotation}
-            scale={mesh.scale}
-            castShadow={mesh.castShadow}
-            receiveShadow={mesh.receiveShadow}
-          >
-            <meshStandardMaterial attach="material" {...getMaterialProps(mesh)} />
-          </mesh>
-        ))}
+      <group ref={groupRef} scale={1.2}>
+        <primitive object={scene} />
       </group>
     </Center>
   );
-}
+};
 
-// export default MiniRobotPreview;
+useGLTF.preload('/models/RobotExpressive.glb');
+
+export default MiniRobotPreview;
