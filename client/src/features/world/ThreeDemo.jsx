@@ -1,4 +1,5 @@
 import CyberpunkCanvasBackdrop from './CyberpunkCanvasBackdrop.jsx';
+import { useSound } from '../../hooks/useSound.js';
 /* eslint-disable react/no-unknown-property */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -9,7 +10,6 @@ import { Bloom, EffectComposer, GodRays } from '@react-three/postprocessing';
 import RobotModel from '../robot/RobotModel.jsx';
 import { SCENES } from '../../context/GameContext.jsx';
 import { CANDY_PATH_POINTS, MAP_NODES, MAP_Y } from '../../game/mapTargets.js';
-// import { useKeyboard } from '../../useKeyboard.js';
 import { useKeyboard } from "../../hooks/useKeyboard.js";
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 import { forestTerrainHeight, FOREST_PATH_SURFACE_LIFT, ForestSky, ForestWorld } from './ForestWorld.jsx';
@@ -653,6 +653,7 @@ function computePolylineT(routeXZ, pointXZ) {
   return totalLen > 0 ? bestAlong / totalLen : 0;
 }
 
+
 function RobotController({
   robotRef,
   controlsEnabled,
@@ -669,6 +670,8 @@ function RobotController({
   mode,
   onLobbyPortalEnter,
 }) {
+  // --- SFX: useSound hook ---
+  const { playTeleport } = useSound();
 
   const [pendingRoom, setPendingRoom] = useState(null);
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -1090,6 +1093,7 @@ function RobotController({
           if (robot.userData.handControl) {
             robot.userData.handControl.enabled = false;
           }
+          playTeleport(); // 🔊 השמעת צליל כניסה!
           onLobbyPortalEnter(closestPortal.scene);
         }
       }

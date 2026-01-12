@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useSound } from '../../hooks/useSound.js';
 import PropTypes from 'prop-types';
 import { GameContext } from '../../context/GameContext.jsx';
 import api from '../../services/api';
@@ -16,6 +17,7 @@ function evaluatePassword(pw) {
 }
 
 export default function PasswordRoom({ addScore: addScoreProp, awardBadge: awardBadgeProp, gestureRef } = {}) {
+  const { playSuccess, playFail } = useSound();
   // הוספת user מה-Context
   const { user, addScore, registerMistake, awardBadge, handleBack, badges, coins, setCoins, score, setScore, energy, setEnergy, userId } = useContext(GameContext);
   const addScoreFn = addScoreProp || addScore;
@@ -95,10 +97,8 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
     setGestureProcessed(true);
     setShowFeedback(true);
     setFeedbackType(isCorrect ? 'correct' : 'wrong');
-
-
-
     if (isCorrect) {
+      playSuccess();
       const points = 20;
       const newCoins = coins + 10;
       setScore(prev => prev + points);
@@ -120,6 +120,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
         gestureTimeoutRef.current = null;
       }, 1000);
     } else {
+      playFail();
       registerMistake();
       // הורדת אנרגיה רק כאשר התשובה שגויה
       const ENERGY_COST = 10;

@@ -1,17 +1,5 @@
-import { useContext, useEffect, useMemo, useRef, useState, Suspense } from 'react';
-// Utility to play a sound
-function playCoinSound() {
-  try {
-    const audio = new window.Audio(require('../../music/drop-coins.mp3'));
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
-  } catch (e) {
-    // fallback for Vite/webpack static import
-    const audio = new window.Audio('/music/drop-coins.mp3');
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
-  }
-}
+import React, { useContext, useEffect,useMemo ,useState ,useRef,Suspense  } from 'react';
+import { useSound } from '../../hooks/useSound.js';
 import styles from '../game.module.css';
 import room from './ShopRoom.module.css';
 import { Canvas } from '@react-three/fiber';
@@ -22,6 +10,7 @@ import api from '../../services/api';
 import RoomOverlayBg from './RoomOverlayBg';
 
 export default function ShopRoom() {
+  const { playCoins } = useSound();
   const gameContext = useContext(GameContext);
   const { coins, shopState, buyRobot, selectRobot, handleBack } = gameContext;
 
@@ -105,6 +94,7 @@ export default function ShopRoom() {
   }, [userId]);
 
   const ownedRobots = useMemo(() => new Set(shopState?.ownedRobots || []), [shopState?.ownedRobots]);
+  owned.add(defaultRobotId);
   
   const hasOwnedRobots = (shopState?.ownedRobots && shopState.ownedRobots.length > 0);
   const selectedRobotId = shopState?.selectedRobotId || (hasOwnedRobots ? ROBOT_CATALOG[0].id : null);
@@ -182,7 +172,8 @@ export default function ShopRoom() {
           setMessageKind('ok');
           setMessage(response.data.message || `Unlocked ${robot.name}!`);
           triggerEquipFx();
-          playCoinSound();
+          console.log('Calling playCoins() from ShopRoom');
+          playCoins();
         }
       } else {
         setMessageKind('warn');
@@ -242,6 +233,7 @@ export default function ShopRoom() {
    * 🎯 Render robot action button
    */
   const renderRobotAction = (robot) => {
+    const isDefaultRobot = robot.id === ROBOT_CATALOG[0].id;
     const isOwned = ownedRobots.has(robot.id);
     const isSelected = selectedRobotId === robot.id;
     const canAfford = coins >= robot.price;
