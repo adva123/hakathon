@@ -2,14 +2,19 @@ CREATE DATABASE IF NOT EXISTS ai_factory;
 USE ai_factory;
 
 CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  email VARCHAR(100) UNIQUE,
-  coins INT DEFAULT 100, -- money
-  score INT DEFAULT 0,   -- points
-  owned_robots JSON DEFAULT '[]', -- robots the user owns
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+  id INT NOT NULL AUTO_INCREMENT,
+  username VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  score INT DEFAULT 0,
+  coins INT DEFAULT 100,
+  energy INT DEFAULT 100, 
+  robot_color VARCHAR(32) DEFAULT '#ff0000',
+  owned_robots JSON DEFAULT '[]', 
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY email (email),
+  KEY idx_user_robots (id, coins) 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE dolls (
   id INT AUTO_INCREMENT PRIMARY KEY,
