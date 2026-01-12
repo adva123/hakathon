@@ -94,7 +94,7 @@ export default function ShopRoom() {
   }, [userId]);
 
   const ownedRobots = useMemo(() => new Set(shopState?.ownedRobots || []), [shopState?.ownedRobots]);
-  owned.add(defaultRobotId);
+  // owned.add(defaultRobotId);
   
   const hasOwnedRobots = (shopState?.ownedRobots && shopState.ownedRobots.length > 0);
   const selectedRobotId = shopState?.selectedRobotId || (hasOwnedRobots ? ROBOT_CATALOG[0].id : null);
