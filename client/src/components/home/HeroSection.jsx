@@ -70,6 +70,20 @@ export default function HeroSection() {
 
   return (
     <section className={styles.hero}>
+      {/* Video Background */}
+      <div className={styles.videoWrapper}>
+        <video
+          className={styles.heroVideo}
+          autoPlay
+          loop
+          muted
+          playsInline
+        >
+          <source src="/homepage.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+
       {/* 3D Gradient Background */}
       <div className={styles.gradientWrapper}>
         <ShaderGradientCanvas

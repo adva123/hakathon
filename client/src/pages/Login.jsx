@@ -91,6 +91,12 @@ const Login = ({ onClose, onLoginSuccess }) => {
         setTimeout(() => setShowMessage(''), 3000);
     };
 
+    const handleMinistryOfEducationClick = () => {
+        window.open('https://lgn.edu.gov.il/nidp/edu/', '_blank');
+        setShowMessage('Redirecting to Ministry of Education portal...');
+        setTimeout(() => setShowMessage(''), 3000);
+    };
+
     const handleGuestLogin = () => {
         const guestUser = {
             id: 'guest-' + Date.now(),
@@ -155,20 +161,20 @@ const Login = ({ onClose, onLoginSuccess }) => {
                         </svg>
                         Continue with Instagram
                     </button>
+                    <button className="login-btn ministry-of-education" onClick={handleMinistryOfEducationClick}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
+                        </svg>
+                        Continue with Ministry of Education
+                    </button>
                 </div>
-                <div style={{ textAlign: 'center', margin: '20px 0', color: '#888', fontSize: '14px' }}>
+                <div style={{ textAlign: 'center', margin: '16px 0', color: '#888', fontSize: '0.9rem', fontWeight: '500' }}>
                     or
                 </div>
                 <div style={{ textAlign: 'center' }}>
                     <button
-                        className="login-btn"
+                        className="login-btn login-btn-guest"
                         onClick={handleGuestLogin}
-                        style={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            border: 'none',
-                            width: '100%',
-                            maxWidth: '300px'
-                        }}
                     >
                         Play as Guest
                     </button>
