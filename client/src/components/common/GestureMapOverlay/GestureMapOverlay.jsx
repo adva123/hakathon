@@ -163,38 +163,12 @@ const PANELS = [
   },
 ];
 
-export default function GestureMapOverlay({ visible = false, activeGesture }) {
-  if (!visible) return null;
-  return (
-    <div className={`${styles.root} ${styles.visible}`}>
-      <div className={styles.map}>
-        <div className={styles.center}>
-          <div className={styles.centerLabel}>Gesture Command Map</div>
-        </div>
 
-        {PANELS.map((p) => {
-          const isActive = activeGesture === p.key;
-          return (
-            <div
-              key={p.key}
-              className={`${styles.panel} ${styles[p.pos]} ${isActive ? styles.active : ''}`}
-            >
-              <div className={styles.row}>
-                <div className={styles.icon}>{p.icon}</div>
-                <div>
-                  <div className={styles.title}>{p.title}</div>
-                  <div className={styles.sub}>{p.sub}</div>
-                </div>
-                <div className={styles.action}>{p.action}</div>
-              </div>
-              <div className={styles.smallNote}>Hold the gesture to keep it active</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+const GestureMapOverlay = function GestureMapOverlay({ visible = false, activeGesture }) {
+  return null;
+};
+
+export default GestureMapOverlay;
 
 GestureMapOverlay.propTypes = {
   visible: PropTypes.bool,

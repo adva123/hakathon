@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
+import { GameContext } from '../../../context/GameContext.jsx';
 import styles from './GestureManager.module.css';
 
 const GESTURES = Object.freeze({
@@ -19,12 +20,10 @@ function clamp01(n) {
 }
 
 function fingerExtended(lm, tip, pip) {
-  // y is inverted (0 top). Extended if tip is significantly above pip.
   return lm[tip].y + 0.015 < lm[pip].y;
 }
 
 function thumbExtendedUp(lm) {
-  // thumb tip above IP and above MCP-ish region
   return lm[4].y + 0.02 < lm[3].y && lm[4].y + 0.02 < lm[2].y;
 }
 
@@ -33,7 +32,6 @@ function thumbExtendedDown(lm) {
 }
 
 function isILoveYou(lm) {
-  // ILY: thumb + index + pinky extended, middle + ring folded.
   const indexExt = fingerExtended(lm, 8, 6);
   const middleExt = fingerExtended(lm, 12, 10);
   const ringExt = fingerExtended(lm, 16, 14);
@@ -46,7 +44,6 @@ function isILoveYou(lm) {
 }
 
 function isFist(lm) {
-  // All fingertips below their PIP (folded)
   const index = lm[8].y > lm[6].y - 0.005;
   const middle = lm[12].y > lm[10].y - 0.005;
   const ring = lm[16].y > lm[14].y - 0.005;
@@ -65,17 +62,14 @@ function classifyGesture(lm) {
   const fist = isFist(lm);
   if (fist) return GESTURES.fist;
 
-  // I love you sign should win before other partial gestures.
   if (isILoveYou(lm)) return GESTURES.iLoveYou;
 
   const openPalm = indexExt && middleExt && ringExt && pinkyExt;
   if (openPalm) return GESTURES.openPalm;
 
-  // Peace sign: index+middle extended, ring+pinky folded.
   const peace = indexExt && middleExt && !ringExt && !pinkyExt;
   if (peace) return GESTURES.peace;
 
-  // Thumb up/down: thumb extended, other fingers mostly folded.
   const othersFolded = !indexExt && !middleExt && !ringExt && !pinkyExt;
   if (othersFolded && thumbExtendedUp(lm)) return GESTURES.thumbUp;
   if (othersFolded && thumbExtendedDown(lm)) return GESTURES.thumbDown;
@@ -84,7 +78,6 @@ function classifyGesture(lm) {
 }
 
 function velocityForGesture(gesture) {
-  // Coordinate system in scene: W moves z-, D moves x+
   switch (gesture) {
     case GESTURES.openPalm:
       return { x: 0, z: -1 };
@@ -101,6 +94,26 @@ function velocityForGesture(gesture) {
   }
 }
 
+// ✅ פונקציה שבודקת אם תנועה מותרת בסצנה הנוכחית
+function isGestureAllowed(gesture, activeScene) {
+  const g = String(gesture || '').toLowerCase();
+  
+  if (activeScene === 'password') {
+    // בחדר סיסמאות: רק iLoveYou, thumbUp, thumbDown
+    const allowed = ['iloveyou', 'thumbup', 'thumbdown', 'none'];
+    return allowed.includes(g);
+  } 
+  
+  if (activeScene === 'privacy' || activeScene === 'shop' || activeScene === 'strength') {
+    // בשאר החדרים: רק iLoveYou (לחזור)
+    const allowed = ['iloveyou', 'none'];
+    return allowed.includes(g);
+  }
+  
+  // בלובי: הכל מותר
+  return true;
+}
+
 export default function GestureManager({
   enabled,
   showCalibration,
@@ -108,6 +121,9 @@ export default function GestureManager({
   onGesture,
   variant = 'overlay',
 }) {
+  // ✅ גישה ל-Context לדעת באיזו סצנה אנחנו
+  const { currentScene, activeOverlayRoom } = useContext(GameContext);
+  
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
@@ -115,7 +131,7 @@ export default function GestureManager({
   const handsRef = useRef(null);
   const runningRef = useRef(false);
 
-  const [status, setStatus] = useState('idle'); // idle | starting | running | denied | error
+  const [status, setStatus] = useState('idle');
   const [gestureLabel, setGestureLabel] = useState(GESTURES.none);
   const [calibProgress, setCalibProgress] = useState(0);
 
@@ -183,20 +199,38 @@ export default function GestureManager({
             ctx.restore();
 
             const g = classifyGesture(landmarks);
-            setGestureLabel(g);
-
-            // Calibration: require stable tracking for a moment.
-            if (showCalibration) {
-              setCalibProgress((p) => clamp01(p + 0.03));
+            
+            // ✅ בדיקה: האם התנועה מותרת בסצנה הנוכחית?
+            const activeScene = activeOverlayRoom || currentScene;
+            const allowed = isGestureAllowed(g, activeScene);
+            
+            if (!allowed) {
+              console.log(`🚫 Blocked gesture "${g}" in scene "${activeScene}"`);
+              // ✅ תנועה חסומה - שלח 'none' במקום
+              setGestureLabel(GESTURES.none);
+              if (typeof onGesture === 'function') {
+                onGesture({
+                  gesture: GESTURES.none,
+                  velocity: { x: 0, z: 0 },
+                  hasHand: true,
+                });
+              }
+            } else {
+              // ✅ תנועה מותרת - שלח אותה
+              setGestureLabel(g);
+              const vel = velocityForGesture(g);
+              if (typeof onGesture === 'function') {
+                onGesture({
+                  gesture: g,
+                  velocity: vel,
+                  hasHand: true,
+                });
+              }
             }
 
-            const vel = velocityForGesture(g);
-            if (typeof onGesture === 'function') {
-              onGesture({
-                gesture: g,
-                velocity: vel,
-                hasHand: true,
-              });
+            // Calibration
+            if (showCalibration) {
+              setCalibProgress((p) => clamp01(p + 0.03));
             }
           } else {
             setGestureLabel(GESTURES.none);
@@ -225,7 +259,6 @@ export default function GestureManager({
           if (!runningRef.current) {
             runningRef.current = true;
             try {
-              // Avoid blocking the render loop; mediapipe work runs async.
               await h.send({ image: v });
             } catch {
               runningRef.current = false;
@@ -270,7 +303,7 @@ export default function GestureManager({
         }
       }
     };
-  }, [enabled, config.overlayFill, config.overlayStroke, onGesture, showCalibration]);
+  }, [enabled, config.overlayFill, config.overlayStroke, onGesture, showCalibration, currentScene, activeOverlayRoom]);
 
   useEffect(() => {
     if (!showCalibration) return;
@@ -343,6 +376,14 @@ export default function GestureManager({
                 <div className={styles.legendRow}>
                   <div className={styles.legendKey}>Fist</div>
                   <div className={styles.legendVal}>Stop</div>
+                </div>
+                <div className={styles.legendRow}>
+                  <div className={styles.legendKey}>👍 Thumb Up</div>
+                  <div className={styles.legendVal}>Like (Password)</div>
+                </div>
+                <div className={styles.legendRow}>
+                  <div className={styles.legendKey}>👎 Thumb Down</div>
+                  <div className={styles.legendVal}>Dislike (Password)</div>
                 </div>
               </div>
             )}

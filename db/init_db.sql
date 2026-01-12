@@ -6,14 +6,14 @@ CREATE TABLE users (
   username VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   score INT DEFAULT 0,
-  coins INT DEFAULT 50,
-  energy INT DEFAULT 100,
-  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  coins INT DEFAULT 100,
+  energy INT DEFAULT 100, 
   robot_color VARCHAR(32) DEFAULT '#ff0000',
-  owned_robots TEXT,
+  owned_robots JSON DEFAULT '[]', 
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY email (email),
-  KEY idx_user_robots (id, coins)
+  KEY idx_user_robots (id, coins) 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE dolls (

@@ -79,6 +79,8 @@
   border-radius: 28px;
   padding: 30px;
   color: white;
+  position: relative;
+  z-index: 10000;
 }
 
 .layout {
@@ -167,6 +169,11 @@ justify-content: center;
 .shopItemLuxury {
   border-color: #ffd700;
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.05), transparent);
+}
+
+.shopItemSpecial {
+  border-color: #ff69b4;
+  background: linear-gradient(90deg, rgba(255, 105, 180, 0.05), transparent);
 }
 
 .btnBuy, .btnEquip, .btnSelected {

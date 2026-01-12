@@ -1,0 +1,10 @@
+.room-overlay-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(220, 220, 220, 0.71); /* light gray, semi-transparent */
+  z-index: 10;
+  pointer-events: none;
+}

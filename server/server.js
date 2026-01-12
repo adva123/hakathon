@@ -235,37 +235,35 @@ app.post('/api/dolls/generate', async (req, res) => {
 
     if (isUnsafe) {
         console.log('⚠️ Unsafe content detected');
-
-        // Save blocked doll to DB
         try {
             const blockedImageUrl = 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png';
-
             await pool.execute(
                 'INSERT INTO dolls (user_id, name, description, image_url, is_good) VALUES (?, ?, ?, ?, ?)',
-                [userId, 'Blocked Content', 'This creation was blocked for safety reasons', blockedImageUrl, 0]
+                [userId, 'Blocked Content', 'Unsafe content', blockedImageUrl, 0]
             );
-
-            // Penalty: -5 score, -10 energy
+            // ✅ עדכון DB: ירידת ניקוד ואנרגיה במקום אחד
             await pool.execute(
-                'UPDATE users SET score = score - 5, energy = energy - 10 WHERE id = ?',
+                'UPDATE users SET score = GREATEST(0, score - 5), energy = GREATEST(0, energy - 10) WHERE id = ?',
                 [userId]
             );
-
+            // שליפת המשתמש המעודכן מה-DB כדי להחזיר לפרונט
+            const [updatedUser] = await pool.execute('SELECT * FROM users WHERE id = ?', [userId]);
+            return res.json({
+                success: true,
+                isUnsafe: true,
+                doll: {
+                    id: 'blocked_' + Date.now(),
+                    name: "Blocked Content",
+                    description: "Unsafe content",
+                    imageUrl: blockedImageUrl
+                },
+                userData: updatedUser[0], // מחזירים את האנרגיה והניקוד המעודכנים
+                message: "⚠️ הניקוד והאנרגיה ירדו בשל הפרת פרטיות."
+            });
         } catch (dbError) {
-            console.error('❌ DB error saving blocked doll:', dbError);
+            console.error(dbError);
+            return res.status(500).json({ success: false, message: 'DB error saving blocked doll', error: dbError.message });
         }
-
-        return res.json({
-            success: true,
-            isUnsafe: true,
-            message: "⚠️ Privacy violation: Please do not share personal info!",
-            doll: {
-                id: 'blocked_' + Date.now(),
-                name: "Blocked Content",
-                description: "Unsafe content",
-                imageUrl: 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png'
-            }
-        });
     }
 
     // ========================================
@@ -319,30 +317,15 @@ app.post('/api/dolls/generate', async (req, res) => {
         const newDollId = dollResult.insertId;
         console.log('✅ Doll saved to DB with ID:', newDollId);
 
-        // ========================================
-        // 5. UPDATE USER RESOURCES (users table)
-        // ========================================
-        console.log('💰 Updating user resources...');
-
+        // ✅ עדכון DB: עליית ניקוד וכסף
         await pool.execute(
             'UPDATE users SET score = score + 10, coins = coins + 10 WHERE id = ?',
             [userId]
         );
 
-        // ========================================
-        // 6. FETCH UPDATED USER DATA
-        // ========================================
-        const [updatedUserRows] = await pool.execute(
-            'SELECT id, username, email, score, coins, energy FROM users WHERE id = ?',
-            [userId]
-        );
+        // שליפת המשתמש המעודכן
+        const [updatedUser] = await pool.execute('SELECT * FROM users WHERE id = ?', [userId]);
 
-        const updatedUser = updatedUserRows[0];
-        console.log('✅ User resources updated:', updatedUser);
-
-        // ========================================
-        // 7. SEND RESPONSE
-        // ========================================
         res.json({
             success: true,
             isUnsafe: false,
@@ -354,8 +337,8 @@ app.post('/api/dolls/generate', async (req, res) => {
                 generationMethod: generationMethod,
                 createdAt: new Date()
             },
-            userData: updatedUser,
-            message: `✨ Doll created with ${generationMethod}! +10 points & +10 coins!`
+            userData: updatedUser[0], // מחזירים את הנתונים המעודכנים
+            message: "✨you earned 10 points and 10 coins for creating a doll!"
         });
 
     } catch (error) {
@@ -410,4 +393,262 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log("OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
+});
+
+// 🤖 ROBOT SHOP - Server Endpoints with MySQL Integration
+
+/**
+ * POST /api/shop/buy-robot
+ * Buy a robot and save to database
+ */
+app.post('/api/shop/buy-robot', async (req, res) => {
+    const { userId, robotId, price } = req.body;
+
+    console.log('🛍️ Buy robot request:', { userId, robotId, price });
+
+    try {
+        // 1. Get current user data
+        const [userRows] = await pool.execute(
+            'SELECT id, coins, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const user = userRows[0];
+        const currentCoins = user.coins;
+
+        // 2. Check if user has enough coins
+        if (currentCoins < price) {
+            return res.json({
+                success: false,
+                message: `Not enough coins! You need ${price - currentCoins} more.`,
+                coinsNeeded: price - currentCoins
+            });
+        }
+
+        // 3. Parse owned_robots (JSON string or comma-separated)
+        let ownedRobots = [];
+        if (user.owned_robots) {
+            try {
+                // Try parsing as JSON first
+                ownedRobots = JSON.parse(user.owned_robots);
+            } catch (e) {
+                // Fallback: treat as comma-separated string
+                ownedRobots = user.owned_robots.split(',').filter(Boolean);
+            }
+        }
+
+        // 4. Check if robot already owned
+        if (ownedRobots.includes(robotId)) {
+            return res.json({
+                success: false,
+                message: 'You already own this robot!'
+            });
+        }
+
+        // 5. Add robot to owned list
+        ownedRobots.push(robotId);
+        const updatedOwnedRobots = JSON.stringify(ownedRobots);
+
+        // 6. Update database: deduct coins and add robot
+        await pool.execute(
+            'UPDATE users SET coins = coins - ?, owned_robots = ? WHERE id = ?',
+            [price, updatedOwnedRobots, userId]
+        );
+
+        // 7. Fetch updated user data
+        const [updatedUserRows] = await pool.execute(
+            'SELECT id, username, coins, score, energy, robot_color, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        const updatedUser = updatedUserRows[0];
+
+        console.log('✅ Robot purchased successfully:', robotId);
+
+        res.json({
+            success: true,
+            message: `Robot unlocked! -${price} coins`,
+            robotId: robotId,
+            userData: {
+                id: updatedUser.id,
+                coins: updatedUser.coins,
+                score: updatedUser.score,
+                energy: updatedUser.energy,
+                ownedRobots: JSON.parse(updatedUser.owned_robots || '[]')
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error buying robot:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * POST /api/shop/select-robot
+ * Select/equip a robot (change robot_color)
+ */
+app.post('/api/shop/select-robot', async (req, res) => {
+    const { userId, robotId, robotColor } = req.body;
+
+    console.log('🎨 Select robot request:', { userId, robotId, robotColor });
+
+    try {
+        // 1. Get current user data
+        const [userRows] = await pool.execute(
+            'SELECT id, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const user = userRows[0];
+
+        // 2. Check if user owns this robot
+        let ownedRobots = [];
+        if (user.owned_robots) {
+            try {
+                ownedRobots = JSON.parse(user.owned_robots);
+            } catch (e) {
+                ownedRobots = user.owned_robots.split(',').filter(Boolean);
+            }
+        }
+
+        if (!ownedRobots.includes(robotId)) {
+            return res.json({
+                success: false,
+                message: 'You do not own this robot!'
+            });
+        }
+
+        // 3. Update robot_color in database
+        await pool.execute(
+            'UPDATE users SET robot_color = ? WHERE id = ?',
+            [robotColor, userId]
+        );
+
+        console.log('✅ Robot selected:', robotId);
+
+        res.json({
+            success: true,
+            message: 'Robot equipped!',
+            robotId: robotId,
+            robotColor: robotColor
+        });
+
+    } catch (error) {
+        console.error('❌ Error selecting robot:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * GET /api/shop/robots/:userId
+ * Get user's robot shop data
+ */
+app.get('/api/shop/robots/:userId', async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const [userRows] = await pool.execute(
+            'SELECT id, coins, robot_color, owned_robots FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        const user = userRows[0];
+
+        // Parse owned_robots
+        let ownedRobots = [];
+        if (user.owned_robots) {
+            try {
+                ownedRobots = JSON.parse(user.owned_robots);
+            } catch (e) {
+                ownedRobots = user.owned_robots.split(',').filter(Boolean);
+            }
+        }
+
+        res.json({
+            success: true,
+            coins: user.coins,
+            robotColor: user.robot_color,
+            ownedRobots: ownedRobots
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching robot data:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error',
+            error: error.message 
+        });
+    }
+});
+// ✅ עדכון נקודות ומטבעות של משתמש ב-DB
+app.post('/api/user/update-points-coins', async (req, res) => {
+    const { userId, score, coins, energy } = req.body;
+
+    console.log('💰 Update points request:', { userId, score, coins, energy });
+
+    if (!userId) {
+        return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    try {
+        let query, params;
+        if (typeof energy !== 'undefined') {
+            query = 'UPDATE users SET score = ?, coins = ?, energy = ? WHERE id = ?';
+            params = [score, coins, energy, userId];
+        } else {
+            query = 'UPDATE users SET score = ?, coins = ? WHERE id = ?';
+            params = [score, coins, userId];
+        }
+        const [result] = await pool.execute(query, params);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        console.log(`✅ Successfully updated DB for user ${userId}: Score=${score}, Coins=${coins}, Energy=${energy}`);
+
+        res.json({
+            success: true,
+            message: 'Points, coins, and energy updated in database',
+            data: { score, coins, energy }
+        });
+
+    } catch (error) {
+        console.error('❌ DB Error updating points:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error',
+            error: error.message 
+        });
+    }
 });

@@ -1,9 +1,9 @@
 import CyberpunkCanvasBackdrop from './CyberpunkCanvasBackdrop.jsx';
 /* eslint-disable react/no-unknown-property */
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import PropTypes from 'prop-types';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'; // ✅ הוסף useCallback
 import * as THREE from 'three';
 import { Bloom, EffectComposer, GodRays } from '@react-three/postprocessing';
 import RobotModel from '../robot/RobotModel.jsx';
@@ -14,6 +14,106 @@ import { useKeyboard } from "../../hooks/useKeyboard.js";
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 import { forestTerrainHeight, FOREST_PATH_SURFACE_LIFT, ForestSky, ForestWorld } from './ForestWorld.jsx';
 
+
+
+
+// Simple modal for room entry
+function RoomEntryModal({ roomLabel, onConfirm, onCancel }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0,0,0,0.6)',
+      zIndex: 99999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backdropFilter: 'blur(8px)'
+    }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: 20,
+        padding: 40,
+        minWidth: 320,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        textAlign: 'center',
+        border: '2px solid rgba(255,255,255,0.2)'
+      }}>
+        <div style={{
+          fontSize: 28,
+          marginBottom: 24,
+          color: '#fff',
+          fontWeight: 'bold',
+          textShadow: '0 2px 10px rgba(0,0,0,0.3)'
+        }}>
+          🚪 room entrance
+        </div>
+        <div style={{
+          fontSize: 20,
+          marginBottom: 30,
+          color: '#f0f0f0',
+          lineHeight: '1.5'
+        }}>
+          האם להיכנס ל<strong style={{ color: '#FFD700' }}>{roomLabel}</strong>?
+        </div>
+        <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+          <button
+            style={{
+              padding: '14px 32px',
+              fontSize: 18,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #00f2ff 0%, #00a8ff 100%)',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 15px rgba(0,242,255,0.4)',
+              transition: 'transform 0.2s'
+            }}
+            onClick={onConfirm}
+            onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          >
+            ✓ כן
+          </button>
+          <button
+            style={{
+              padding: '14px 32px',
+              fontSize: 18,
+              borderRadius: 12,
+              background: 'rgba(255,255,255,0.15)',
+              color: '#fff',
+              border: '2px solid rgba(255,255,255,0.3)',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'all 0.2s'
+            }}
+            onClick={onCancel}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'rgba(255,255,255,0.25)';
+              e.target.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'rgba(255,255,255,0.15)';
+              e.target.style.transform = 'scale(1)';
+            }}
+          >
+            ✗ no
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+RoomEntryModal.propTypes = {
+  roomLabel: PropTypes.string.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+};
 function smoothstep01(x) {
   const t = Math.max(0, Math.min(1, x));
   return t * t * (3 - 2 * t);
@@ -567,7 +667,11 @@ function RobotController({
   equippedItem,
   laptopCanvas,
   mode,
+  onLobbyPortalEnter,
 }) {
+
+  const [pendingRoom, setPendingRoom] = useState(null);
+  const [showRoomModal, setShowRoomModal] = useState(false);
   const keys = useKeyboard();
   const scratch2 = useRef(new THREE.Vector3());
   const scratch3 = useRef(new THREE.Vector3());
@@ -575,6 +679,19 @@ function RobotController({
   const prevP = useRef(new THREE.Vector3());
   const hasPrev = useRef(false);
   const prevYaw = useRef(0);
+
+  const handleRoomModalConfirm = useCallback(() => {
+    if (pendingRoom && typeof onLobbyPortalEnter === 'function') {
+      onLobbyPortalEnter(pendingRoom.scene);
+    }
+    setShowRoomModal(false);
+    setPendingRoom(null);
+  }, [pendingRoom, onLobbyPortalEnter]);
+
+  const handleRoomModalCancel = useCallback(() => {
+    setShowRoomModal(false);
+    setPendingRoom(null);
+  }, []);
 
   useFrame(({ clock, camera }, delta) => {
     if (!robotRef.current) return;
@@ -945,48 +1062,54 @@ function RobotController({
     }
 
     // Transition FX near spur junctions: camera tilt/zoom + slow environmental tint.
-    if (Array.isArray(roomPortals) && roomPortals.length) {
+    // --- לוגיקת זיהוי קרבה לחדרים ---
+    if (Array.isArray(roomPortals) && roomPortals.length && curveData?.curve) {
       let bestDist = Infinity;
-      let bestSide = 0;
-      let bestScene = '';
-
-      const pAt = scratch2.current; // reuse scratch
-      const tanAt = scratch3.current;
-      const leftAt = tmpV.current;
-
-      for (let i = 0; i < roomPortals.length; i += 1) {
-        const r = roomPortals[i];
-        const rt = Number(r?.t ?? 0);
-        curveData.curve.getPointAt(rt, pAt);
-        curveData.curve.getTangentAt(rt, tanAt);
-        tanAt.y = 0;
-        if (tanAt.lengthSq() < 1e-9) tanAt.set(0, 0, 1);
-        tanAt.normalize();
-        leftAt.set(0, 1, 0).cross(tanAt).normalize();
-
-        const side = typeof r?.side === 'number' ? Math.sign(r.side) || 1 : (i % 2 === 0 ? 1 : -1);
-        const isPassword = r?.scene === 'password';
-        const jx = pAt.x + leftAt.x * (isPassword ? 1.25 : 1.65) * side + tanAt.x * (isPassword ? -0.85 : 0);
-        const jz = pAt.z + leftAt.z * (isPassword ? 1.25 : 1.65) * side + tanAt.z * (isPassword ? -0.85 : 0);
-
-        const dx = robot.position.x - jx;
-        const dz = robot.position.z - jz;
-        const d = Math.hypot(dx, dz);
-        if (d < bestDist) {
-          bestDist = d;
-          bestSide = side;
-          bestScene = String(r?.scene || '');
+      let closestPortal = null;
+      roomPortals.forEach((portal) => {
+        const portalPos = curveData.curve.getPointAt(Number(portal.t || 0));
+        const dist = robot.position.distanceTo(portalPos);
+        if (dist < bestDist) {
+          bestDist = dist;
+          closestPortal = portal;
+        }
+      });
+      // אם המרחק קטן מ-1.8 מטר והמודל לא פתוח כרגע
+      if (bestDist < 1.8 && closestPortal && !showRoomModal) {
+        setPendingRoom(closestPortal);
+        setShowRoomModal(true);
+        // כניסה אוטומטית אם לא מדובר בלחיצה על כפתור
+        if (onLobbyPortalEnter) {
+          // Stop all walking (auto-walk and hand movement), but keep hand gesture detection enabled
+          if (typeof setAutoWalkTarget === 'function') {
+            setAutoWalkTarget([]); // clear auto-walk target if setter exists
+          } else if (robot.userData.nav) {
+            robot.userData.nav.arrived = true;
+          }
+          // Stop hand-controlled walking (but not gesture detection)
+          if (robot.userData.handControl) {
+            robot.userData.handControl.enabled = false;
+          }
+          onLobbyPortalEnter(closestPortal.scene);
         }
       }
-
-      const amt = smoothstep01(1 - (bestDist - 1.8) / 7.0);
-      robot.userData.turnFx = { side: bestSide, amount: amt };
-      robot.userData.envFx = { scene: bestScene, amount: amt };
+      // אם המשתמש התרחק מעבר ל-3 מטר, נסגור את ההודעה אוטומטית
+      else if (bestDist > 3.0 && showRoomModal) {
+        setShowRoomModal(false);
+        setPendingRoom(null);
+      }
     } else {
       robot.userData.turnFx = { side: 0, amount: 0 };
       robot.userData.envFx = { scene: '', amount: 0 };
+      // Re-enable hand gesture walking only if not in overlay/room
+      if (robot.userData.handControl && !pendingRoom && !showRoomModal) {
+        robot.userData.handControl.enabled = true;
+      }
+      if (showRoomModal) {
+        setShowRoomModal(false);
+        setPendingRoom(null);
+      }
     }
-
     // Keep animation stable: avoid high-frequency scale wobble that reads as jitter.
     const targetSX = 1.0 + 0.008 * Math.sin(time * 2.5);
     const targetSY = 1.0 - 0.006 * Math.sin(time * 2.5);
@@ -1001,14 +1124,17 @@ function RobotController({
   });
 
   return (
-    <RobotModel
-      ref={robotRef}
-      scale={1.05}
-      position={[0, floorY, 0]}
-      faceTextureUrl={faceTextureUrl || undefined}
-      laptopCanvas={laptopCanvas || undefined}
-      equippedItem={equippedItem || undefined}
-    />
+    <>
+      <RobotModel
+        ref={robotRef}
+        scale={1.05}
+        position={[0, floorY, 0]}
+        faceTextureUrl={faceTextureUrl || undefined}
+        laptopCanvas={laptopCanvas || undefined}
+        equippedItem={equippedItem || undefined}
+      />
+      {/* Room entry modal removed: user enters rooms automatically without prompt */}
+    </>
   );
 }
 
@@ -1031,6 +1157,7 @@ RobotController.propTypes = {
   equippedItem: PropTypes.string,
   laptopCanvas: PropTypes.any,
   mode: PropTypes.string,
+  onLobbyPortalEnter: PropTypes.func, // ✅ הוסף
 };
 
 function SceneAtmosphere({ mode }) {
@@ -2868,7 +2995,7 @@ export default function ThreeDemo({
           faceTextureUrl={avatarFaceUrl || undefined}
           equippedItems={shopState?.equippedItems || []}
           laptopCanvas={laptopCanvas}
-          mode={'forest'}
+          onLobbyPortalEnter={onLobbyPortalEnter} // ✅ העבר את זה
         />
 
         <CandyFollowCamera targetRef={robotRef} curveData={curveData} navActive={navActive} occluderRootRef={worldRef} />

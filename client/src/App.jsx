@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import GameShell from './game/GameShell.jsx';
-import { GameContext } from '../src/context/GameContext.jsx';
+import { GameContext } from './context/GameContext';
 import Login from './pages/Login.jsx';
 import styles from '../src/styles/modules/App.module.css';
 
