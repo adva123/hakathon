@@ -4,7 +4,7 @@
   - Bubbly bold typography
 */
 
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Assistant:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 :root {
   /* Candy palette */
@@ -44,9 +44,71 @@
   --glass-shadow: 0 18px 44px rgba(40, 18, 46, 0.18);
 
   /* Typography */
-  --font-sans: 'Fredoka', 'Assistant', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+  --font-sans: 'Fredoka', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+/* Dark theme variables */
+:root[data-theme="dark"] {
+  /* Cyberpunk dark palette */
+  --neo-cyan: #00f2ff;
+  --neo-purple: #7000ff;
+  --neo-red: #ff2d55;
+  --neo-bg: #0a0e1a;
+
+  /* Surfaces */
+  --neo-surface: rgba(20, 24, 40, 0.85);
+  --neo-surface-strong: rgba(30, 35, 55, 0.92);
+
+  /* Text */
+  --neo-text: rgba(255, 255, 255, 0.92);
+  --neo-text-dim: rgba(255, 255, 255, 0.65);
+
+  /* Borders */
+  --neo-border: rgba(0, 242, 255, 0.25);
+
+  /* Glassmorphism - dark variant */
+  --glass-bg: rgba(20, 24, 40, 0.72);
+  --glass-border: rgba(0, 242, 255, 0.18);
+  --glass-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+
+  /* Glow effects */
+  --neo-glow-cyan: 0 0 30px rgba(0, 242, 255, 0.35);
+  --neo-glow-purple: 0 0 30px rgba(112, 0, 255, 0.35);
+  --neo-glow-soft: 0 18px 60px rgba(0, 0, 0, 0.35);
+}
+
+/* Light theme - explicit declaration for clarity */
+:root[data-theme="light"] {
+  /* Keep candy palette but ensure proper contrast */
+  --neo-cyan: #4DB8E8;
+  --neo-purple: #A366FF;
+  --neo-red: #FF5A8E;
+  --neo-bg: #FFF7FD;
+
+  /* Surfaces */
+  --neo-surface: rgba(255, 255, 255, 0.75);
+  --neo-surface-strong: rgba(255, 255, 255, 0.90);
+
+  /* Text */
+  --neo-text: rgba(40, 18, 46, 0.92);
+  --neo-text-dim: rgba(40, 18, 46, 0.65);
+
+  /* Borders */
+  --neo-border: rgba(160, 130, 180, 0.35);
+
+  /* Glassmorphism - light variant */
+  --glass-bg: rgba(255, 255, 255, 0.70);
+  --glass-border: rgba(215, 183, 255, 0.30);
+  --glass-shadow: 0 18px 44px rgba(40, 18, 46, 0.12);
+
+  /* Glow effects */
+  --neo-glow-cyan: 0 0 30px rgba(77, 184, 232, 0.25);
+  --neo-glow-purple: 0 0 30px rgba(163, 102, 255, 0.25);
+  --neo-glow-soft: 0 18px 60px rgba(40, 18, 46, 0.10);
 }
 
 html,

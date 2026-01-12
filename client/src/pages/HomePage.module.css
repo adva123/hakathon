@@ -1,0 +1,11 @@
+.homePage {
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  background: var(--neo-bg);
+  transition: background 0.3s ease;
+}
+
+.homePage main {
+  width: 100%;
+}
