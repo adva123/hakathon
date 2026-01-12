@@ -1,0 +1,118 @@
+.demoSection {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  background: var(--neo-bg);
+}
+
+.container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.sectionTitle {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(42px, 6vw, 64px);
+  font-weight: 800;
+  color: var(--neo-text);
+  text-align: center;
+  margin: 0 0 60px;
+  background: linear-gradient(135deg, var(--neo-cyan), var(--neo-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+}
+
+.videoWrapper {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 40px;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.videoPlaceholder {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.1), rgba(112, 0, 255, 0.1));
+  border: 2px solid var(--neo-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  border-radius: 24px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.playButton {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neo-cyan), var(--neo-purple));
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--neo-glow-cyan), var(--neo-glow-purple);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.playButton:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 50px rgba(0, 242, 255, 0.6), 0 0 70px rgba(112, 0, 255, 0.5);
+}
+
+.playIcon {
+  font-size: 32px;
+  color: white;
+  margin-left: 4px;
+}
+
+.placeholderText {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--neo-text);
+  margin: 0;
+  letter-spacing: -0.3px;
+  text-transform: uppercase;
+}
+
+.description {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(14px, 1.8vw, 18px);
+  font-weight: 400;
+  color: var(--neo-text-dim);
+  text-align: center;
+  max-width: 750px;
+  margin: 0 auto;
+  line-height: 1.8;
+  letter-spacing: -0.2px;
+}
+
+@media (max-width: 768px) {
+  .demoSection {
+    padding: 60px 16px;
+  }
+
+  .playButton {
+    width: 60px;
+    height: 60px;
+  }
+
+  .playIcon {
+    font-size: 24px;
+  }
+
+  .placeholderText {
+    font-size: 18px;
+  }
+}
