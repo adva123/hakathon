@@ -268,24 +268,44 @@ const PrivacyRoom = ({ gestureRef }) => {
           {/* Back button */}
           <button
             className={styles.backButton}
-            onClick={handleBack}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🔙 Privacy Room back button clicked!');
+              console.log('handleBack available?', !!handleBack);
+              if (handleBack) {
+                handleBack();
+              } else {
+                console.error('❌ handleBack not defined');
+              }
+            }}
             style={{
               position: 'absolute',
               top: 18,
               left: 18,
-              zIndex: 100,
-              background: 'rgba(0,0,0,0.5)',
-              border: 'none',
+              zIndex: 10000,
+              background: 'rgba(0,0,0,0.8)',
+              border: '2px solid #00f2ff',
               borderRadius: '12px',
               color: '#00f2ff',
               fontSize: '1.3rem',
-              padding: '8px 18px',
-              boxShadow: '0 0 12px #00f2ff55',
+              padding: '12px 24px',
+              boxShadow: '0 0 20px #00f2ffaa',
               cursor: 'pointer',
-              transition: 'background 0.2s',
+              transition: 'all 0.2s',
+              fontWeight: 'bold',
+              pointerEvents: 'auto',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'rgba(0,242,255,0.3)';
+              e.target.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'rgba(0,0,0,0.8)';
+              e.target.style.transform = 'scale(1)';
             }}
           >
-            ← Back
+            ← Back to Lobby
           </button>
 
           {/* Display side */}
