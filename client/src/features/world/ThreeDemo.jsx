@@ -14,52 +14,13 @@ import { useKeyboard } from "../../hooks/useKeyboard.js";
 import { CyberpunkWorld } from './CyberpunkWorld.jsx';
 
 
-import { ForestWorld } from './ForestWorld.jsx';
+import { ForestWorld, ForestSky, forestTerrainHeight, FOREST_PATH_SURFACE_LIFT } from './ForestWorld.jsx';
 
 
 
 
 
-export default function ThreeDemo({
-  gestureRef,
-  autoWalkTarget,
-  controlsEnabled,
-  neonMode,
-  sceneId,
-  avatarFaceUrl,
-  onLobbyPoiNavigate,
-  onLobbyPortalEnter,
-  lobbyReturnEvent,
-  badges,
-  shopState
-}) {
-  return (
-    <Canvas
-      shadows
-      camera={{ position: [0, 10, 30], fov: 50 }}
-      style={{ width: '100vw', height: '100vh' }}
-    >
-      <ForestWorld
-        gestureRef={gestureRef}
-        // TODO: Pass other required props: floorY, curveData, robotRef, roomPortals, completion, onPortalEnter, etc.
-      />
-    </Canvas>
-  );
-}
-
-ThreeDemo.propTypes = {
-  gestureRef: PropTypes.object,
-  autoWalkTarget: PropTypes.any,
-  controlsEnabled: PropTypes.bool,
-  neonMode: PropTypes.bool,
-  sceneId: PropTypes.string,
-  avatarFaceUrl: PropTypes.string,
-  onLobbyPoiNavigate: PropTypes.func,
-  onLobbyPortalEnter: PropTypes.func,
-  lobbyReturnEvent: PropTypes.object,
-  badges: PropTypes.object,
-  shopState: PropTypes.object,
-};
+// ...existing code...
 function smoothstep01(x) {
   const t = Math.max(0, Math.min(1, x));
   return t * t * (3 - 2 * t);
