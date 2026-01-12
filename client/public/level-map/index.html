@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Level Map (Candy-Style)</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand__title">Level Map</div>
+          <div class="brand__subtitle">Candy-style, canvas-rendered, scrollable</div>
+        </div>
+        <div class="legend" aria-hidden="true">
+          <div class="legend__item"><span class="dot dot--done"></span>Completed</div>
+          <div class="legend__item"><span class="dot dot--current"></span>Current</div>
+          <div class="legend__item"><span class="dot dot--locked"></span>Locked</div>
+        </div>
+      </header>
+
+      <main class="mapWrap" id="mapWrap">
+        <canvas id="map" class="map" aria-label="Level map" role="img"></canvas>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <script src="./map.js"></script>
+  </body>
+</html>

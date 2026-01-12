@@ -1,0 +1,144 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.overlay.show {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  pointer-events: all;
+}
+
+.popup {
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid #00f2ff;
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 
+    0 0 30px rgba(0, 242, 255, 0.3),
+    0 10px 40px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  transform: scale(0.8) translateY(50px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.popup.popupShow {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+.icon {
+  font-size: 60px;
+  margin-bottom: 15px;
+  animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.title {
+  color: #00f2ff;
+  font-size: 24px;
+  margin: 0 0 10px 0;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+}
+
+.description {
+  color: #e0e0e0;
+  font-size: 16px;
+  margin: 0 0 25px 0;
+  line-height: 1.5;
+}
+
+.buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.enterBtn,
+.dismissBtn {
+  flex: 1;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.enterBtn {
+  background: linear-gradient(145deg, #00f2ff, #00c9db);
+  color: #0a0e27;
+  box-shadow: 0 4px 15px rgba(0, 242, 255, 0.4);
+}
+
+.enterBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 242, 255, 0.6);
+}
+
+.enterBtn:active {
+  transform: translateY(0);
+}
+
+.dismissBtn {
+  background: linear-gradient(145deg, #2d3748, #1a202c);
+  color: #e0e0e0;
+  border: 1px solid #4a5568;
+}
+
+.dismissBtn:hover {
+  background: linear-gradient(145deg, #374151, #1f2937);
+  border-color: #6b7280;
+  transform: translateY(-2px);
+}
+
+.dismissBtn:active {
+  transform: translateY(0);
+}
+
+.hint {
+  color: #a0a0a0;
+  font-size: 13px;
+  font-style: italic;
+  margin-top: 10px;
+}
+
+/* אנימציה של ריחוף */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.popup:hover {
+  animation: float 2s ease-in-out infinite;
+}
