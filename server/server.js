@@ -11,8 +11,15 @@ import cors from 'cors';
 import OpenAI from 'openai';
 import pool from '../db/db.js';
 
+// Initialize OpenAI only if API key is provided
+let openai = null;
+if (process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('sk-proj')) {
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  console.log('✅ OpenAI initialized');
+} else {
+  console.warn('⚠️  OpenAI API key not configured - AI features will be disabled');
+}
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const app = express();
 app.use(cors({
     origin: 'http://localhost:5173',
