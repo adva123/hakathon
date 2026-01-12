@@ -158,7 +158,7 @@ export default function SideNavigation({
                 window.dispatchEvent(new CustomEvent('open-mission1'));
               }}
             >
-              🤖 Room
+              🤖 Underground Room
             </button>
           </div>
           <div className={styles.small}>Robot auto-navigates on the map.</div>
