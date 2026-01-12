@@ -354,7 +354,7 @@ export default function GameShell() {
   });
   const lastGestureForUiRef = useRef('none');
 
-  const handTrackingEnabled = currentScene === SCENES.lobby || currentScene === SCENES.strength;
+  const handTrackingEnabled = currentScene === SCENES.lobby || currentScene === SCENES.strength || currentScene === SCENES.password;
   const controlsEnabled = currentScene === SCENES.lobby && !activeOverlayRoom && !robotAutoWalkTarget;
   const neonMode = true;
 
