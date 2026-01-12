@@ -83,11 +83,11 @@ export default function AboutSection() {
     <section ref={sectionRef} className={styles.aboutSection} id="about">
       <div className={styles.container}>
         <h2 ref={titleRef} className={styles.sectionTitle}>
-          What is Netropolise?
+          What is SafeForest?
         </h2>
 
         <p className={styles.intro}>
-          Netropolise is an immersive cybersecurity education game that transforms
+          SafeForest is an immersive cybersecurity education game that transforms
           complex security concepts into engaging, interactive challenges. Learn to
           protect yourself in the digital world while playing through a cyberpunk
           adventure.

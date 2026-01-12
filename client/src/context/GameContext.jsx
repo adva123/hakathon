@@ -6,8 +6,6 @@ import { updateUserPointsAndCoins } from '../api/pointsApi';
 
 // ✅ יצירת ה-Context
 export const GameContext = createContext(null);
-
-// ✅ SCENES
 export const SCENES = {
   entry: 'entry',
   lobby: 'lobby',

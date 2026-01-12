@@ -150,6 +150,16 @@ export default function SideNavigation({
             >
               🤖 Robot Shop
             </button>
+            <button
+              type="button"
+              className={`${styles.kpi} ${styles.mapPin}`}
+              onClick={() => {
+                // פותח את Mission1
+                window.dispatchEvent(new CustomEvent('open-mission1'));
+              }}
+            >
+              🤖 Room
+            </button>
           </div>
           <div className={styles.small}>Robot auto-navigates on the map.</div>
         </div>

@@ -46,7 +46,7 @@ export default function Navbar() {
   return (
     <nav ref={navRef} className={styles.navbar}>
       <div className={styles.logo} onClick={scrollToTop} style={{ cursor: 'pointer' }}>
-        <span className={styles.logoText}>Netropolise</span>
+        <span className={styles.logoText}>SafeForest</span>
       </div>
 
       <div className={styles.navLinks}>
