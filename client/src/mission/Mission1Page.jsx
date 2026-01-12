@@ -131,6 +131,7 @@ export default function Scene({
   onMissionTrigger,
   onExit,
 }) {
+  // gestureRef is now required for gesture-based movement
   const [roomId, setRoomId] = useState("task1");
   const keys = useKeyboard();
 
@@ -349,9 +350,23 @@ export default function Scene({
     // ✅ Gesture handling at the end
     if (gestureRef?.current?.gesture && inputEnabled) {
       const gesture = gestureRef.current.gesture.toLowerCase();
-      console.log('👋 Gesture detected:', gesture);
-      if (gesture === 'iloveyou') {
-        console.log('💚 iLoveYou - going back');
+      // דוגמה: תנועה קדימה/אחורה/ימינה/שמאלה
+      if (gesture === 'forward') {
+        // תנועה קדימה
+        const vx = Math.sin(yaw.current) * SPEED * delta;
+        const vz = Math.cos(yaw.current) * SPEED * delta;
+        pos.current.x = clamp(pos.current.x + vx, minX, maxX);
+        pos.current.z = clamp(pos.current.z + vz, minZ, maxZ);
+      } else if (gesture === 'back') {
+        const vx = Math.sin(yaw.current) * -SPEED * delta;
+        const vz = Math.cos(yaw.current) * -SPEED * delta;
+        pos.current.x = clamp(pos.current.x + vx, minX, maxX);
+        pos.current.z = clamp(pos.current.z + vz, minZ, maxZ);
+      } else if (gesture === 'left') {
+        yaw.current += 2.2 * delta;
+      } else if (gesture === 'right') {
+        yaw.current -= 2.2 * delta;
+      } else if (gesture === 'iloveyou') {
         if (onExit) onExit();
       }
       // ניקוי

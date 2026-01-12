@@ -14,8 +14,19 @@ import ClothingRoom from './scenes/ClothingRoom.jsx';
 
 import TryAgain from './scenes/TryAgain.jsx';
 
+import React from 'react';
+import Mission1Page from '../mission/Mission1Page.jsx';
 export default function MainGameContainer({ gestureRef } = {}) {
   const { currentScene, activeOverlayRoom, addScore, awardBadge } = useContext(GameContext);
+  const [showMission1, setShowMission1] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = () => {
+      setShowMission1(true);
+    };
+    window.addEventListener('open-mission1', handler);
+    return () => window.removeEventListener('open-mission1', handler);
+  }, []);
 
   const overlay = useMemo(() => {
     switch (activeOverlayRoom) {
@@ -60,12 +71,23 @@ export default function MainGameContainer({ gestureRef } = {}) {
     }
   }, [currentScene, overlay, addScore, awardBadge, gestureRef]);
 
+  const handleMissionExit = () => {
+    setShowMission1(false);
+  };
+
   return (
     <>
       {/* <EnergyNavBar /> */}
       <GlobalGestureOverlay gestureRef={gestureRef} />
       <ResourceBank />
-      {view}
+      {showMission1 ? (
+        <Mission1Page gestureRef={gestureRef} onExit={handleMissionExit} />
+      ) : (
+        <>
+          {view}
+          {activeOverlayRoom && overlay}
+        </>
+      )}
     </>
   );
 }
