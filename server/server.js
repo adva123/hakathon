@@ -419,3 +419,70 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log("OPENAI_API_KEY present:", !!process.env.OPENAI_API_KEY);
 });
+// ========================================
+// PASSWORDS ENDPOINTS
+// ========================================
+
+app.get('/api/passwords/random/:count', async (req, res) => {
+    const { count } = req.params;
+    const limit = parseInt(count) || 10;
+
+    console.log(`🎲 Getting ${limit} random passwords...`);
+
+    try {
+        const [rows] = await pool.execute(
+            'SELECT id, password, is_safe, explanation FROM passwords ORDER BY RAND() LIMIT ?',
+            [limit]
+        );
+        
+        if (rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No passwords found in database' 
+            });
+        }
+        
+        console.log(`✅ ${rows.length} random passwords selected`);
+        res.json(rows);
+        
+    } catch (err) {
+        console.error('❌ Error loading random passwords:', err);
+        res.status(500).json({ 
+            success: false,
+            error: err.message 
+        });
+    }
+});
+
+app.post('/api/passwords/check', async (req, res) => {
+    const { passwordId, userAnswer } = req.body;
+    
+    try {
+        const [rows] = await pool.execute(
+            'SELECT is_safe FROM passwords WHERE id = ?',
+            [passwordId]
+        );
+        
+        if (rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Password not found' 
+            });
+        }
+        
+        const isCorrect = rows[0].is_safe === userAnswer;
+        
+        res.json({
+            success: true,
+            correct: isCorrect,
+            actualAnswer: rows[0].is_safe
+        });
+        
+    } catch (err) {
+        console.error('❌ Error checking password:', err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
+    }
+});
