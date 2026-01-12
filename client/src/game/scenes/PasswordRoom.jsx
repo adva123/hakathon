@@ -44,12 +44,14 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
 
   // טעינה של 10 סיסמאות
   useEffect(() => {
+    // טען סיסמאות רק אם לא נטען כבר (מונע כפילות בטעינה כפולה)
+    if (passwordSamples.length > 0) return;
     const fetchPasswords = async () => {
       try {
         setLoading(true);
         const response = await fetch('http://localhost:5000/api/passwords/random/10');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+      
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
           const formattedData = data.map(pw => ({
@@ -67,7 +69,7 @@ export default function PasswordRoom({ addScore: addScoreProp, awardBadge: award
       }
     };
     fetchPasswords();
-  }, []);
+  }, [passwordSamples]);
 
   const currentPassword = passwordSamples[currentPasswordIndex];
 

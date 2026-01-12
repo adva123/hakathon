@@ -61,19 +61,21 @@ export default function Mission1({ robotRef, onExit }) {
     return Math.max(0, Math.min(100, score));
   }, [collectedItems]);
 
+  // שיפור ביצועים: בודק רק אריחים קרובים (radius 8)
   useFrame(() => {
     if (!robotRef?.current || isSuccess) return;
-
     const robotPos = robotRef.current.position;
     const threshold = 2.5;
-
-    tiles.forEach((tile) => {
-      if (tile.collected) return;
+    // בחר רק אריחים קרובים לבדיקה
+    const closeTiles = tiles.filter(tile => !tile.collected &&
+      Math.abs(tile.pos[0] - robotPos.x) < 8 && Math.abs(tile.pos[2] - robotPos.z) < 8);
+    for (let tile of closeTiles) {
       const tilePos = new THREE.Vector3(tile.pos[0], tile.pos[1], tile.pos[2]);
       if (robotPos.distanceTo(tilePos) < threshold) {
         collectTile(tile);
+        break; // רק אחד לפריים
       }
-    });
+    }
   });
 
   const collectTile = (tile) => {
@@ -94,18 +96,12 @@ export default function Mission1({ robotRef, onExit }) {
     setTiles(prev => prev.map(t => t.id === tileId ? { ...t, collected: false } : t));
   };
 
-  // const Wall = ({ args, pos, rot }) => (
-  //   <mesh position={pos} rotation={rot}>
-  //     <boxGeometry args={args} />
-  //     <meshStandardMaterial color="#5566aa" roughness={0.4} />
-  //   </mesh>
-  // );
-
+  
+  // המלצה: להוסיף dpr={1} ל-<Canvas /> בקומפוננטת האב להפחתת עומס גרפי
+  // <Canvas dpr={1} ...>
   return (
     <group>
-      {/* <Wall args={[4, 3, 2]} pos={[0, 0, -4]} rot={[0,0,0]} />
-      <Wall args={[10, 3, 1]} pos={[-8, 0, 2]} rot={[0, 0.4, 0]} />
-      <Wall args={[10, 3, 1]} pos={[8, 0, 2]} rot={[0, -0.4, 0]} /> */}
+      
       
       <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, -1.14, 0]}>
          <planeGeometry args={[40, 40]} />

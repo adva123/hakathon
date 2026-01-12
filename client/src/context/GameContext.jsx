@@ -358,6 +358,8 @@ export function GameProvider({ children }) {
       ) {
         prepareLobbyReturn(currentScene);
       }
+      // אפס overlay בכל מעבר חדר
+      setActiveOverlayRoom(null);
       setCurrentScene(targetScene);
     },
     [currentScene, prepareLobbyReturn]
