@@ -1,4 +1,5 @@
 import React, { useContext, useState } from 'react';
+import { useSound } from '../hooks/useSound.js';
 import PropTypes from 'prop-types';
 import { GameContext } from '../context/GameContext.jsx';
 import styles from './ResourceBank.module.css';
@@ -7,12 +8,14 @@ import styles from './ResourceBank.module.css';
  * רכיב המודאל הפנימי של הבנק
  */
 function ResourceBankModal({ isOpen, onClose, score, coins, energy, exchangePointsForCoins, buyEnergyWithCoins }) {
+  const { playCoins } = useSound();
   const [message, setMessage] = useState('');
 
   const handleExchange = () => {
     console.log('🔄 Attempting to exchange points...');
     const res = exchangePointsForCoins(50);
     if (res?.success) {
+      playCoins();
       setMessage('✅ Exchanged 50 points for 25 coins!');
       setTimeout(() => setMessage(''), 3000);
     } else {
@@ -24,7 +27,8 @@ function ResourceBankModal({ isOpen, onClose, score, coins, energy, exchangePoin
   const handleBuyEnergy = () => {
     console.log('⚡ Attempting to buy energy...');
     const res = buyEnergyWithCoins(30);
-    if (res?.success) {
+    if (res?.success) {      
+      playCoins();
       setMessage('✅ Bought energy! ⚡');
       setTimeout(() => setMessage(''), 3000);
     } else {

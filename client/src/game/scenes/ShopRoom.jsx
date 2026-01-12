@@ -1,17 +1,5 @@
-import { useContext, useEffect, useMemo, useRef, useState, Suspense } from 'react';
-// Utility to play a sound
-function playCoinSound() {
-  try {
-    const audio = new window.Audio(require('../../music/drop-coins.mp3'));
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
-  } catch (e) {
-    // fallback for Vite/webpack static import
-    const audio = new window.Audio('/music/drop-coins.mp3');
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
-  }
-}
+import React, { useContext, useEffect,useMemo ,useState ,useRef,Suspense  } from 'react';
+import { useSound } from '../../hooks/useSound.js';
 import styles from '../game.module.css';
 import room from './ShopRoom.module.css';
 import { Canvas } from '@react-three/fiber';
@@ -22,6 +10,7 @@ import api from '../../services/api';
 import RoomOverlayBg from './RoomOverlayBg';
 
 export default function ShopRoom() {
+  const { playCoins } = useSound();
   const gameContext = useContext(GameContext);
   const { coins, shopState, buyRobot, selectRobot, handleBack } = gameContext;
 
@@ -182,7 +171,8 @@ export default function ShopRoom() {
           setMessageKind('ok');
           setMessage(response.data.message || `Unlocked ${robot.name}!`);
           triggerEquipFx();
-          playCoinSound();
+          console.log('Calling playCoins() from ShopRoom');
+          playCoins();
         }
       } else {
         setMessageKind('warn');

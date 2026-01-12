@@ -3,11 +3,13 @@ import GameShell from './game/GameShell.jsx';
 import { GameContext } from './context/GameContext';
 import Login from './pages/Login.jsx';
 import styles from '../src/styles/modules/App.module.css';
+import { useSound } from './hooks/useSound.js';
 
 function App() {
   const { handleLogin, userId, score, coins, energy, playerName } = useContext(GameContext);
   const [showLogin, setShowLogin] = useState(false);
   const [userPicture, setUserPicture] = useState('');
+  const { playCoins } = useSound();
 
   // ✅ בדוק אם יש משתמש מחובר בעת הטעינה
   useEffect(() => {
@@ -82,7 +84,7 @@ function App() {
   };
 
   return (
-    <>
+    <div className={styles.appWrap}>
       {/* User profile top right */}
       {userId && !showLogin && (
         <div className={styles.userProfile}>
@@ -95,7 +97,6 @@ function App() {
           </button>
         </div>
       )}
-
       {/* הצג התחברות או משחק */}
       {showLogin || !userId ? (
         <Login 
@@ -105,7 +106,7 @@ function App() {
       ) : (
         <GameShell userId={userId} />
       )}
-    </>
+    </div>
   );
 }
 
