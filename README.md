@@ -1,134 +1,300 @@
 # QueenB X AppsFlyer - BeSafe Hackathon 2026
 
-This project template is designed for junior developers aimed at gaining hands-on experience in full-stack development. 
-This project includes a Node.js server with Express and a React client (powered by Vite), providing an opportunity to engage in frontend development, backend development, and API integration.
-Specifically the template is a full-stack MERN application for managing a library of rubber ducks - but you can modify it and build a library application of your choice.
+**BeSafe** is an interactive 3D educational cybersecurity game designed to teach digital safety and online security concepts to younger audiences through engaging gameplay. Players control a customizable robot avatar in a vibrant cyberpunk world and complete missions that teach password security, privacy protection, and general digital safety.
 
-## Introduction
-This template includes a simple feature to display a random rubber duck from example READ ONLY database. 
-This feature demonstrates the integration of the frontend with the backend and can be used to test if your setup is working correctly.
+## Features
 
-1. Client:
-   - The home page contains a button labeled `Show Random Duck`.
-   - When clicked, this button sends a request to the backend to fetch a random rubber duck.
-   - The details of the random rubber duck, including its name and image, are displayed on the page.
-2. Backend:
-   - The server has an endpoint `/api/rubberDucks/random` that selects a random rubber duck from the database and returns its details in the response.
-   - The server contains more endpoints, but without corresponding implementation in the client. These endpoints are to set example of more types of requests.
+### Educational Mini-Games
+
+- **Password Room**: Learn password strength principles by evaluating passwords as strong or weak. Players review 10 random passwords and earn a "Golden Key" badge for mastery
+- **Privacy Room**: Understand personal data privacy through AI-powered doll generation. The game uses DALL-E to visualize consequences of sharing personal information publicly
+- **Strength Room**: Test cybersecurity knowledge with an interactive quiz featuring gesture-based controls
+- **Shop Room**: Spend earned coins on robot cosmetics and upgrades with 3D preview
+- **Clothing Room**: Customize your robot avatar with different appearance options
+
+### Game Mechanics
+
+- **3D Lobby World**: Interactive cyberpunk-themed 3D environment built with Three.js
+- **Progression System**: Earn score points, coins, and energy as you complete challenges
+- **Badge System**: Unlock achievements like "Golden Key" and "Privacy Shield"
+- **Mission System**: Story-driven missions with specific objectives
+- **Multiple Input Methods**: Keyboard controls (WASD/Arrow keys) and hand gesture recognition via MediaPipe
+
+### Authentication
+
+- Google OAuth login
+- Ministry of Education authentication option
+- Session persistence with profile pictures
+
+## Technology Stack
+
+### Frontend
+
+- React 19 with Vite
+- Three.js & @react-three/fiber for 3D rendering
+- @react-three/drei and @react-three/postprocessing for visual effects (Bloom, GodRays)
+- @mediapipe/hands for hand gesture recognition
+- @react-oauth/google for authentication
+- React Router for navigation
+- Axios for API communication
+
+### Backend
+
+- Node.js with Express.js 5
+- MySQL database for data persistence
+- OpenAI SDK for DALL-E image generation
+- CORS for cross-origin requests
 
 ## Installation
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/en) 
-  - Version 20.x or higher required (latest LTS recommended)
-- `npm` (will be typically installed automatically when you install Node.js above)
-  -  Version 10.x or higher required (get the latest by running `npm install -g npm@latest --no-optional`)
+- [Node.js](https://nodejs.org/en) version 20.x or higher (latest LTS recommended)
+- npm version 10.x or higher
+- MySQL database server
 
 ### Clone the Repository
-To get started with this project, you need to clone the repository to your local machine. Follow these steps:
-1. Create a project from this repository by clicking on `Use this template` -> `Create a new repository` (more info [here](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)) - only ONCE per project
-1. Clone the new Repository: https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository
+
+1. Clone the repository to your local machine:
+   ```bash
+   git clone <repository-url>
+   cd hakathon
+   ```
+
+### Database Setup
+
+1. Install and start MySQL on your machine
+2. Create a new database for the project:
+   ```sql
+   CREATE DATABASE besafe_db;
+   ```
+3. Create the required tables by running the SQL schema (check `db/` folder for schema files)
+
+Required tables:
+- `users` - stores user accounts, scores, coins, energy, robot customization
+- `passwords` - stores password examples for the Password Room mini-game
+- `dolls` - stores AI-generated dolls from the Privacy Room
 
 ### Server Setup
-1. Navigate to the server directory: `cd server`
-1. Install server dependencies: `npm install`
+
+1. Navigate to the server directory:
+   ```bash
+   cd server
+   ```
+
+2. Install server dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file in the `server` directory with the following variables:
+   ```env
+   PORT=5000
+   CLIENT_URL=http://localhost:5173
+   OPENAI_API_KEY=your_openai_api_key_here
+   DB_HOST=localhost
+   DB_USER=your_mysql_username
+   DB_PASSWORD=your_mysql_password
+   DB_NAME=besafe_db
+   ```
+
+   **Important**: You need a valid OpenAI API key for the Privacy Room doll generation feature to work
 
 ### Client Setup
-1. Navigate to the client directory: `cd ../client`
-1. Install client dependencies: `npm install`
 
-## Configuration
+1. Navigate to the client directory:
+   ```bash
+   cd ../client
+   ```
 
-### Environment Variables
-Environment variables are used to configure your application without hardcoding sensitive information into your code. For this project, you need to set up the following environment variables in `.env` files located both in the `server` directory and `client` directory.
+2. Install client dependencies:
+   ```bash
+   npm install
+   ```
 
-#### Configure the Backend (server)
-
-Make a copy of the `.env.example` file under the `server` folder and name it `.env`. This file contains the following environment variables (you don't need to touch them at this point):
-   - `CLIENT_URL` - this should match the URL of the client, which is what you'll see at the address bar of your browser after running your client (via `npm start`).
-   - `PORT` - This variable defines the port on which your Express server will run. By default, this is set to `5000`, but you can change it to any available port number.
-
-#### Configure the Frontend (client)
-
-Make a copy of the `.env.example` file under the `client` folder and name it `.env`. 
-This file contains the following environment variable (you don't need to touch them at this point):
-
-* `VITE_SERVER_API_URL`: This variable contains the URL of your backend API. It tells your client where to send requests to interact with the server. By default, this should be set to http://localhost:5000/, but you should change it to match your server's actual URL if different (where 5000 is the `PORT` you defined in the server `.env` file above).
+3. Create a `.env` file in the `client` directory:
+   ```env
+   VITE_SERVER_API_URL=http://localhost:5000
+   VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
+   ```
 
 ## Usage
 
-This section explains how to use the application once it’s set up and configured. Follow these steps to interact with both the client and server components of the application.
-
 ### Start the Server
-1. Open a terminal in the root folder of the cloned repository, and navigate to the `server` directory: `cd server`
-1. Start the Express server in development mode: `npm run dev`
-   - By default, the server will run on `http://localhost:5000` (see configuration section above)
+
+1. Open a terminal in the server directory:
+   ```bash
+   cd server
+   npm run dev
+   ```
+
+   The server will run on `http://localhost:5000` by default
 
 ### Run the Client
-1. Open a **new** terminal in the root folder of the cloned repository, and navigate to the `client` directory: `cd client`
 
-2. Run the Frontend Client: `npm run dev`
-   - A new browser window with the client application should open (if you close the tab, you can return to it by navigating to http://localhost:3000/ by default)
+1. Open a new terminal in the client directory:
+   ```bash
+   cd client
+   npm run dev
+   ```
 
-### Test the Application
+   The client will run on `http://localhost:5173` by default
+   A browser window should open automatically
 
-   - Click the `Show Random Duck` button to retrieve a random duck from the database and display its details on the screen.
-   - This feature helps verify that your frontend can communicate with the backend. If you see the random duck's details displayed on the page, your setup is working properly.
-   - You may also use an API client (like [Postman](https://www.postman.com/)) to directly test your API endpoints.
+### Playing the Game
 
-**Please report any issues or provide feedback for further improvements!**
+1. **Login**: Use Google OAuth to sign in or create a new account
+2. **Lobby**: Explore the 3D cyberpunk world using WASD or arrow keys
+3. **Enter Rooms**: Approach room entrances to receive proximity notifications, then enter to play mini-games
+4. **Complete Challenges**:
+   - Password Room: Classify 10 passwords as strong or weak
+   - Privacy Room: Create dolls and learn about privacy settings
+   - Strength Room: Answer cybersecurity quiz questions
+5. **Earn Rewards**: Gain points, coins, and badges
+6. **Customize**: Visit the Shop to purchase robot cosmetics with your earned coins
 
-### Stopping the Servers
+### Controls
 
-- **Stop the Express Server**: In the terminal where the server is running, press `Ctrl + C` to stop the server.
-- **Stop the React Client**: In the terminal where the client is running, press `Ctrl + C` to stop the client.
+- **WASD** or **Arrow Keys**: Move robot
+- **Space**: Jump
+- **Hand Gestures**: Alternative control method (requires webcam)
+  - Forward gesture: Move forward
+  - Back gesture: Move backward
+  - Left/Right gestures: Turn
+  - "I love you" gesture: Exit
 
-### Troubleshooting
+### Stopping the Application
 
-Ensure backend and frontend configurations (`.env` files) are correct.
-
-- **Server Issues**:
-  - Ensure that the React development server is running and that you have no conflicting applications using port 3000.
-  - Check the terminal for error messages 
-
-- **Client Issues**:
-  - Check the browser dev tools console for errors if the client is not displaying correctly (recommended: https://reactjs.org/link/react-devtools).
-  - Check the browser dev tools network logs for failed requests
+- **Stop the Express Server**: In the server terminal, press `Ctrl + C`
+- **Stop the React Client**: In the client terminal, press `Ctrl + C`
 
 ## Project Structure
 
 ### Client Directory (`client/`)
-Contains the React (Vite) frontend application.
-- `package.json`: Lists the client-side dependencies and scripts for managing the React application.
-- `.env`: Stores environment variables like the API endpoint URL.
-- `index.html`: Main HTML page hosting all the React components of the application (frontend entry point)
-- `public/`: static assets that do not need to be processed by Vite's build pipeline. These files are copied as-is to the build output directory. In our case, the HTML's favicon.
-- `src/`: Contains the source code for the React application.
-   - `assets/`: assets that are part of the source code and need to be processed by Vite's build pipeline. This includes images, fonts, and other files that might be imported into your JS or CSS files. In our case, the QueenB summer camp logo.
-   - `components/`: Reusable UI components such as buttons, forms, and other elements.
-   - `context/`: Contains the React context for the ducks, responsible for pulling the current duck from the API
-   - `pages/`: Page components that represent different routes in the application.
-   - `services/`: Services for making API calls and handling business logic.
-   - `styles/`: CSS and styling files for the application.
-   - `App.jsx`: The main React component that sets up routing and renders the application.
-   - `index.jsx`: The entry point for the React application, responsible for rendering the App component into the DOM.
-      
-### Server Directory (`server/`)
-Contains the Node.js / Express backend application.
-- `package.json`: Lists the server-side dependencies and scripts for managing the Node.js application.
-- `.env`: Stores environment variables like database connection strings and server port.
-- `server.js`: The main server file that sets up Express, connects to the database, and starts the server (backend entry point).
-- `controllers/`: Contains the logic for handling API requests and responses.
-- `data/`: Contains the initial duck data (readonly database)
-- `images/`: Contains the duck images referenced by the duck data above
-- `routes/`: Defines the API endpoints and maps them to controller functions.
 
-## Best practices & Teamwork
-[Full guide](BestPractices.md)
+```
+client/
+├── src/
+│   ├── game/                    # Main game components
+│   │   ├── GameShell.jsx        # Game container
+│   │   ├── MainGameContainer.jsx # Scene router
+│   │   └── scenes/              # Individual rooms
+│   │       ├── Lobby.jsx
+│   │       ├── PasswordRoom.jsx
+│   │       ├── PrivacyRoom.jsx
+│   │       ├── ShopRoom.jsx
+│   │       ├── StrengthRoom.jsx
+│   │       └── ClothingRoom.jsx
+│   ├── mission/                 # Mission system
+│   │   └── Mission1Page.jsx
+│   ├── features/
+│   │   ├── robot/               # Robot 3D models
+│   │   └── world/               # 3D world environments
+│   │       ├── ThreeDemo.jsx
+│   │       ├── CyberpunkWorld.jsx
+│   │       └── ForestWorld.jsx
+│   ├── context/
+│   │   └── GameContext.jsx      # Global game state
+│   ├── pages/
+│   │   └── Login.jsx            # Login page
+│   ├── hooks/                   # Custom hooks (useKeyboard, useSound, etc.)
+│   ├── components/              # Reusable UI components
+│   ├── styles/                  # CSS modules
+│   ├── App.jsx                  # Root component
+│   └── index.jsx                # Entry point
+└── package.json
+```
+
+### Server Directory (`server/`)
+
+```
+server/
+├── server.js                    # Main server file with all API endpoints
+├── db/
+│   └── db.js                    # MySQL connection pool
+├── routes/                      # Route files (legacy)
+└── package.json
+```
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - Login or create new user
+- `GET /api/users/:userId` - Get user data
+
+### User Management
+- `POST /api/user/update-points-coins` - Update user score, coins, and energy
+
+### Password Game
+- `GET /api/passwords/random/:count` - Get random passwords for evaluation
+- `POST /api/passwords/check` - Check if password strength answer is correct
+
+### Privacy/Doll Generation
+- `POST /api/dolls/generate` - Generate AI doll with DALL-E
+- `GET /api/dolls/:userId` - Get user's doll collection
+- `DELETE /api/dolls/:id` - Delete a doll
+
+### Shop
+- `POST /api/shop/buy-robot` - Purchase robot with coins
+- `POST /api/shop/select-robot` - Equip owned robot
+- `GET /api/shop/robots/:userId` - Get user's robot collection
+
+## Configuration
+
+### Environment Variables
+
+#### Server (`.env`)
+- `PORT` - Server port (default: 5000)
+- `CLIENT_URL` - Frontend URL for CORS (default: http://localhost:5173)
+- `OPENAI_API_KEY` - OpenAI API key for DALL-E image generation
+- `DB_HOST` - MySQL host
+- `DB_USER` - MySQL username
+- `DB_PASSWORD` - MySQL password
+- `DB_NAME` - MySQL database name
+
+#### Client (`.env`)
+- `VITE_SERVER_API_URL` - Backend API URL (default: http://localhost:5000)
+- `VITE_GOOGLE_CLIENT_ID` - Google OAuth client ID
+
+## Troubleshooting
+
+### Database Issues
+- Ensure MySQL is running on your machine
+- Verify database credentials in server `.env` file
+- Check that all required tables are created with correct schema
+
+### OpenAI API Issues
+- If DALL-E fails, the app will use placeholder images
+- Verify your OpenAI API key is valid and has credits
+- Check console logs for specific error messages
+
+### Server Issues
+- Ensure no other application is using port 5000
+- Check server console for error messages
+- Verify all environment variables are set correctly
+
+### Client Issues
+- Check browser console (F12) for errors
+- Verify the client can connect to the server API
+- Ensure port 5173 is available
+
+### 3D Performance Issues
+- The game requires a modern GPU for smooth 3D rendering
+- Try reducing browser window size
+- Close other tabs/applications to free up resources
+
+## Best Practices & Teamwork
+
+For team collaboration guidelines, see [BestPractices.md](BestPractices.md)
 
 ## Support
 
-For any issues please contact us via [mail](mailto:queenb.community@gmail.com) or open an issue.
+For any issues, please:
+- Open an issue on the GitHub repository
+- Contact via [mail](mailto:queenb.community@gmail.com)
 
-**Happy Coding! :)**
+## License
+
+This project was created for the QueenB X AppsFlyer - BeSafe Hackathon 2026
+
+**Happy Coding!**
