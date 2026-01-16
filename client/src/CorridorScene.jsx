@@ -50,7 +50,6 @@ export default function CorridorScene({ text }) {
           letterSpacing: 0.2,
         }}
       >
-        {/* הטקסט הדינמי המועבר מה-ThreeDemo (למשל: "starting Mission 1") */}
         {text}
       </div>
     </div>

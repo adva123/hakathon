@@ -10,6 +10,7 @@ export function useKeyboard() {
     KeyS: false,
     KeyA: false,
     KeyD: false,
+    Space: false,
   });
 
   useEffect(() => {
