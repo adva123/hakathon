@@ -133,3 +133,5 @@ dist
 .pnp.*
 
 client/.vite/
+
+CLAUDE.md
