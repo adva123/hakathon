@@ -6,6 +6,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { GameProvider } from './context/GameContext';
 import { ThemeProvider } from './context/ThemeContext';
 import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
 import App from './App';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -17,6 +18,22 @@ const AppRouter = () => (
     <ThemeProvider>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route
+          path="/login"
+          element={
+            GOOGLE_CLIENT_ID ? (
+              <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                <GameProvider>
+                  <LoginPage />
+                </GameProvider>
+              </GoogleOAuthProvider>
+            ) : (
+              <GameProvider>
+                <LoginPage />
+              </GameProvider>
+            )
+          }
+        />
         <Route
           path="/game"
           element={
