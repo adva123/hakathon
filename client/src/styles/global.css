@@ -175,4 +175,332 @@ code {
     animation: none;
   }
 }
-  
+
+/* ===== CYBER-FOREST SANCTUARY THEME EXTENSIONS ===== */
+
+/* Enhanced Color Palette for Cyber-Forest Fusion */
+:root {
+  /* Forest-Cyber Accent Colors */
+  --forest-emerald: #00ff9f;
+  --forest-jade: #1de9b6;
+  --cyber-magenta: #ff006e;
+  --cyber-electric: #00f0ff;
+
+  /* Security Motif Colors */
+  --security-shield: #00ffaa;
+  --security-alert: #ff3366;
+  --security-safe: #00cc88;
+
+  /* Portal/Gateway Colors */
+  --portal-cyan: #00f2ff;
+  --portal-purple: #b300ff;
+  --portal-pink: #ff00aa;
+}
+
+:root[data-theme="dark"] {
+  --forest-emerald: #00ff9f;
+  --forest-jade: #1de9b6;
+  --cyber-magenta: #ff006e;
+  --cyber-electric: #00f0ff;
+  --security-shield: #00ffaa;
+  --security-alert: #ff3366;
+  --security-safe: #00cc88;
+  --portal-cyan: #00f2ff;
+  --portal-purple: #b300ff;
+  --portal-pink: #ff00aa;
+}
+
+:root[data-theme="light"] {
+  --forest-emerald: #00cc7f;
+  --forest-jade: #18c9a4;
+  --cyber-magenta: #e6005f;
+  --cyber-electric: #00c7d6;
+  --security-shield: #00dd99;
+  --security-alert: #ff2255;
+  --security-safe: #00b377;
+  --portal-cyan: #00c7d6;
+  --portal-purple: #9900dd;
+  --portal-pink: #dd0088;
+}
+
+/* ===== KEYFRAME ANIMATIONS ===== */
+
+/* Glitch Text Effect */
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+    text-shadow: -2px 0 var(--portal-cyan), 2px 0 var(--portal-pink);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+    text-shadow: 2px -2px var(--portal-cyan), -2px 2px var(--portal-pink);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+    text-shadow: 2px 2px var(--portal-cyan), -2px -2px var(--portal-pink);
+  }
+  60% {
+    transform: translate(2px, 2px);
+    text-shadow: -2px -2px var(--portal-cyan), 2px 2px var(--portal-pink);
+  }
+  80% {
+    transform: translate(2px, -2px);
+    text-shadow: -2px 2px var(--portal-cyan), 2px -2px var(--portal-pink);
+  }
+  100% {
+    transform: translate(0);
+    text-shadow: -2px 0 var(--portal-cyan), 2px 0 var(--portal-pink);
+  }
+}
+
+/* Scanning Line Animation */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* Portal Pulse Glow */
+@keyframes portalPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px var(--portal-cyan),
+      0 0 40px var(--portal-purple),
+      0 0 60px var(--portal-pink),
+      inset 0 0 20px rgba(0, 242, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 40px var(--portal-cyan),
+      0 0 80px var(--portal-purple),
+      0 0 120px var(--portal-pink),
+      inset 0 0 40px rgba(0, 242, 255, 0.4);
+  }
+}
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-20px) rotate(5deg);
+  }
+  66% {
+    transform: translateY(-10px) rotate(-5deg);
+  }
+}
+
+/* Particle Flow */
+@keyframes particleFlow {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(50px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+/* Data Stream */
+@keyframes dataStream {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(200vh);
+    opacity: 0;
+  }
+}
+
+/* Holographic Shimmer */
+@keyframes holoShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Border Gradient Rotation */
+@keyframes borderRotate {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* Ripple Effect */
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Glitch Text */
+.glitchText {
+  position: relative;
+  animation: glitch 0.5s infinite;
+  animation-play-state: paused;
+}
+
+.glitchText:hover {
+  animation-play-state: running;
+}
+
+/* Scanning Line Overlay */
+.scanLine {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanLine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent,
+    var(--portal-cyan),
+    transparent
+  );
+  animation: scan 2s linear infinite;
+  box-shadow: 0 0 10px var(--portal-cyan);
+}
+
+/* Holographic Border */
+.holoBorder {
+  position: relative;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--neo-bg), var(--neo-bg)) padding-box,
+    linear-gradient(135deg,
+      var(--portal-cyan),
+      var(--portal-purple),
+      var(--portal-pink),
+      var(--forest-emerald)
+    ) border-box;
+  animation: borderRotate 3s linear infinite;
+}
+
+/* Portal Glow Effect */
+.portalGlow {
+  animation: portalPulse 3s ease-in-out infinite;
+}
+
+/* Floating Element */
+.floatElement {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Glass Panel with Neon Edge */
+.cyberGlass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid;
+  border-image: linear-gradient(
+    135deg,
+    var(--portal-cyan),
+    var(--portal-purple)
+  ) 1;
+  box-shadow:
+    var(--glass-shadow),
+    0 0 20px rgba(0, 242, 255, 0.1),
+    inset 0 0 20px rgba(0, 242, 255, 0.05);
+}
+
+/* Security Checkpoint Style */
+.checkpoint {
+  position: relative;
+  border: 2px solid var(--security-shield);
+  box-shadow:
+    0 0 20px rgba(0, 255, 170, 0.3),
+    inset 0 0 20px rgba(0, 255, 170, 0.1);
+}
+
+.checkpoint::before,
+.checkpoint::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--security-shield);
+}
+
+.checkpoint::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.checkpoint::after {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Terminal Style */
+.terminal {
+  background: rgba(0, 20, 10, 0.9);
+  border: 1px solid var(--forest-emerald);
+  font-family: var(--font-mono);
+  color: var(--forest-emerald);
+  box-shadow:
+    0 0 30px rgba(0, 255, 159, 0.2),
+    inset 0 0 30px rgba(0, 255, 159, 0.05);
+}
+
+/* Particle Background Helper */
+.particleBg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Accessibility: Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .glitchText,
+  .scanLine::after,
+  .holoBorder,
+  .portalGlow,
+  .floatElement {
+    animation: none !important;
+  }
+
+  .glitchText {
+    text-shadow: -1px 0 var(--portal-cyan), 1px 0 var(--portal-pink);
+  }
+}
