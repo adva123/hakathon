@@ -1,0 +1,280 @@
+/* ===== HOLOGRAPHIC TERMINAL FEATURE CARD ===== */
+/* Cyber-Forest Sanctuary Theme */
+
+.card {
+  position: relative;
+  padding: 36px 28px;
+  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid;
+  border-image: linear-gradient(
+    135deg,
+    var(--portal-cyan),
+    var(--portal-purple),
+    transparent
+  ) 1;
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  cursor: pointer;
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+}
+
+/* Animated Border Gradient */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    var(--portal-cyan),
+    var(--portal-purple),
+    var(--forest-emerald),
+    var(--portal-cyan)
+  );
+  background-size: 300% 300%;
+  animation: borderFlow 4s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+/* Scanning Line Animation */
+.scanLine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--portal-cyan),
+    transparent
+  );
+  box-shadow: 0 0 10px var(--portal-cyan);
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.card:hover .scanLine {
+  animation: scan 2s linear infinite;
+  opacity: 1;
+}
+
+/* Corner Brackets */
+.cornerBrackets div {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--security-shield);
+  opacity: 0;
+  transition: opacity 0.4s, transform 0.4s;
+}
+
+.cornerTL {
+  top: 8px;
+  left: 8px;
+  border-right: none;
+  border-bottom: none;
+  transform: translate(-4px, -4px);
+}
+
+.cornerTR {
+  top: 8px;
+  right: 8px;
+  border-left: none;
+  border-bottom: none;
+  transform: translate(4px, -4px);
+}
+
+.cornerBL {
+  bottom: 8px;
+  left: 8px;
+  border-right: none;
+  border-top: none;
+  transform: translate(-4px, 4px);
+}
+
+.cornerBR {
+  bottom: 8px;
+  right: 8px;
+  border-left: none;
+  border-top: none;
+  transform: translate(4px, 4px);
+}
+
+.card:hover .cornerBrackets div {
+  opacity: 0.6;
+  transform: translate(0, 0);
+}
+
+/* Icon Wrapper */
+.iconWrapper {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--portal-cyan), var(--portal-purple));
+  padding: 16px;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  z-index: 1;
+}
+
+.iconWrapper svg {
+  width: 100%;
+  height: 100%;
+  color: white;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  transition: transform 0.4s;
+}
+
+.card:hover .iconWrapper {
+  transform: translateY(-8px) scale(1.1);
+  box-shadow:
+    0 0 30px rgba(0, 242, 255, 0.5),
+    0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.card:hover .iconWrapper svg {
+  transform: rotate(5deg);
+}
+
+/* Title */
+.title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--neo-text);
+  margin: 0 0 16px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+  transition: color 0.3s;
+}
+
+.card:hover .title {
+  background: linear-gradient(135deg, var(--portal-cyan), var(--forest-emerald));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Description */
+.description {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--neo-text-dim);
+  line-height: 1.7;
+  margin: 0;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* Interactive Spotlight Effect */
+.spotlight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    600px circle at var(--mouse-x) var(--mouse-y),
+    rgba(0, 242, 255, 0.1),
+    transparent 40%
+  );
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.card:hover .spotlight {
+  opacity: 1;
+}
+
+/* Hover Animation */
+.card:hover {
+  transform: translateY(-12px) scale(1.02);
+  box-shadow:
+    0 0 40px rgba(0, 242, 255, 0.3),
+    0 0 80px rgba(112, 0, 255, 0.2),
+    0 30px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Staggered Entrance Animation */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(60px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card {
+  animation: cardEntrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--index) * 0.1s);
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .scanLine,
+  .card::before,
+  .iconWrapper,
+  .iconWrapper svg {
+    animation: none !important;
+    transition-duration: 0.1s;
+  }
+
+  .card:hover {
+    transform: translateY(-6px);
+  }
+
+  .card:hover .iconWrapper {
+    transform: translateY(-4px) scale(1.05);
+  }
+
+  .card:hover .iconWrapper svg {
+    transform: none;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .card {
+    padding: 28px 24px;
+  }
+
+  .iconWrapper {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 16px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .description {
+    font-size: 14px;
+  }
+}

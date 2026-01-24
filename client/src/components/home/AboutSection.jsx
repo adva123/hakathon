@@ -1,10 +1,12 @@
 import { useRef, useEffect } from 'react';
 import anime from 'animejs';
+import FeatureCard from './FeatureCard';
 import styles from './AboutSection.module.css';
 
 export default function AboutSection() {
   const sectionRef = useRef(null);
   const titleRef = useRef(null);
+  const introRef = useRef(null);
   const cardsRef = useRef(null);
   const hasAnimated = useRef(false);
 
@@ -15,6 +17,7 @@ export default function AboutSection() {
           if (entry.isIntersecting && !hasAnimated.current) {
             hasAnimated.current = true;
 
+            // Animate title
             anime({
               targets: titleRef.current,
               translateY: [40, 0],
@@ -23,12 +26,22 @@ export default function AboutSection() {
               easing: 'easeOutExpo',
             });
 
+            // Animate intro text
             anime({
-              targets: cardsRef.current?.children,
-              translateY: [60, 0],
+              targets: introRef.current,
+              translateY: [30, 0],
               opacity: [0, 1],
               duration: 800,
-              delay: anime.stagger(150),
+              delay: 200,
+              easing: 'easeOutExpo',
+            });
+
+            // Cards will animate via CSS with stagger
+            anime({
+              targets: cardsRef.current,
+              opacity: [0, 1],
+              duration: 600,
+              delay: 400,
               easing: 'easeOutExpo',
             });
 
@@ -81,25 +94,30 @@ export default function AboutSection() {
 
   return (
     <section ref={sectionRef} className={styles.aboutSection} id="about">
+      {/* Forest Silhouette Background */}
+      <div className={styles.forestBackground}></div>
+      <div className={styles.circuitPattern}></div>
+
       <div className={styles.container}>
         <h2 ref={titleRef} className={styles.sectionTitle}>
-          What is SafeForest?
+          What is <span className={styles.titleHighlight}>SafeForest</span>?
         </h2>
 
-        <p className={styles.intro}>
-          SafeForest is an immersive cybersecurity education game that transforms
-          complex security concepts into engaging, interactive challenges. Learn to
-          protect yourself in the digital world while playing through a cyberpunk
-          adventure.
+        <p ref={introRef} className={styles.intro}>
+          SafeForest is a <strong>digital forest sanctuary</strong> where cybersecurity education
+          meets immersive gameplay. Transform complex security concepts into engaging challenges
+          while exploring a world where technology and nature harmoniously blend.
         </p>
 
         <div ref={cardsRef} className={styles.featuresGrid}>
           {features.map((feature, index) => (
-            <div key={index} className={styles.featureCard}>
-              <div className={styles.icon}>{feature.icon}</div>
-              <h3 className={styles.featureTitle}>{feature.title}</h3>
-              <p className={styles.featureDescription}>{feature.description}</p>
-            </div>
+            <FeatureCard
+              key={index}
+              icon={feature.icon}
+              title={feature.title}
+              description={feature.description}
+              index={index}
+            />
           ))}
         </div>
       </div>
