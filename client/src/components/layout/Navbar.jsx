@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import anime from 'animejs';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,6 +10,7 @@ export default function Navbar() {
   const location = useLocation();
   const navRef = useRef(null);
   const hasAnimated = useRef(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const isGamePage = location.pathname === '/game';
   const isLoginPage = location.pathname === '/login';
@@ -25,6 +26,15 @@ export default function Navbar() {
       duration: 800,
       easing: 'easeOutExpo',
     });
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleTryThis = () => {
@@ -59,7 +69,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav ref={navRef} className={styles.navbar}>
+    <nav ref={navRef} className={`${styles.navbar} ${scrolled ? styles.scrolled : ''}`}>
       <div className={styles.logo} onClick={scrollToTop} style={{ cursor: 'pointer' }}>
         <span className={styles.logoText}>SafeForest</span>
       </div>
@@ -67,6 +77,7 @@ export default function Navbar() {
       {!isGamePage && !isLoginPage && (
         <div className={styles.navLinks}>
           <a href="#about" className={styles.navLink}>About</a>
+          <a href="#learning-paths" className={styles.navLink}>Learning Paths</a>
           <a href="#demo" className={styles.navLink}>Demo</a>
           <a href="#contact" className={styles.navLink}>Contact</a>
         </div>

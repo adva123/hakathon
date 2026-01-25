@@ -1,0 +1,220 @@
+.featuresShowcase {
+  position: relative;
+  padding: var(--space-3xl) var(--space-md);
+  background: var(--section-bg-alt);
+  overflow: hidden;
+}
+
+.container {
+  max-width: var(--container-xl);
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: var(--space-3xl);
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s ease;
+}
+
+.featuresShowcase.visible .header {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.heading {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 900;
+  color: var(--neo-text);
+  margin: 0 0 var(--space-md);
+  letter-spacing: -1px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--neo-cyan), var(--neo-purple));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subheading {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 500;
+  color: var(--neo-text-dim);
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.featuresGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xl);
+}
+
+.feature {
+  display: flex;
+  gap: var(--space-2xl);
+  align-items: center;
+  opacity: 0;
+  transform: translateX(-50px);
+  transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.featuresShowcase.visible .feature {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.feature.reverse {
+  flex-direction: row-reverse;
+  transform: translateX(50px);
+}
+
+.featuresShowcase.visible .feature.reverse {
+  transform: translateX(0);
+}
+
+.featureVisual {
+  flex: 1 1 400px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.iconWrapper {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  border: 2px solid var(--glass-border);
+  border-radius: 24px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--glass-shadow);
+}
+
+.iconWrapper::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 24px;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--feature-color), transparent);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.feature:hover .iconWrapper::before {
+  opacity: 1;
+}
+
+.featureIcon {
+  font-size: 80px;
+  filter: drop-shadow(0 0 20px var(--feature-color));
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.feature:hover .iconWrapper {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow:
+    0 20px 60px rgba(0, 242, 255, 0.3),
+    0 20px 60px rgba(112, 0, 255, 0.2);
+}
+
+.feature:hover .featureIcon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.featureContent {
+  flex: 1 1 400px;
+}
+
+.featureTitle {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 800;
+  color: var(--neo-text);
+  margin: 0 0 var(--space-md);
+  letter-spacing: -0.5px;
+}
+
+.featureDescription {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(15px, 1.5vw, 18px);
+  font-weight: 400;
+  color: var(--neo-text-dim);
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .feature,
+  .feature.reverse {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--space-xl);
+  }
+
+  .featureVisual {
+    min-height: auto;
+  }
+
+  .iconWrapper {
+    width: 160px;
+    height: 160px;
+  }
+
+  .featureIcon {
+    font-size: 64px;
+  }
+}
+
+@media (max-width: 768px) {
+  .featuresShowcase {
+    padding: var(--space-2xl) var(--space-md);
+  }
+
+  .header {
+    margin-bottom: var(--space-2xl);
+  }
+
+  .featuresGrid {
+    gap: var(--space-2xl);
+  }
+
+  .iconWrapper {
+    width: 140px;
+    height: 140px;
+  }
+
+  .featureIcon {
+    font-size: 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature {
+    transition: opacity 0.3s ease;
+  }
+
+  .feature:hover .iconWrapper {
+    transform: scale(1.02);
+  }
+
+  .feature:hover .featureIcon {
+    transform: scale(1.05);
+  }
+}

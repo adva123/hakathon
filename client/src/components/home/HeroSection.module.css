@@ -34,7 +34,7 @@
   z-index: 0;
   transition: opacity 0.5s ease;
   mix-blend-mode: screen;
-  opacity: 0.6;
+  opacity: 0.3;
 }
 
 .gradientWrapper canvas {
@@ -111,6 +111,19 @@
   width: 100%;
 }
 
+/* Eyebrow Text */
+.eyebrow {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--portal-cyan);
+  margin-bottom: 24px;
+  opacity: 0.9;
+  text-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+}
+
 /* Main Title */
 .title {
   font-family: 'Orbitron', sans-serif;
@@ -162,7 +175,8 @@
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  padding: 20px 48px;
+  padding: 0 48px;
+  height: 60px;
   border-radius: 999px;
   border: none;
   background: linear-gradient(135deg, var(--portal-cyan), var(--portal-purple));
@@ -180,6 +194,7 @@
     0 0 40px rgba(0, 242, 255, 0.5),
     0 0 60px rgba(112, 0, 255, 0.4),
     0 20px 40px rgba(0, 0, 0, 0.3);
+  animation: ctaGlow 2s ease-in-out infinite;
 }
 
 /* Ripple Effect on Button */
@@ -263,12 +278,97 @@
 .particle:nth-child(9) { left: 85%; animation-delay: 4.5s; }
 .particle:nth-child(10) { left: 95%; animation-delay: 1.5s; background: var(--forest-emerald); }
 
+/* Scroll Down Indicator */
+.scrollIndicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+
+.scrollMouse {
+  width: 28px;
+  height: 44px;
+  border: 2px solid var(--portal-cyan);
+  border-radius: 14px;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+}
+
+.scrollWheel {
+  width: 4px;
+  height: 8px;
+  background: var(--portal-cyan);
+  border-radius: 2px;
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: scrollWheel 1.5s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--portal-cyan);
+}
+
+.scrollText {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--neo-text-dim);
+  opacity: 0.8;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes scrollBounce {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+@keyframes scrollWheel {
+  0% {
+    opacity: 1;
+    top: 8px;
+  }
+  100% {
+    opacity: 0;
+    top: 24px;
+  }
+}
+
+@keyframes ctaGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 40px rgba(0, 242, 255, 0.5),
+      0 0 60px rgba(112, 0, 255, 0.4),
+      0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 60px rgba(0, 242, 255, 0.7),
+      0 0 80px rgba(112, 0, 255, 0.6),
+      0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+}
+
 /* Accessibility: Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .floatingIcon,
   .glitch,
+  .ctaButton,
   .ctaButton::after,
-  .particle {
+  .particle,
+  .scrollIndicator,
+  .scrollWheel {
     animation: none !important;
   }
 
@@ -317,11 +417,16 @@
 
   .ctaButton {
     font-size: 16px;
-    padding: 16px 32px;
+    height: 52px;
+    padding: 0 32px;
     gap: 10px;
   }
 
   .particle {
+    display: none;
+  }
+
+  .scrollIndicator {
     display: none;
   }
 }
