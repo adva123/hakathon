@@ -128,11 +128,13 @@ export default function HeroSection() {
 
       {/* Content Overlay */}
       <div className={styles.content}>
+        <div className={styles.eyebrow}>CYBERSECURITY EDUCATION</div>
+
         <h1 ref={titleRef} className={styles.title}>
-          Learn{' '}
-          <span className={styles.highlight}>Cybersecurity</span>
+          Master{' '}
+          <span className={styles.highlight}>Digital Security</span>
           <br />
-          Through Play
+          Through Immersive Play
         </h1>
 
         <p ref={subtitleRef} className={styles.subtitle}>
@@ -144,6 +146,14 @@ export default function HeroSection() {
           Start Your Journey
           <span className={styles.ctaArrow}>→</span>
         </button>
+      </div>
+
+      {/* Scroll Down Indicator */}
+      <div className={styles.scrollIndicator}>
+        <div className={styles.scrollMouse}>
+          <div className={styles.scrollWheel}></div>
+        </div>
+        <span className={styles.scrollText}>Scroll to explore</span>
       </div>
     </section>
   );
