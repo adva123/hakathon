@@ -134,4 +134,5 @@ dist
 
 client/.vite/
 
+# Claude code
 CLAUDE.md

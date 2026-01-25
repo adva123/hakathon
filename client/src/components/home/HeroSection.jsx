@@ -68,6 +68,9 @@ export default function HeroSection() {
     });
   };
 
+  // Security icons for floating effect
+  const securityIcons = ['🔐', '🛡️', '🔑', '🔒', '⚡', '🌲'];
+
   return (
     <section className={styles.hero}>
       {/* Video Background */}
@@ -97,17 +100,44 @@ export default function HeroSection() {
         </ShaderGradientCanvas>
       </div>
 
+      {/* Floating Security Icons Layer */}
+      <div className={styles.floatingIcons}>
+        {securityIcons.map((icon, index) => (
+          <div
+            key={index}
+            className={styles.floatingIcon}
+            style={{
+              color: index % 2 === 0
+                ? 'var(--portal-cyan)'
+                : index % 3 === 0
+                  ? 'var(--forest-emerald)'
+                  : 'var(--portal-purple)'
+            }}
+          >
+            {icon}
+          </div>
+        ))}
+      </div>
+
+      {/* Particle Effect Layer */}
+      <div className={styles.particleLayer}>
+        {[...Array(10)].map((_, i) => (
+          <div key={i} className={styles.particle} />
+        ))}
+      </div>
+
       {/* Content Overlay */}
       <div className={styles.content}>
         <h1 ref={titleRef} className={styles.title}>
-          Learn <span className={styles.highlight}>Cybersecurity</span>
+          Learn{' '}
+          <span className={styles.highlight}>Cybersecurity</span>
           <br />
           Through Play
         </h1>
 
         <p ref={subtitleRef} className={styles.subtitle}>
           Master password security, privacy protection, and digital safety in an
-          immersive 3D game world with gesture controls.
+          immersive 3D game world with gesture controls and AI companions.
         </p>
 
         <button ref={ctaRef} className={styles.ctaButton} onClick={handleCtaClick}>
