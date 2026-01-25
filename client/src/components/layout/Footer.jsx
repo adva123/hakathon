@@ -1,9 +1,18 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import styles from './Footer.module.css';
 
 export default function Footer() {
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
+  const [email, setEmail] = useState('');
+
+  const handleNewsletterSubmit = (e) => {
+    e.preventDefault();
+    // TODO: Implement newsletter signup
+    console.log('Newsletter signup:', email);
+    setEmail('');
+  };
 
   return (
     <footer className={styles.footer} id="contact">
@@ -14,6 +23,24 @@ export default function Footer() {
             <p className={styles.tagline}>
               Learn cybersecurity through immersive gameplay
             </p>
+
+            {/* Newsletter Signup */}
+            <form className={styles.newsletter} onSubmit={handleNewsletterSubmit}>
+              <h4 className={styles.newsletterHeading}>Stay Updated</h4>
+              <div className={styles.newsletterInput}>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={styles.emailInput}
+                  required
+                />
+                <button type="submit" className={styles.subscribeBtn}>
+                  Subscribe
+                </button>
+              </div>
+            </form>
           </div>
 
           <div className={styles.links}>

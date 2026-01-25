@@ -29,6 +29,22 @@
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.navbar.scrolled {
+  background: rgba(10, 14, 26, 0.85);
+  box-shadow:
+    0 8px 40px rgba(0, 242, 255, 0.2),
+    0 8px 40px rgba(112, 0, 255, 0.15),
+    inset 0 1px 0 rgba(0, 242, 255, 0.25);
+  border-image: linear-gradient(
+    90deg,
+    var(--neo-cyan),
+    var(--neo-purple),
+    #ff0055,
+    var(--forest-emerald),
+    #00f2ff
+  );
+}
+
 .navbar:hover {
   background: rgba(10, 14, 26, 0.65);
   box-shadow:
@@ -345,14 +361,17 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 2px;
   background: linear-gradient(135deg, var(--neo-cyan), var(--neo-purple), #ff0055);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
   mask-composite: exclude;
+  -webkit-mask-composite: xor;
   opacity: 0.6;
   animation: borderRotate 4s linear infinite;
 }
