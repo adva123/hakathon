@@ -1,0 +1,116 @@
+.testimonialCard {
+  position: relative;
+  padding: var(--space-lg);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--glass-shadow);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 280px;
+}
+
+.testimonialCard:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 20px 60px rgba(0, 242, 255, 0.25),
+    0 20px 60px rgba(112, 0, 255, 0.15);
+  border-color: var(--neo-cyan);
+}
+
+.rating {
+  display: flex;
+  gap: 4px;
+}
+
+.star {
+  color: var(--star-gold);
+  font-size: 18px;
+  filter: drop-shadow(0 0 8px var(--star-gold));
+}
+
+.quote {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(15px, 1.5vw, 17px);
+  font-weight: 500;
+  color: var(--neo-text);
+  line-height: 1.7;
+  margin: 0;
+  flex: 1;
+  font-style: italic;
+}
+
+.author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--neo-border);
+}
+
+.avatarWrapper {
+  position: relative;
+  padding: 3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neo-cyan), var(--neo-purple));
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: var(--neo-bg);
+  border: 2px solid var(--neo-bg);
+}
+
+.authorInfo {
+  flex: 1;
+}
+
+.authorName {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--neo-text);
+  margin-bottom: 2px;
+}
+
+.authorTitle {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--neo-text-dim);
+}
+
+@media (max-width: 480px) {
+  .testimonialCard {
+    padding: var(--space-md);
+    min-height: 260px;
+  }
+
+  .quote {
+    font-size: 15px;
+  }
+
+  .authorName {
+    font-size: 14px;
+  }
+
+  .authorTitle {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .testimonialCard:hover {
+    transform: translateY(-3px);
+  }
+}

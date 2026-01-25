@@ -1,0 +1,109 @@
+.testimonialsSection {
+  position: relative;
+  padding: var(--space-3xl) var(--space-md);
+  background: var(--neo-bg);
+  overflow: hidden;
+}
+
+.container {
+  max-width: var(--container-xl);
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: var(--space-2xl);
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.8s ease;
+}
+
+.testimonialsSection.visible .header {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.heading {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 900;
+  color: var(--neo-text);
+  margin: 0 0 var(--space-md);
+  letter-spacing: -1px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--neo-cyan), var(--neo-purple));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subheading {
+  font-family: 'Fredoka', sans-serif;
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 500;
+  color: var(--neo-text-dim);
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.testimonialsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-lg);
+}
+
+.gridItem {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.testimonialsSection.visible .gridItem {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Mobile: Horizontal Scroll */
+@media (max-width: 768px) {
+  .testimonialsSection {
+    padding: var(--space-2xl) var(--space-md);
+  }
+
+  .header {
+    margin-bottom: var(--space-xl);
+  }
+
+  .testimonialsGrid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: var(--space-md);
+    padding: var(--space-sm) 0;
+  }
+
+  .testimonialsGrid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gridItem {
+    flex-shrink: 0;
+    scroll-snap-align: center;
+    width: 85vw;
+    max-width: 400px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gridItem {
+    width: 90vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gridItem {
+    transition: opacity 0.3s ease;
+  }
+}
