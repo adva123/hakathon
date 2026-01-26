@@ -11,10 +11,8 @@ const Login = ({ onClose, onLoginSuccess }) => {
     const navigate = useNavigate();
     const { handleLogin } = useContext(GameContext);
 
-    // Check if Google OAuth is available
     const hasGoogleAuth = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
-    // Always call the hook, but conditionally use it
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             try {
@@ -38,16 +36,13 @@ const Login = ({ onClose, onLoginSuccess }) => {
                     const userData = serverResponse.data.user;
                     const googlePicture = userInfo.data.picture;
 
-                    // Store user picture in localStorage
                     if (googlePicture) {
                         localStorage.setItem('userPicture', googlePicture);
                     }
 
-                    // Call onLoginSuccess if provided (for backward compatibility)
                     if (onLoginSuccess) {
                         onLoginSuccess(userData, googlePicture);
                     } else {
-                        // Otherwise, handle login directly
                         handleLogin(userData);
                     }
 
@@ -58,7 +53,6 @@ const Login = ({ onClose, onLoginSuccess }) => {
                         if (onClose) {
                             onClose();
                         } else {
-                            // Redirect to game page
                             navigate('/game');
                         }
                     }, 1000);
@@ -117,11 +111,9 @@ const Login = ({ onClose, onLoginSuccess }) => {
 
         console.log('🎮 Guest login:', guestUser);
 
-        // Call onLoginSuccess if provided (for backward compatibility)
         if (onLoginSuccess) {
             onLoginSuccess(guestUser, '');
         } else {
-            // Otherwise, handle login directly
             handleLogin(guestUser);
         }
 
@@ -130,7 +122,6 @@ const Login = ({ onClose, onLoginSuccess }) => {
             if (onClose) {
                 onClose();
             } else {
-                // Redirect to game page
                 navigate('/game');
             }
         }, 1000);
@@ -138,16 +129,13 @@ const Login = ({ onClose, onLoginSuccess }) => {
 
     return (
         <div className={styles.loginContainer}>
-            {/* LEFT SIDE: Visual Branding */}
             <div className={styles.visualSide}>
-                {/* Animated gradient background */}
                 <div className={styles.floatingShapes}>
                     <div className={styles.shape}></div>
                     <div className={styles.shape}></div>
                     <div className={styles.shape}></div>
                 </div>
 
-                {/* Branding Content */}
                 <div className={styles.brandingContent}>
                     <h1 className={styles.brandLogo}>SafeForest</h1>
                     <p className={styles.brandTagline}>Your Cybersecurity Sanctuary</p>
@@ -158,7 +146,6 @@ const Login = ({ onClose, onLoginSuccess }) => {
                 </div>
             </div>
 
-            {/* RIGHT SIDE: Login Form */}
             <div className={styles.formSide}>
                 <div className={styles.formContainer}>
                     {onClose && (

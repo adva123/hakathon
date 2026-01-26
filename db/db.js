@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// טעינת ה-env מהתיקייה שמעל (server)
 dotenv.config({ path: path.resolve(__dirname, '../server/.env') });
 
 console.log("--- DB Connection Test ---");
