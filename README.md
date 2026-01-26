@@ -1,4 +1,4 @@
-# SafeForest - BeSafe Hackathon 2026 🏆 2nd Place Winner
+# BeSafe Hackathon 2026 🏆 2nd Place Winner
 ## QueenB X AppsFlyer - BeSafe Hackathon 2026
 ### SafeForest - Cybersecurity Education Game
 
