@@ -1,4 +1,3 @@
-/* App.module.css */
 .appWrap {
   position: relative;
   min-height: 100vh;
@@ -63,7 +62,6 @@
   align-items: center;
   gap: 12px;
 
-  /* רקע זכוכית עדין עם פינות מעוגלות קלות (כמו ב-Side Panel) */
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   padding: 6px 14px;
@@ -73,11 +71,10 @@
 }
 
 .userAvatar {
-  /* תמונה עגולה מושלמת */
   width: 32px;
   height: 32px;
-  border-radius: 50%; /* זה מה שהופך את התמונה לעיגול */
-  border: 2px solid #00f2ff; /* מסגרת ניאון דקה סביב העיגול */
+  border-radius: 50%; 
+  border: 2px solid #00f2ff; 
   object-fit: cover;
   display: block;
 }
