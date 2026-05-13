@@ -7,9 +7,9 @@ SafeForest helps young users learn about online safety through interactive gamep
 
 Built as part of the QueenB x AppsFlyer BeSafe Hackathon 2026, where the project reached the finals and won 2nd place.
 
-## Demo
+## 
 
-Add demo video, screenshots, or presentation link here.
+<img src="demo.gif" width="700" alt="Project demo">
 
 ## How it works
 
