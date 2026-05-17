@@ -69,55 +69,6 @@ flowchart LR
     H --> I["Update UI"]
 ```
 
-## Main flows
-
-### Login flow
-
-```mermaid
-flowchart TD
-    A["User clicks login"] --> B["Google OAuth"]
-    B --> C["Client receives user details"]
-    C --> D["POST /api/auth/login"]
-    D --> E["Server checks user in MySQL"]
-    E --> F{"User exists?"}
-    F -->|Yes| G["Return existing user"]
-    F -->|No| H["Create new user<br/>score: 0, coins: 50, energy: 100"]
-    H --> G
-    G --> I["Store user in GameContext"]
-    I --> J["Save session in localStorage"]
-```
-
-### Game progress flow
-
-```mermaid
-flowchart TD
-    A["Player completes challenge"] --> B{"Answer correct?"}
-    B -->|Yes| C["Increase score and coins"]
-    B -->|No| D["Decrease energy"]
-    C --> E["Send update to server"]
-    D --> E
-    E --> F["Update user data in MySQL"]
-    F --> G["Return updated state"]
-    G --> H["Update GameContext"]
-    H --> I["Refresh game UI"]
-```
-
-### AI doll generation flow
-
-```mermaid
-flowchart TD
-    A["User writes doll description"] --> B["POST /api/dolls/generate"]
-    B --> C["Server receives request"]
-    C --> D["Try OpenAI DALL-E 3"]
-    D --> E{"OpenAI available?"}
-    E -->|Yes| F["Generate image with OpenAI"]
-    E -->|No| G["Use Pollinations.ai fallback"]
-    F --> H["Save doll in MySQL"]
-    G --> H
-    H --> I["Return doll to client"]
-    I --> J["Display doll in Privacy Room"]
-```
-
 ## Stack
 
 ### Frontend
